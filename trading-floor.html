@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Floor — The Economic Forum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0f1f3d; --navy-light: #1a2e52;
+    --gold: #c9a84c; --gold-light: #e2c47a;
+    --cream: #f5f0e8; --cream-dark: #ede7d9;
+    --text-dark: #0f1f3d; --text-muted: #6b7280;
+    --sidebar-width: 195px;
+    --green: #16a34a; --green-bg: #f0fdf4; --green-border: #bbf7d0;
+    --red: #dc2626; --red-bg: #fff1f2; --red-border: #fecdd3;
+  }
+  body { font-family: 'Crimson Pro', Georgia, serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; display: flex; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-width); background: var(--navy); min-height: 100vh; position: fixed; top:0; left:0; display:flex; flex-direction:column; z-index:100; }
+  .sidebar-logo { display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
+  .logo-icon { width:36px; height:36px; background:var(--gold); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; color:var(--navy); flex-shrink:0; }
+  .logo-text { display:flex; flex-direction:column; line-height:1.1; }
+  .logo-text .top { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:#fff; letter-spacing:0.05em; }
+  .logo-text .bot { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:var(--gold); letter-spacing:0.05em; }
+  .sidebar-nav { flex:1; padding:20px 0; overflow-y:auto; }
+  .nav-section-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; color:rgba(255,255,255,0.35); padding:0 16px 8px; margin-top:8px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; color:rgba(255,255,255,0.65); font-family:'Crimson Pro',serif; font-size:14px; cursor:pointer; transition:all 0.15s; border-left:2px solid transparent; text-decoration:none; }
+  .nav-item:hover { color:#fff; background:rgba(255,255,255,0.05); }
+  .nav-item.active { color:#fff; background:rgba(255,255,255,0.08); border-left-color:var(--gold); }
+  .nav-icon { width:16px; height:16px; opacity:0.7; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .nav-item.active .nav-icon { opacity:1; }
+  .sidebar-footer { padding:14px 16px; border-top:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between; }
+  .user-info { display:flex; align-items:center; gap:8px; }
+  .avatar { width:30px; height:30px; border-radius:50%; background:var(--navy-light); border:1px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:11px; color:rgba(255,255,255,0.7); font-family:'Space Mono',monospace; }
+  .user-name { font-size:13px; color:rgba(255,255,255,0.8); line-height:1.2; }
+  .user-role { font-size:10px; color:rgba(255,255,255,0.4); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
+  .logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.4); padding:4px; transition:color 0.15s; }
+  .logout-btn:hover { color:rgba(255,255,255,0.7); }
+
+  /* MAIN */
+  .main { margin-left:var(--sidebar-width); flex:1; display:flex; flex-direction:column; min-height:100vh; }
+
+  /* PAGE HEADER */
+  .page-header {
+    padding: 48px 64px 36px;
+    background: var(--cream);
+    border-bottom: 1px solid #ddd;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before {
+    content:'';
+    position:absolute; top:-20px; right:-20px;
+    width:420px; height:160px;
+    background-image:
+      repeating-linear-gradient(0deg,rgba(201,168,76,0.08) 0px,rgba(201,168,76,0.08) 1px,transparent 1px,transparent 40px),
+      repeating-linear-gradient(90deg,rgba(201,168,76,0.08) 0px,rgba(201,168,76,0.08) 1px,transparent 1px,transparent 40px);
+    pointer-events:none;
+  }
+  .page-header h1 { font-family:'Playfair Display',serif; font-size:40px; font-weight:900; color:var(--navy); margin-bottom:8px; }
+  .page-header .subtitle { font-size:16px; color:var(--text-muted); font-weight:300; margin-bottom:14px; }
+  .header-rule { width:40px; height:2px; background:var(--gold); border-radius:2px; }
+
+  /* CONTENT */
+  .content { padding: 40px 64px 60px; }
+
+  /* QUIZ CARD */
+  .quiz-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    max-width: 680px;
+    margin: 0 auto 40px;
+    overflow: hidden;
+  }
+
+  .quiz-header {
+    padding: 18px 24px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .quiz-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .quiz-score {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+  }
+
+  .progress-bar {
+    height: 3px;
+    background: #f3f4f6;
+    margin: 12px 24px 0;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .quiz-question {
+    padding: 24px 24px 20px;
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.45;
+  }
+
+  .quiz-options { padding: 0 24px 6px; display: flex; flex-direction: column; gap: 10px; }
+
+  .option-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: border-color 0.15s, background 0.15s;
+    font-family: 'Crimson Pro', serif;
+    font-size: 16px;
+    color: var(--navy);
+  }
+  .option-btn:hover:not(:disabled) { border-color: var(--navy); background: #f9f8f6; }
+  .option-btn:disabled { cursor: default; }
+
+  .option-btn.correct { border-color: var(--green-border); background: var(--green-bg); color: var(--green); }
+  .option-btn.wrong   { border-color: var(--red-border);   background: var(--red-bg);   color: var(--red);   }
+  .option-btn.dimmed  { border-color: #f0f0ee; color: #bbb; background: #fafaf8; }
+
+  .option-letter {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid #d1d5db;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .option-btn.correct .option-letter { border-color: var(--green); color: var(--green); }
+  .option-btn.wrong   .option-letter { border-color: var(--red);   color: var(--red);   }
+  .option-btn.dimmed  .option-letter { border-color: #e5e7eb; color: #ccc; }
+
+  .option-icon { margin-left: auto; flex-shrink: 0; }
+
+  /* EXPLANATION */
+  .explanation-box {
+    margin: 16px 24px;
+    padding: 14px 18px;
+    background: #f9f8f4;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    font-size: 15px;
+    color: #374151;
+    line-height: 1.65;
+    display: none;
+  }
+  .explanation-box.visible { display: block; }
+  .explanation-box strong { color: var(--navy); }
+
+  /* NEXT BUTTON */
+  .quiz-footer {
+    padding: 12px 24px 20px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-next {
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: background 0.2s;
+    display: none;
+  }
+  .btn-next.visible { display: flex; }
+  .btn-next:hover { background: var(--navy-light); }
+
+  /* RESULTS CARD */
+  .results-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    max-width: 680px;
+    margin: 0 auto 40px;
+    padding: 48px 40px;
+    text-align: center;
+    display: none;
+  }
+  .results-card.visible { display: block; }
+
+  .results-icon { font-size: 48px; margin-bottom: 16px; }
+  .results-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; color: var(--navy); margin-bottom: 8px; }
+  .results-score { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--gold); margin-bottom: 20px; letter-spacing: 0.08em; }
+  .results-message { font-size: 17px; color: #4b5563; font-weight: 300; line-height: 1.65; margin-bottom: 28px; max-width: 420px; margin-left: auto; margin-right: auto; }
+
+  .results-breakdown {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  .breakdown-pill {
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .pill-correct { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .pill-wrong   { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+
+  .countdown-box {
+    background: var(--cream);
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    padding: 16px 24px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .countdown-box strong { font-family: 'Space Mono', monospace; color: var(--navy); font-size: 13px; }
+
+  .btn-restart {
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    padding: 13px 28px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-restart:hover { background: var(--navy-light); }
+
+  /* HOW IT WORKS */
+  .how-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    max-width: 680px;
+    margin: 0 auto 14px;
+  }
+
+  .how-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    max-width: 680px;
+    margin: 0 auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .how-card {
+    padding: 24px 22px;
+    background: #fff;
+    border-right: 1px solid #e5e7eb;
+  }
+  .how-card:last-child { border-right: none; }
+
+  .how-icon { color: var(--gold); margin-bottom: 12px; }
+  .how-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .how-desc  { font-size: 13px; color: #4b5563; line-height: 1.6; font-weight: 300; }
+
+  /* FOOTER */
+  footer { background:var(--cream-dark); border-top:1px solid #ddd; padding:28px 64px; display:flex; align-items:center; justify-content:space-between; margin-top:auto; }
+  .footer-brand .name { font-family:'Space Mono',monospace; font-size:12px; font-weight:700; letter-spacing:0.12em; color:var(--navy); }
+  .footer-brand .sub  { font-size:13px; color:var(--text-muted); margin-top:2px; }
+  .footer-social { display:flex; gap:10px; }
+  .social-btn { width:34px; height:34px; border:1px solid #d1d5db; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--navy); transition:all 0.15s; text-decoration:none; }
+  .social-btn:hover { background:var(--navy); color:#fff; border-color:var(--navy); }
+  .footer-bottom { background:var(--cream-dark); border-top:1px solid #e5e7eb; padding:14px 64px; display:flex; align-items:center; justify-content:space-between; }
+  .footer-copy { font-size:12px; color:var(--text-muted); }
+  .footer-disc { font-family:'Space Mono',monospace; font-size:9px; color:var(--text-muted); border:1px solid #d1d5db; padding:4px 10px; letter-spacing:0.06em; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">TEF</div>
+    <div class="logo-text"><span class="top">THE ECONOMIC</span><span class="bot">FORUM</span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">MAIN</div>
+    <a class="nav-item" href="economic-forum.html">
+      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>The Nexus
+    </a>
+    <a class="nav-item active" href="#">
+      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg></span>Trading Floor
+    </a>
+    <a class="nav-item" href="about-us.html">
+      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>About Us
+    </a>
+    <div class="nav-section-label" style="margin-top:14px;">FORUM SUITE</div>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>The Floor</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>Weekly Feature</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>Perspectives</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>The Academy</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v2"/><path d="M4 22a2 2 0 01-2-2V6a2 2 0 012-2"/></svg></span>The Bulletin</a>
+    <div class="nav-section-label" style="margin-top:14px;">EXEC BOARD</div>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg></span>Admin Panel</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="avatar">KP</div>
+      <div><div class="user-name">Kartikeya Pant</div><div class="user-role">EXEC</div></div>
+    </div>
+    <button class="logout-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-header">
+    <h1>The Trading Floor</h1>
+    <p class="subtitle">Weekly economics games and challenges. Test your knowledge, compete with peers.</p>
+    <div class="header-rule"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- QUIZ CARD -->
+    <div class="quiz-card" id="quizCard">
+      <div class="quiz-header">
+        <span class="quiz-meta" id="questionMeta">QUESTION 1 OF 5</span>
+        <span class="quiz-score" id="scoreDisplay">0 correct</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:20%"></div></div>
+      <div class="quiz-question" id="questionText"></div>
+      <div class="quiz-options" id="optionsContainer"></div>
+      <div class="explanation-box" id="explanationBox"></div>
+      <div class="quiz-footer">
+        <button class="btn-next" id="nextBtn" onclick="nextQuestion()">
+          Next Question &nbsp;→
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTS CARD -->
+    <div class="results-card" id="resultsCard">
+      <div class="results-icon" id="resultsIcon">🏆</div>
+      <div class="results-title" id="resultsTitle">Quiz Complete!</div>
+      <div class="results-score" id="resultsScore"></div>
+      <div class="results-message" id="resultsMessage"></div>
+      <div class="results-breakdown">
+        <div class="breakdown-pill pill-correct" id="correctPill"></div>
+        <div class="breakdown-pill pill-wrong"   id="wrongPill"></div>
+      </div>
+      <div class="countdown-box">
+        New questions drop every <strong>Monday</strong>. Come back next week for a fresh challenge!
+      </div>
+      <button class="btn-restart" onclick="restartQuiz()">Try Again</button>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="how-label">HOW IT WORKS</div>
+    <div class="how-grid">
+      <div class="how-card">
+        <div class="how-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="how-title">New Every Week</div>
+        <div class="how-desc">A fresh economics challenge is released each Monday.</div>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg>
+        </div>
+        <div class="how-title">Test Knowledge</div>
+        <div class="how-desc">Quiz-style games on inflation, markets, trade, and more.</div>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>
+        </div>
+        <div class="how-title">Learn &amp; Compete</div>
+        <div class="how-desc">Sharpen your economic literacy in a fun format.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-brand">
+      <div class="name">THE ECONOMIC FORUM</div>
+      <div class="sub">Watchung Hills Regional High School</div>
+    </div>
+    <div class="footer-social">
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></a>
+    </div>
+  </footer>
+  <div class="footer-bottom">
+    <span class="footer-copy">© 2026 The Economic Forum. All rights reserved.</span>
+    <span class="footer-disc">Not affiliated with WHRHS</span>
+  </div>
+</main>
+
+<script>
+// ── WEEKLY QUESTION BANK ──
+// Questions rotate by ISO week number so a new set appears every Monday.
+const allWeeks = [
+  // Week A
+  [
+    {
+      q: "If the Federal Reserve raises interest rates, what typically happens to consumer borrowing?",
+      options: ["It increases", "It decreases", "No change", "It becomes illegal"],
+      correct: 1,
+      explanation: "Higher interest rates make borrowing more expensive, which typically reduces consumer borrowing."
+    },
+    {
+      q: "What does GDP stand for?",
+      options: ["Gross Domestic Product", "General Demand Price", "Government Deficit Percentage", "Global Distribution Protocol"],
+      correct: 0,
+      explanation: "GDP — Gross Domestic Product — measures the total monetary value of all goods and services produced within a country in a given time period."
+    },
+    {
+      q: "When inflation rises faster than wages, what happens to workers' purchasing power?",
+      options: ["It increases", "It stays the same", "It decreases", "It doubles"],
+      correct: 2,
+      explanation: "If prices rise faster than wages, each dollar earns buys less. Real purchasing power — what wages can actually buy — falls."
+    },
+    {
+      q: "Which of the following best describes a 'recession'?",
+      options: ["Two consecutive quarters of economic growth", "A sustained rise in the general price level", "Two consecutive quarters of negative GDP growth", "A government budget surplus"],
+      correct: 2,
+      explanation: "A recession is commonly defined as two consecutive quarters (six months) of negative GDP growth, signaling a contraction in economic activity."
+    },
+    {
+      q: "What is the opportunity cost of a decision?",
+      options: ["The monetary price paid", "The value of the next best alternative foregone", "The total cost of all options", "The sunk cost of a previous choice"],
+      correct: 1,
+      explanation: "Opportunity cost is the value of the best alternative you give up when making a choice. It's a core concept in economics — every decision has a hidden cost."
+    }
+  ],
+  // Week B
+  [
+    {
+      q: "What happens to the price of a good when demand increases but supply stays constant?",
+      options: ["Price falls", "Price stays the same", "Price rises", "Quantity demanded falls"],
+      correct: 2,
+      explanation: "With supply held constant, an increase in demand shifts the demand curve rightward, resulting in a higher equilibrium price and greater quantity sold."
+    },
+    {
+      q: "Which institution is primarily responsible for monetary policy in the United States?",
+      options: ["The U.S. Treasury", "The Federal Reserve", "The World Bank", "The Securities and Exchange Commission"],
+      correct: 1,
+      explanation: "The Federal Reserve ('the Fed') is the central bank of the U.S. It controls monetary policy through tools like setting interest rates and open market operations."
+    },
+    {
+      q: "What is a 'trade deficit'?",
+      options: ["When a country exports more than it imports", "When a country imports more than it exports", "When a country has balanced trade", "When tariffs exceed export revenue"],
+      correct: 1,
+      explanation: "A trade deficit occurs when a country's imports exceed its exports. The U.S. has run a trade deficit for decades, importing more goods and services than it sells abroad."
+    },
+    {
+      q: "In economics, what does 'elasticity' measure?",
+      options: ["The flexibility of a production line", "How responsive quantity is to a change in price", "The speed of economic growth", "The physical properties of manufactured goods"],
+      correct: 1,
+      explanation: "Price elasticity of demand measures how much the quantity demanded changes in response to a price change. Elastic goods are very sensitive to price; inelastic goods are not."
+    },
+    {
+      q: "What is 'quantitative easing' (QE)?",
+      options: ["Raising taxes to reduce inflation", "A central bank buying assets to inject money into the economy", "Cutting government spending to balance the budget", "Imposing tariffs on foreign goods"],
+      correct: 1,
+      explanation: "QE is when a central bank purchases financial assets (like government bonds) to increase the money supply and stimulate lending and investment during economic downturns."
+    }
+  ],
+  // Week C
+  [
+    {
+      q: "What does the Consumer Price Index (CPI) measure?",
+      options: ["The average wages of consumers", "Changes in the price level of a basket of consumer goods", "Corporate profit margins", "Government spending per capita"],
+      correct: 1,
+      explanation: "The CPI tracks changes in the prices of a representative 'basket' of goods and services purchased by households. It's the most common measure of inflation."
+    },
+    {
+      q: "A 'monopoly' exists when:",
+      options: ["Two firms control an entire market", "A single firm is the sole producer in a market", "The government controls all production", "Consumers have no preference between products"],
+      correct: 1,
+      explanation: "A monopoly is a market structure where a single firm is the only supplier of a product with no close substitutes, giving it significant pricing power."
+    },
+    {
+      q: "Fiscal policy refers to government decisions about:",
+      options: ["Interest rates and money supply", "Taxation and government spending", "International trade agreements", "Central bank reserve requirements"],
+      correct: 1,
+      explanation: "Fiscal policy involves government decisions on taxation and public spending. Expansionary fiscal policy (tax cuts or spending increases) stimulates the economy; contractionary policy does the opposite."
+    },
+    {
+      q: "What is the 'invisible hand' concept in economics?",
+      options: ["Secret government price controls", "The idea that self-interested actions lead to beneficial societal outcomes", "Hidden taxes on consumer goods", "Covert central bank interventions"],
+      correct: 1,
+      explanation: "Adam Smith's 'invisible hand' describes how individuals pursuing their own self-interest in free markets inadvertently promote the economic well-being of society as a whole."
+    },
+    {
+      q: "Which of the following is an example of a 'negative externality'?",
+      options: ["A factory that trains workers who improve the local economy", "A beekeeper whose bees pollinate nearby farms", "A factory that pollutes a river used by local residents", "A company that builds a park for its employees"],
+      correct: 2,
+      explanation: "A negative externality is a cost imposed on third parties not involved in a transaction. Pollution is the classic example — the factory and its customers don't bear the cost; nearby residents do."
+    }
+  ],
+  // Week D
+  [
+    {
+      q: "What is 'comparative advantage'?",
+      options: ["Producing more of a good than any other country", "Being better at producing every good than trading partners", "Producing a good at a lower opportunity cost than others", "Having superior technology in manufacturing"],
+      correct: 2,
+      explanation: "Comparative advantage means producing a good at a lower opportunity cost than others. It's the foundation of trade theory — even if one country is better at everything, both benefit from specializing and trading."
+    },
+    {
+      q: "In a supply-and-demand model, a 'price floor' set above equilibrium will cause:",
+      options: ["A shortage", "A surplus", "No change in the market", "A decrease in demand"],
+      correct: 1,
+      explanation: "A price floor set above equilibrium forces prices higher than the market would naturally set. At higher prices, quantity supplied exceeds quantity demanded, creating a surplus."
+    },
+    {
+      q: "What does it mean when a bond's yield rises?",
+      options: ["The bond's price has risen", "The bond's price has fallen", "The issuer has defaulted", "Interest rates have been cut"],
+      correct: 1,
+      explanation: "Bond prices and yields move inversely. When a bond's price falls (e.g., due to rising interest rates or perceived risk), the fixed coupon payment represents a higher yield relative to the lower price."
+    },
+    {
+      q: "What is 'stagflation'?",
+      options: ["High growth with low inflation", "Slow economic growth combined with high inflation", "Rapid deflation with rising unemployment", "A period of zero GDP growth"],
+      correct: 1,
+      explanation: "Stagflation combines stagnant economic growth (or recession) with high inflation — a challenging scenario for policymakers because the usual remedies for one problem worsen the other."
+    },
+    {
+      q: "Which of the following is NOT a function of money?",
+      options: ["Medium of exchange", "Store of value", "Unit of account", "Guarantee of employment"],
+      correct: 3,
+      explanation: "The three classic functions of money are: medium of exchange (facilitates trade), store of value (holds purchasing power over time), and unit of account (common measure of value). Guaranteeing employment is not a function of money."
+    }
+  ]
+];
+
+// ── STATE ──
+let questions = [];
+let current = 0;
+let score = 0;
+let answered = false;
+
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function initQuiz() {
+  const weekIndex = getWeekNumber(new Date()) % allWeeks.length;
+  questions = allWeeks[weekIndex];
+  current = 0;
+  score = 0;
+  answered = false;
+  document.getElementById('quizCard').style.display = '';
+  document.getElementById('resultsCard').classList.remove('visible');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = questions[current];
+  const total = questions.length;
+
+  document.getElementById('questionMeta').textContent = `QUESTION ${current + 1} OF ${total}`;
+  document.getElementById('scoreDisplay').textContent = `${score} correct`;
+  document.getElementById('progressFill').style.width = `${((current + 1) / total) * 100}%`;
+  document.getElementById('questionText').textContent = q.q;
+
+  const container = document.getElementById('optionsContainer');
+  container.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `
+      <span class="option-letter">${letters[i]}</span>
+      <span>${opt}</span>
+      <span class="option-icon"></span>
+    `;
+    btn.onclick = () => selectAnswer(i, btn);
+    container.appendChild(btn);
+  });
+
+  document.getElementById('explanationBox').className = 'explanation-box';
+  document.getElementById('explanationBox').innerHTML = '';
+  document.getElementById('nextBtn').className = 'btn-next';
+  answered = false;
+}
+
+function selectAnswer(selectedIndex, clickedBtn) {
+  if (answered) return;
+  answered = true;
+
+  const q = questions[current];
+  const buttons = document.querySelectorAll('.option-btn');
+  const isCorrect = selectedIndex === q.correct;
+
+  if (isCorrect) score++;
+
+  buttons.forEach((btn, i) => {
+    btn.disabled = true;
+    const iconSpan = btn.querySelector('.option-icon');
+    if (i === q.correct) {
+      btn.classList.add('correct');
+      iconSpan.innerHTML = `<svg width="18" height="18" fill="none" stroke="#16a34a" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+    } else if (i === selectedIndex && !isCorrect) {
+      btn.classList.add('wrong');
+      iconSpan.innerHTML = `<svg width="18" height="18" fill="none" stroke="#dc2626" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+    } else {
+      btn.classList.add('dimmed');
+    }
+  });
+
+  const explanationBox = document.getElementById('explanationBox');
+  explanationBox.innerHTML = `<strong>Explanation:</strong> ${q.explanation}`;
+  explanationBox.classList.add('visible');
+
+  document.getElementById('scoreDisplay').textContent = `${score} correct`;
+
+  const nextBtn = document.getElementById('nextBtn');
+  if (current < questions.length - 1) {
+    nextBtn.textContent = '';
+    nextBtn.innerHTML = 'Next Question &nbsp;→';
+    nextBtn.classList.add('visible');
+  } else {
+    nextBtn.textContent = '';
+    nextBtn.innerHTML = 'See Results &nbsp;→';
+    nextBtn.classList.add('visible');
+  }
+}
+
+function nextQuestion() {
+  current++;
+  if (current < questions.length) {
+    renderQuestion();
+  } else {
+    showResults();
+  }
+}
+
+function showResults() {
+  document.getElementById('quizCard').style.display = 'none';
+  const card = document.getElementById('resultsCard');
+  card.classList.add('visible');
+
+  const total = questions.length;
+  const pct = Math.round((score / total) * 100);
+
+  let icon, title, message;
+  if (pct === 100) {
+    icon = '🏆'; title = 'Perfect Score!';
+    message = 'Outstanding! You got every question right. You clearly have a strong grasp of economics — keep it up!';
+  } else if (pct >= 80) {
+    icon = '🎯'; title = 'Excellent Work!';
+    message = 'Great performance! You have a solid understanding of economics. Review the questions you missed and come back stronger next week.';
+  } else if (pct >= 60) {
+    icon = '📈'; title = 'Good Effort!';
+    message = 'Solid attempt! Keep engaging with The Floor, Weekly Features, and The Academy to sharpen your economic knowledge.';
+  } else {
+    icon = '📚'; title = 'Keep Learning!';
+    message = 'Economics takes time to master. Check out The Academy for foundational resources, and try again — practice makes perfect!';
+  }
+
+  document.getElementById('resultsIcon').textContent = icon;
+  document.getElementById('resultsTitle').textContent = title;
+  document.getElementById('resultsScore').textContent = `${score} / ${total} correct — ${pct}%`;
+  document.getElementById('resultsMessage').textContent = message;
+  document.getElementById('correctPill').textContent = `✓  ${score} correct`;
+  document.getElementById('wrongPill').textContent = `✗  ${total - score} incorrect`;
+}
+
+function restartQuiz() {
+  document.getElementById('resultsCard').classList.remove('visible');
+  document.getElementById('quizCard').style.display = '';
+  current = 0; score = 0; answered = false;
+  renderQuestion();
+}
+
+// Boot
+initQuiz();
+</script>
+</body>
+</html>
