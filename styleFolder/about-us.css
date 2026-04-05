@@ -1,0 +1,237 @@
+/* ── MAIN ── */
+  .main {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    padding: 48px 64px 36px;
+    background: var(--cream);
+    border-bottom: 1px solid #ddd;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Faint mosaic background tiles */
+  .page-header::before {
+    content: '';
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 420px; height: 160px;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(201,168,76,0.08) 0px, rgba(201,168,76,0.08) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(90deg, rgba(201,168,76,0.08) 0px, rgba(201,168,76,0.08) 1px, transparent 1px, transparent 40px);
+    pointer-events: none;
+  }
+
+  .page-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 40px; font-weight: 900;
+    color: var(--navy);
+    margin-bottom: 8px;
+  }
+
+  .page-header .subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+    font-weight: 300;
+    margin-bottom: 14px;
+  }
+
+  .header-rule {
+    width: 40px; height: 2px;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+
+  /* ── MISSION SECTION ── */
+  .mission-section {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 0;
+    border-bottom: 1px solid #ddd;
+    background: var(--cream);
+  }
+
+  .mission-logo-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    border-right: 1px solid #ddd;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mission-badge-svg { width: 160px; height: 160px; }
+  .mission-badge-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--navy);
+  }
+
+  .mission-text-col { padding: 60px 56px; }
+
+  .mission-text-col h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 20px;
+  }
+
+  .mission-text-col p {
+    font-size: 17px;
+    color: #374151;
+    line-height: 1.75;
+    font-weight: 300;
+    margin-bottom: 18px;
+  }
+  .mission-text-col p:last-child { margin-bottom: 0; }
+
+  /* ── SECTION WRAPPER ── */
+  .section-wrap { padding: 52px 64px; }
+  .section-wrap + .section-wrap { border-top: 1px solid #ddd; }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 28px;
+  }
+
+  /* ── WHAT WE DO CARDS ── */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .feature-card {
+    padding: 28px 30px;
+    border-right: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
+    background: #fff;
+    transition: background 0.15s;
+  }
+  .feature-card:nth-child(even) { border-right: none; }
+  .feature-card:nth-last-child(1),
+  .feature-card:nth-last-child(2) { border-bottom: none; }
+  .feature-card:hover { background: #fafaf8; }
+
+  .feature-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px; font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 10px;
+  }
+
+  .feature-card p {
+    font-size: 15px;
+    color: #4b5563;
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* ── CONNECT WITH US ── */
+  .social-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .social-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .social-row:hover { border-color: var(--navy); background: #fafaf8; }
+
+  .social-left { display: flex; align-items: center; gap: 14px; }
+
+  .social-icon-wrap {
+    width: 36px; height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--navy);
+    background: var(--cream);
+    flex-shrink: 0;
+  }
+
+  .social-name { font-size: 15px; font-weight: 600; color: var(--navy); line-height: 1.2; }
+  .social-handle { font-size: 13px; color: var(--gold); font-weight: 300; }
+
+  .social-ext { color: #9ca3af; }
+
+  .social-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 10px;
+  }
+
+  /* ── MEMBERSHIP TIERS ── */
+  .tiers-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .tier-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    padding: 26px 24px;
+  }
+
+  .tier-card.exec {
+    border-color: var(--gold);
+    background: #fffdf7;
+  }
+
+  .tier-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px; font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 10px;
+  }
+  .tier-card.exec .tier-name { color: var(--gold); }
+
+  .tier-desc {
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.6;
+    font-weight: 300;
+    margin-bottom: 16px;
+  }
+
+  .tier-perks { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .tier-perks li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.4;
+  }
+  .tier-perks li::before {
+    content: '';
+    width: 5px; height: 5px;
+    background: var(--navy);
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .tier-card.exec .tier-perks li::before { background: var(--gold); }
+

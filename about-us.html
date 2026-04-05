@@ -1,663 +1,412 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>About Us — The Economic Forum</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --navy: #0f1f3d;
-    --navy-light: #1a2e52;
-    --gold: #c9a84c;
-    --gold-light: #e2c47a;
-    --cream: #f5f0e8;
-    --cream-dark: #ede7d9;
-    --text-dark: #0f1f3d;
-    --text-muted: #6b7280;
-    --sidebar-width: 195px;
-  }
-
-  body {
-    font-family: 'Crimson Pro', Georgia, serif;
-    background: var(--cream);
-    color: var(--text-dark);
-    min-height: 100vh;
-    display: flex;
-  }
-
-  /* ── SIDEBAR ── */
-  .sidebar {
-    width: var(--sidebar-width);
-    background: var(--navy);
-    min-height: 100vh;
-    position: fixed;
-    top: 0; left: 0;
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-  }
-
-  .sidebar-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 18px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-
-  .logo-icon {
-    width: 36px; height: 36px;
-    background: var(--gold);
-    border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--navy);
-    flex-shrink: 0;
-  }
-
-  .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
-  .logo-text .top { font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; color: #fff; letter-spacing: 0.05em; }
-  .logo-text .bot { font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; color: var(--gold); letter-spacing: 0.05em; }
-
-  .sidebar-nav { flex: 1; padding: 20px 0; overflow-y: auto; }
-
-  .nav-section-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px; font-weight: 700;
-    letter-spacing: 0.12em;
-    color: rgba(255,255,255,0.35);
-    padding: 0 16px 8px;
-    margin-top: 8px;
-  }
-
-  .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 16px;
-    color: rgba(255,255,255,0.65);
-    font-family: 'Crimson Pro', serif;
-    font-size: 14px; font-weight: 400;
-    cursor: pointer;
-    transition: all 0.15s;
-    border-left: 2px solid transparent;
-    text-decoration: none;
-  }
-  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
-  .nav-item.active { color: #fff; background: rgba(255,255,255,0.08); border-left-color: var(--gold); }
-  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .nav-item.active .nav-icon { opacity: 1; }
-
-  .sidebar-footer {
-    padding: 14px 16px;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .user-info { display: flex; align-items: center; gap: 8px; }
-  .avatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--navy-light);
-    border: 1px solid rgba(255,255,255,0.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; color: rgba(255,255,255,0.7);
-    font-family: 'Space Mono', monospace;
-  }
-  .user-name { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.2; }
-  .user-role { font-size: 10px; color: rgba(255,255,255,0.4); font-family: 'Space Mono', monospace; letter-spacing: 0.05em; }
-  .logout-btn { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.4); font-size: 16px; padding: 4px; transition: color 0.15s; }
-  .logout-btn:hover { color: rgba(255,255,255,0.7); }
-
-  /* ── MAIN ── */
-  .main {
-    margin-left: var(--sidebar-width);
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  /* ── PAGE HEADER ── */
-  .page-header {
-    padding: 48px 64px 36px;
-    background: var(--cream);
-    border-bottom: 1px solid #ddd;
-    position: relative;
-    overflow: hidden;
-  }
-
-  /* Faint mosaic background tiles */
-  .page-header::before {
-    content: '';
-    position: absolute;
-    top: -20px; right: -20px;
-    width: 420px; height: 160px;
-    background-image:
-      repeating-linear-gradient(0deg, rgba(201,168,76,0.08) 0px, rgba(201,168,76,0.08) 1px, transparent 1px, transparent 40px),
-      repeating-linear-gradient(90deg, rgba(201,168,76,0.08) 0px, rgba(201,168,76,0.08) 1px, transparent 1px, transparent 40px);
-    pointer-events: none;
-  }
-
-  .page-header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 40px; font-weight: 900;
-    color: var(--navy);
-    margin-bottom: 8px;
-  }
-
-  .page-header .subtitle {
-    font-size: 16px;
-    color: var(--text-muted);
-    font-weight: 300;
-    margin-bottom: 14px;
-  }
-
-  .header-rule {
-    width: 40px; height: 2px;
-    background: var(--gold);
-    border-radius: 2px;
-  }
-
-  /* ── MISSION SECTION ── */
-  .mission-section {
-    display: grid;
-    grid-template-columns: 1fr 1.6fr;
-    gap: 0;
-    border-bottom: 1px solid #ddd;
-    background: var(--cream);
-  }
-
-  .mission-logo-col {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 40px;
-    border-right: 1px solid #ddd;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .mission-badge-svg { width: 160px; height: 160px; }
-  .mission-badge-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px; font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--navy);
-  }
-
-  .mission-text-col { padding: 60px 56px; }
-
-  .mission-text-col h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 26px; font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 20px;
-  }
-
-  .mission-text-col p {
-    font-size: 17px;
-    color: #374151;
-    line-height: 1.75;
-    font-weight: 300;
-    margin-bottom: 18px;
-  }
-  .mission-text-col p:last-child { margin-bottom: 0; }
-
-  /* ── SECTION WRAPPER ── */
-  .section-wrap { padding: 52px 64px; }
-  .section-wrap + .section-wrap { border-top: 1px solid #ddd; }
-
-  .section-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 26px; font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 28px;
-  }
-
-  /* ── WHAT WE DO CARDS ── */
-  .cards-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    border: 1px solid #d1d5db;
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .feature-card {
-    padding: 28px 30px;
-    border-right: 1px solid #d1d5db;
-    border-bottom: 1px solid #d1d5db;
-    background: #fff;
-    transition: background 0.15s;
-  }
-  .feature-card:nth-child(even) { border-right: none; }
-  .feature-card:nth-last-child(1),
-  .feature-card:nth-last-child(2) { border-bottom: none; }
-  .feature-card:hover { background: #fafaf8; }
-
-  .feature-card h3 {
-    font-family: 'Playfair Display', serif;
-    font-size: 17px; font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 10px;
-  }
-
-  .feature-card p {
-    font-size: 15px;
-    color: #4b5563;
-    line-height: 1.65;
-    font-weight: 300;
-  }
-
-  /* ── CONNECT WITH US ── */
-  .social-list { display: flex; flex-direction: column; gap: 10px; }
-
-  .social-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 2px;
-    text-decoration: none;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .social-row:hover { border-color: var(--navy); background: #fafaf8; }
-
-  .social-left { display: flex; align-items: center; gap: 14px; }
-
-  .social-icon-wrap {
-    width: 36px; height: 36px;
-    border: 1px solid #e5e7eb;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--navy);
-    background: var(--cream);
-    flex-shrink: 0;
-  }
-
-  .social-name { font-size: 15px; font-weight: 600; color: var(--navy); line-height: 1.2; }
-  .social-handle { font-size: 13px; color: var(--gold); font-weight: 300; }
-
-  .social-ext { color: #9ca3af; }
-
-  .social-note {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    font-style: italic;
-    margin-top: 10px;
-  }
-
-  /* ── MEMBERSHIP TIERS ── */
-  .tiers-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px;
-  }
-
-  .tier-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 2px;
-    padding: 26px 24px;
-  }
-
-  .tier-card.exec {
-    border-color: var(--gold);
-    background: #fffdf7;
-  }
-
-  .tier-name {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px; font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 10px;
-  }
-  .tier-card.exec .tier-name { color: var(--gold); }
-
-  .tier-desc {
-    font-size: 14px;
-    color: #4b5563;
-    line-height: 1.6;
-    font-weight: 300;
-    margin-bottom: 16px;
-  }
-
-  .tier-perks { list-style: none; display: flex; flex-direction: column; gap: 7px; }
-  .tier-perks li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 13px;
-    color: #374151;
-    line-height: 1.4;
-  }
-  .tier-perks li::before {
-    content: '';
-    width: 5px; height: 5px;
-    background: var(--navy);
-    border-radius: 50%;
-    margin-top: 5px;
-    flex-shrink: 0;
-  }
-  .tier-card.exec .tier-perks li::before { background: var(--gold); }
-
-  /* ── FOOTER ── */
-  footer {
-    background: var(--cream-dark);
-    border-top: 1px solid #ddd;
-    padding: 28px 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: auto;
-  }
-  .footer-brand .name { font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: var(--navy); }
-  .footer-brand .sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-  .footer-social { display: flex; gap: 10px; }
-  .social-btn {
-    width: 34px; height: 34px;
-    border: 1px solid #d1d5db;
-    border-radius: 50%;
-    background: #fff;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--navy);
-    transition: all 0.15s; text-decoration: none;
-  }
-  .social-btn:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
-  .footer-bottom {
-    background: var(--cream-dark);
-    border-top: 1px solid #e5e7eb;
-    padding: 14px 64px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .footer-copy { font-size: 12px; color: var(--text-muted); font-family: 'Crimson Pro', serif; }
-  .footer-disc { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--text-muted); border: 1px solid #d1d5db; padding: 4px 10px; letter-spacing: 0.06em; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Us — The Economic Forum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styleFolder/style.css">
+  <link rel="stylesheet" href="styleFolder/about-us.css">
 </head>
+
 <body>
 
-<!-- SIDEBAR -->
-<aside class="sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-icon">TEF</div>
-    <div class="logo-text">
-      <span class="top">THE ECONOMIC</span>
-      <span class="bot">FORUM</span>
-    </div>
-  </div>
-  <nav class="sidebar-nav">
-    <div class="nav-section-label">MAIN</div>
-    <a class="nav-item" href="economic-forum.html">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-      The Nexus
-    </a>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg></span>
-      Trading Floor
-    </a>
-    <a class="nav-item active" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
-      About Us
-    </a>
-    <div class="nav-section-label" style="margin-top:14px;">FORUM SUITE</div>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>
-      The Floor
-    </a>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
-      Weekly Feature
-    </a>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
-      Perspectives
-    </a>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
-      The Academy
-    </a>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v2"/><path d="M4 22a2 2 0 01-2-2V6a2 2 0 012-2"/></svg></span>
-      The Bulletin
-    </a>
-    <div class="nav-section-label" style="margin-top:14px;">EXEC BOARD</div>
-    <a class="nav-item" href="#">
-      <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg></span>
-      Admin Panel
-    </a>
-  </nav>
-  <div class="sidebar-footer">
-    <div class="user-info">
-      <div class="avatar">KP</div>
-      <div>
-        <div class="user-name">Kartikeya Pant</div>
-        <div class="user-role">EXEC</div>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">TEF</div>
+      <div class="logo-text">
+        <span class="top">THE ECONOMIC</span>
+        <span class="bot">FORUM</span>
       </div>
     </div>
-    <button class="logout-btn">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-    </button>
-  </div>
-</aside>
-
-<!-- MAIN -->
-<main class="main">
-
-  <!-- PAGE HEADER -->
-  <div class="page-header">
-    <h1>About The Economic Forum</h1>
-    <p class="subtitle">Understand Economics, Understand The World.</p>
-    <div class="header-rule"></div>
-  </div>
-
-  <!-- MISSION -->
-  <div class="mission-section">
-    <div class="mission-logo-col">
-      <svg class="mission-badge-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="88" cy="110" r="62" stroke="#c9a84c" stroke-width="2" fill="none" opacity="0.3"/>
-        <ellipse cx="88" cy="110" rx="62" ry="28" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4"/>
-        <line x1="88" y1="48" x2="88" y2="172" stroke="#c9a84c" stroke-width="1.5" opacity="0.4"/>
-        <path d="M26 110 Q88 85 150 110" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4"/>
-        <path d="M30 85 Q88 62 146 85" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4"/>
-        <path d="M30 135 Q88 158 146 135" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4"/>
-        <line x1="120" y1="80" x2="168" y2="32" stroke="#c9a84c" stroke-width="3" stroke-linecap="round"/>
-        <polyline points="148,28 168,32 164,52" stroke="#c9a84c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <text x="62" y="124" font-family="Georgia, serif" font-size="38" font-weight="bold" fill="#c9a84c" opacity="0.85">TEF</text>
-      </svg>
-      <div class="mission-badge-label">THE ECONOMIC FORUM</div>
-    </div>
-    <div class="mission-text-col">
-      <h2>Our Mission</h2>
-      <p>The Economic Forum (TEF) is the official economics club of Watchung Hills Regional High School. We exist to cultivate economic literacy, foster rigorous debate, and empower students to understand the forces that shape our world.</p>
-      <p>Through our forum, weekly academic features, educational resources, and interactive games, we create a space where students can engage with economics beyond the classroom — exploring everything from monetary policy to international trade, from market dynamics to the intersection of economics and politics.</p>
-      <p>Our platform is built by students, for students. Whether you're a seasoned AP Economics scholar or just beginning to explore the subject, The Economic Forum has a place for you.</p>
-    </div>
-  </div>
-
-  <!-- WHAT WE DO -->
-  <div class="section-wrap">
-    <h2 class="section-title">What We Do</h2>
-    <div class="cards-grid">
-      <div class="feature-card">
-        <h3>The Floor</h3>
-        <p>Open 24/7 discussion forum for debating economic topics, posting questions, and engaging in discourse with fellow members.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Weekly Feature</h3>
-        <p>A flagship academic essay published each week on a topic chosen by member vote, written collaboratively and published by the Exec Board.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Perspectives</h3>
-        <p>A space for members to publish long-form essays and analysis on any economics-adjacent topic, from fiscal policy to politics.</p>
-      </div>
-      <div class="feature-card">
-        <h3>The Academy</h3>
-        <p>Simplified educational resources written by Exec members, designed to make economics accessible to younger students and the community.</p>
-      </div>
-      <div class="feature-card">
-        <h3>The Bulletin</h3>
-        <p>Curated collection of the most important pinned posts, polls, and discussions — selected by the Exec Board.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Trading Floor Games</h3>
-        <p>Weekly interactive economics games and quizzes to test your knowledge in a fun, competitive format.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- CONNECT WITH US -->
-  <div class="section-wrap">
-    <h2 class="section-title">Connect With Us</h2>
-    <div class="social-list">
-
-      <a href="#" class="social-row">
-        <div class="social-left">
-          <div class="social-icon-wrap">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
-          </div>
-          <div>
-            <div class="social-name">Twitter / X</div>
-            <div class="social-handle">@TEF_WHRHS</div>
-          </div>
-        </div>
-        <div class="social-ext">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">MAIN</div>
+      <a class="nav-item" href="economic-forum.html">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg></span>
+        The Nexus
       </a>
-
-      <a href="#" class="social-row">
-        <div class="social-left">
-          <div class="social-icon-wrap">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg>
-          </div>
-          <div>
-            <div class="social-name">Instagram</div>
-            <div class="social-handle">@theeconomicforum</div>
-          </div>
-        </div>
-        <div class="social-ext">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+      <a class="nav-item" href="trading-floor.html">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <polyline points="8 21 12 17 16 21" />
+          </svg></span>
+        Trading Floor
       </a>
-
-      <a href="#" class="social-row">
-        <div class="social-left">
-          <div class="social-icon-wrap">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-          </div>
-          <div>
-            <div class="social-name">LinkedIn</div>
-            <div class="social-handle">The Economic Forum</div>
-          </div>
-        </div>
-        <div class="social-ext">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+      <a class="nav-item active" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg></span>
+        About Us
       </a>
-
-      <a href="#" class="social-row">
-        <div class="social-left">
-          <div class="social-icon-wrap">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none"/></svg>
-          </div>
-          <div>
-            <div class="social-name">YouTube</div>
-            <div class="social-handle">The Economic Forum</div>
-          </div>
-        </div>
-        <div class="social-ext">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+      <div class="nav-section-label" style="margin-top:14px;">FORUM SUITE</div>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          </svg></span>
+        The Floor
       </a>
-
-      <a href="mailto:contact@theeconomicforum.org" class="social-row">
-        <div class="social-left">
-          <div class="social-icon-wrap">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </div>
-          <div>
-            <div class="social-name">Email</div>
-            <div class="social-handle">contact@theeconomicforum.org</div>
-          </div>
-        </div>
-        <div class="social-ext">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg></span>
+        Weekly Feature
       </a>
-
-    </div>
-    <p class="social-note">Social media accounts coming soon — handles are placeholders.</p>
-  </div>
-
-  <!-- MEMBERSHIP TIERS -->
-  <div class="section-wrap">
-    <h2 class="section-title">Membership Tiers</h2>
-    <div class="tiers-grid">
-
-      <div class="tier-card">
-        <div class="tier-name">Public</div>
-        <p class="tier-desc">View all content. Browse discussions, read essays, and explore educational resources.</p>
-        <ul class="tier-perks">
-          <li>View all posts</li>
-          <li>Read essays &amp; features</li>
-          <li>Play weekly games</li>
-        </ul>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg></span>
+        Perspectives
+      </a>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+            <path d="M6 12v5c3 3 9 3 12 0v-5" />
+          </svg></span>
+        The Academy
+      </a>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v2" />
+            <path d="M4 22a2 2 0 01-2-2V6a2 2 0 012-2" />
+          </svg></span>
+        The Bulletin
+      </a>
+      <div class="nav-section-label" style="margin-top:14px;">EXEC BOARD</div>
+      <a class="nav-item" href="#">
+        <span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14" />
+          </svg></span>
+        Admin Panel
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="avatar">KP</div>
+        <div>
+          <div class="user-name">Kartikeya Pant</div>
+          <div class="user-role">EXEC</div>
+        </div>
       </div>
+      <button class="logout-btn">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </div>
+  </aside>
 
-      <div class="tier-card">
-        <div class="tier-name">Member</div>
-        <p class="tier-desc">Full participation. Post, discuss, vote, and contribute to the forum.</p>
-        <ul class="tier-perks">
-          <li>Everything public gets</li>
-          <li>Post discussions &amp; essays</li>
-          <li>Vote on polls</li>
-          <li>Comment &amp; reply</li>
-          <li>@mention other members</li>
-        </ul>
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1>About The Economic Forum</h1>
+      <p class="subtitle">Understand Economics, Understand The World.</p>
+      <div class="header-rule"></div>
+    </div>
+
+    <!-- MISSION -->
+    <div class="mission-section">
+      <div class="mission-logo-col">
+        <svg class="mission-badge-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="88" cy="110" r="62" stroke="#c9a84c" stroke-width="2" fill="none" opacity="0.3" />
+          <ellipse cx="88" cy="110" rx="62" ry="28" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4" />
+          <line x1="88" y1="48" x2="88" y2="172" stroke="#c9a84c" stroke-width="1.5" opacity="0.4" />
+          <path d="M26 110 Q88 85 150 110" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4" />
+          <path d="M30 85 Q88 62 146 85" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4" />
+          <path d="M30 135 Q88 158 146 135" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4" />
+          <line x1="120" y1="80" x2="168" y2="32" stroke="#c9a84c" stroke-width="3" stroke-linecap="round" />
+          <polyline points="148,28 168,32 164,52" stroke="#c9a84c" stroke-width="3" stroke-linecap="round"
+            stroke-linejoin="round" fill="none" />
+          <text x="62" y="124" font-family="Georgia, serif" font-size="38" font-weight="bold" fill="#c9a84c"
+            opacity="0.85">TEF</text>
+        </svg>
+        <div class="mission-badge-label">THE ECONOMIC FORUM</div>
       </div>
-
-      <div class="tier-card exec">
-        <div class="tier-name">Exec Board</div>
-        <p class="tier-desc">Full administrative control. Publish features, create polls, pin content, and moderate.</p>
-        <ul class="tier-perks">
-          <li>Everything members get</li>
-          <li>Publish Weekly Features</li>
-          <li>Create &amp; manage polls</li>
-          <li>Pin content to Bulletin</li>
-          <li>Delete inappropriate posts</li>
-          <li>Approve new members</li>
-        </ul>
+      <div class="mission-text-col">
+        <h2>Our Mission</h2>
+        <p>The Economic Forum (TEF) is the official economics club of Watchung Hills Regional High School. We exist to
+          cultivate economic literacy, foster rigorous debate, and empower students to understand the forces that shape
+          our world.</p>
+        <p>Through our forum, weekly academic features, educational resources, and interactive games, we create a space
+          where students can engage with economics beyond the classroom — exploring everything from monetary policy to
+          international trade, from market dynamics to the intersection of economics and politics.</p>
+        <p>Our platform is built by students, for students. Whether you're a seasoned AP Economics scholar or just
+          beginning to explore the subject, The Economic Forum has a place for you.</p>
       </div>
-
     </div>
-  </div>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="footer-brand">
-      <div class="name">THE ECONOMIC FORUM</div>
-      <div class="sub">Watchung Hills Regional High School</div>
+    <!-- WHAT WE DO -->
+    <div class="section-wrap">
+      <h2 class="section-title">What We Do</h2>
+      <div class="cards-grid">
+        <div class="feature-card">
+          <h3>The Floor</h3>
+          <p>Open 24/7 discussion forum for debating economic topics, posting questions, and engaging in discourse with
+            fellow members.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Weekly Feature</h3>
+          <p>A flagship academic essay published each week on a topic chosen by member vote, written collaboratively and
+            published by the Exec Board.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Perspectives</h3>
+          <p>A space for members to publish long-form essays and analysis on any economics-adjacent topic, from fiscal
+            policy to politics.</p>
+        </div>
+        <div class="feature-card">
+          <h3>The Academy</h3>
+          <p>Simplified educational resources written by Exec members, designed to make economics accessible to younger
+            students and the community.</p>
+        </div>
+        <div class="feature-card">
+          <h3>The Bulletin</h3>
+          <p>Curated collection of the most important pinned posts, polls, and discussions — selected by the Exec Board.
+          </p>
+        </div>
+        <div class="feature-card">
+          <h3>Trading Floor Games</h3>
+          <p>Weekly interactive economics games and quizzes to test your knowledge in a fun, competitive format.</p>
+        </div>
+      </div>
     </div>
-    <div class="footer-social">
-      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg></a>
-      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg></a>
-      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>
-      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none"/></svg></a>
-      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></a>
-    </div>
-  </footer>
-  <div class="footer-bottom">
-    <span class="footer-copy">© 2026 The Economic Forum. All rights reserved.</span>
-    <span class="footer-disc">Not affiliated with WHRHS</span>
-  </div>
 
-</main>
+    <!-- CONNECT WITH US -->
+    <div class="section-wrap">
+      <h2 class="section-title">Connect With Us</h2>
+      <div class="social-list">
+
+        <a href="#" class="social-row">
+          <div class="social-left">
+            <div class="social-icon-wrap">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path
+                  d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" />
+              </svg>
+            </div>
+            <div>
+              <div class="social-name">Twitter / X</div>
+              <div class="social-handle">@TEF_WHRHS</div>
+            </div>
+          </div>
+          <div class="social-ext">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </div>
+        </a>
+
+        <a href="#" class="social-row">
+          <div class="social-left">
+            <div class="social-icon-wrap">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <div class="social-name">Instagram</div>
+              <div class="social-handle">@theeconomicforum</div>
+            </div>
+          </div>
+          <div class="social-ext">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </div>
+        </a>
+
+        <a href="#" class="social-row">
+          <div class="social-left">
+            <div class="social-icon-wrap">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z" />
+                <rect x="2" y="9" width="4" height="12" />
+                <circle cx="4" cy="4" r="2" />
+              </svg>
+            </div>
+            <div>
+              <div class="social-name">LinkedIn</div>
+              <div class="social-handle">The Economic Forum</div>
+            </div>
+          </div>
+          <div class="social-ext">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </div>
+        </a>
+
+        <a href="#" class="social-row">
+          <div class="social-left">
+            <div class="social-icon-wrap">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path
+                  d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z" />
+                <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <div>
+              <div class="social-name">YouTube</div>
+              <div class="social-handle">The Economic Forum</div>
+            </div>
+          </div>
+          <div class="social-ext">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </div>
+        </a>
+
+        <a href="mailto:contact@theeconomicforum.org" class="social-row">
+          <div class="social-left">
+            <div class="social-icon-wrap">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+            <div>
+              <div class="social-name">Email</div>
+              <div class="social-handle">contact@theeconomicforum.org</div>
+            </div>
+          </div>
+          <div class="social-ext">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </div>
+        </a>
+
+      </div>
+      <p class="social-note">Social media accounts coming soon — handles are placeholders.</p>
+    </div>
+
+    <!-- MEMBERSHIP TIERS -->
+    <div class="section-wrap">
+      <h2 class="section-title">Membership Tiers</h2>
+      <div class="tiers-grid">
+
+        <div class="tier-card">
+          <div class="tier-name">Public</div>
+          <p class="tier-desc">View all content. Browse discussions, read essays, and explore educational resources.</p>
+          <ul class="tier-perks">
+            <li>View all posts</li>
+            <li>Read essays &amp; features</li>
+            <li>Play weekly games</li>
+          </ul>
+        </div>
+
+        <div class="tier-card">
+          <div class="tier-name">Member</div>
+          <p class="tier-desc">Full participation. Post, discuss, vote, and contribute to the forum.</p>
+          <ul class="tier-perks">
+            <li>Everything public gets</li>
+            <li>Post discussions &amp; essays</li>
+            <li>Vote on polls</li>
+            <li>Comment &amp; reply</li>
+            <li>@mention other members</li>
+          </ul>
+        </div>
+
+        <div class="tier-card exec">
+          <div class="tier-name">Exec Board</div>
+          <p class="tier-desc">Full administrative control. Publish features, create polls, pin content, and moderate.
+          </p>
+          <ul class="tier-perks">
+            <li>Everything members get</li>
+            <li>Publish Weekly Features</li>
+            <li>Create &amp; manage polls</li>
+            <li>Pin content to Bulletin</li>
+            <li>Delete inappropriate posts</li>
+            <li>Approve new members</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="footer-brand">
+        <div class="name">THE ECONOMIC FORUM</div>
+        <div class="sub">Watchung Hills Regional High School</div>
+      </div>
+      <div class="footer-social">
+        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path
+              d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" />
+          </svg></a>
+        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
+          </svg></a>
+        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z" />
+            <rect x="2" y="9" width="4" height="12" />
+            <circle cx="4" cy="4" r="2" />
+          </svg></a>
+        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path
+              d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z" />
+            <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none" />
+          </svg></a>
+        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            viewBox="0 0 24 24">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg></a>
+      </div>
+    </footer>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2026 The Economic Forum. All rights reserved.</span>
+      <span class="footer-disc">Not affiliated with WHRHS</span>
+    </div>
+
+  </main>
 </body>
+
 </html>
