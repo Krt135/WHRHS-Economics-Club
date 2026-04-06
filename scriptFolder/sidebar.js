@@ -16,7 +16,7 @@ class SpecialSidebar extends HTMLElement {
             <nav class="sidebar-nav">
                 <div class="nav-section-label">MAIN</div>
                 
-                <a class="nav-item ${active === 'nexus' ? 'active' : ''}" href="economic-forum.html">
+                <a class="nav-item ${active === 'nexus' ? 'active' : ''}" href="index.html">
                     <span class="nav-icon">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
