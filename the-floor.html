@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Floor — The Economic Forum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #0f1f3d; --navy-light: #1a2e52;
+  --gold: #c9a84c; --gold-light: #e2c47a; --gold-bg: #fdf8ee;
+  --cream: #f5f0e8; --cream-dark: #ede7d9;
+  --text-dark: #0f1f3d; --text-muted: #6b7280;
+  --sidebar-width: 240px;
+  --border: #e5e7eb;
+}
+body { font-family: 'Crimson Pro', Georgia, serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; display: flex; }
+
+/* ── SIDEBAR ── */
+.sidebar { width: var(--sidebar-width); background: var(--navy); min-height: 100vh; position: fixed; top:0; left:0; display:flex; flex-direction:column; z-index:100; }
+.sidebar-logo { display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.logo-icon { width:36px; height:36px; background:var(--gold); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; color:var(--navy); flex-shrink:0; }
+.logo-text { display:flex; flex-direction:column; line-height:1.1; }
+.logo-text .top { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:#fff; letter-spacing:0.05em; }
+.logo-text .bot { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:var(--gold); letter-spacing:0.05em; }
+.sidebar-nav { flex:1; padding:20px 0; overflow-y:auto; }
+.nav-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; color:rgba(255,255,255,0.35); padding:0 16px 8px; margin-top:8px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; color:rgba(255,255,255,0.65); font-family:'Crimson Pro',serif; font-size:14px; cursor:pointer; transition:all 0.15s; border-left:2px solid transparent; text-decoration:none; }
+.nav-item:hover { color:#fff; background:rgba(255,255,255,0.05); }
+.nav-item.active { color:#fff; background:rgba(255,255,255,0.08); border-left-color:var(--gold); }
+.nav-icon { width:16px; height:16px; opacity:0.7; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.nav-item.active .nav-icon { opacity:1; }
+.sidebar-footer { padding:14px 16px; border-top:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between; }
+.avatar { width:30px; height:30px; border-radius:50%; background:var(--navy-light); border:1px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:11px; color:rgba(255,255,255,0.7); font-family:'Space Mono',monospace; }
+.user-name { font-size:13px; color:rgba(255,255,255,0.8); line-height:1.2; }
+.user-role { font-size:10px; color:rgba(255,255,255,0.4); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
+.logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.4); padding:4px; transition:color 0.15s; }
+.logout-btn:hover { color:rgba(255,255,255,0.7); }
+
+/* ── MAIN ── */
+.main { margin-left:var(--sidebar-width); flex:1; display:flex; flex-direction:column; min-height:100vh; }
+
+/* PAGE HEADER */
+.page-header { padding:48px 64px 36px; background:var(--cream); border-bottom:1px solid #ddd; position:relative; overflow:hidden; }
+.page-header::before { content:''; position:absolute; top:-20px; right:-20px; width:420px; height:160px; background-image: repeating-linear-gradient(0deg,rgba(201,168,76,0.08) 0px,rgba(201,168,76,0.08) 1px,transparent 1px,transparent 40px), repeating-linear-gradient(90deg,rgba(201,168,76,0.08) 0px,rgba(201,168,76,0.08) 1px,transparent 1px,transparent 40px); pointer-events:none; }
+.page-header h1 { font-family:'Playfair Display',serif; font-size:40px; font-weight:900; color:var(--navy); margin-bottom:8px; }
+.page-header .subtitle { font-size:16px; color:var(--text-muted); font-weight:300; margin-bottom:14px; }
+.header-rule { width:40px; height:2px; background:var(--gold); border-radius:2px; }
+
+/* CONTENT */
+.content { padding:36px 64px 60px; max-width:960px; }
+
+/* ACTION BUTTONS */
+.action-bar { display:flex; gap:12px; margin-bottom:24px; }
+.btn-primary { background:var(--navy); color:#fff; border:none; padding:12px 22px; font-family:'Crimson Pro',serif; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background 0.2s; }
+.btn-primary:hover { background:var(--navy-light); }
+.btn-outline { background:transparent; color:var(--navy); border:1.5px solid var(--navy); padding:11px 20px; font-family:'Crimson Pro',serif; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:all 0.2s; }
+.btn-outline:hover { background:var(--navy); color:#fff; }
+
+/* TABS */
+.tabs { display:flex; gap:0; margin-bottom:20px; border:1.5px solid var(--navy); border-radius:2px; overflow:hidden; width:fit-content; }
+.tab { padding:9px 22px; font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.1em; cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:all 0.15s; }
+.tab.active { background:var(--navy); color:#fff; }
+.tab:not(.active):hover { background:var(--cream-dark); color:var(--navy); }
+
+/* FILTER BAR */
+.filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; align-items:center; }
+.filter-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.1em; color:var(--text-muted); margin-right:4px; }
+.filter-tag { padding:5px 12px; border:1px solid var(--border); border-radius:20px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.06em; cursor:pointer; background:#fff; color:var(--text-muted); transition:all 0.15s; }
+.filter-tag:hover { border-color:var(--gold); color:var(--gold); }
+.filter-tag.active { background:var(--gold); border-color:var(--gold); color:#fff; }
+
+/* POSTS LIST */
+.posts-list { display:flex; flex-direction:column; gap:12px; }
+
+/* DISCUSSION CARD */
+.disc-card { background:var(--gold-bg); border:1px solid #e8ddb8; border-radius:2px; padding:22px 24px; cursor:pointer; transition:border-color 0.15s; }
+.disc-card:hover { border-color:var(--gold); }
+.disc-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--navy); margin-bottom:6px; }
+.disc-body { font-size:15px; color:#4b5563; font-weight:300; line-height:1.6; margin-bottom:12px; }
+.disc-image { width:100%; max-height:220px; object-fit:cover; border-radius:2px; margin-bottom:12px; border:1px solid #e8ddb8; }
+.disc-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.tag-pill { padding:3px 10px; background:rgba(201,168,76,0.15); border:1px solid rgba(201,168,76,0.4); border-radius:20px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.05em; color:var(--gold); }
+.disc-meta { display:flex; align-items:center; gap:14px; font-size:13px; color:var(--text-muted); margin-bottom:12px; }
+.disc-meta .author { display:flex; align-items:center; gap:6px; }
+.author-av { width:20px; height:20px; border-radius:50%; background:var(--gold); display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:8px; font-weight:700; color:var(--navy); flex-shrink:0; }
+.disc-actions { display:flex; align-items:center; gap:16px; }
+.action-btn { display:flex; align-items:center; gap:5px; background:none; border:none; cursor:pointer; font-family:'Crimson Pro',serif; font-size:14px; color:var(--text-muted); padding:4px 8px; border-radius:2px; transition:all 0.15s; }
+.action-btn:hover { background:rgba(0,0,0,0.04); }
+.action-btn.liked { color:#16a34a; }
+.action-btn.disliked { color:#dc2626; }
+.action-btn.commented { color:var(--navy); }
+
+/* COMMENTS SECTION */
+.comments-section { margin-top:16px; border-top:1px solid #e8ddb8; padding-top:14px; display:none; }
+.comments-section.open { display:block; }
+.comment { display:flex; gap:10px; margin-bottom:12px; }
+.comment-av { width:24px; height:24px; border-radius:50%; background:var(--navy-light); display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:8px; color:rgba(255,255,255,0.8); flex-shrink:0; margin-top:2px; }
+.comment-body { flex:1; }
+.comment-author { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; color:var(--navy); letter-spacing:0.05em; margin-bottom:3px; }
+.comment-text { font-size:14px; color:#374151; line-height:1.5; }
+.comment-input-row { display:flex; gap:8px; align-items:flex-end; }
+.comment-input { flex:1; border:1px solid var(--border); background:#fff; padding:9px 12px; font-family:'Crimson Pro',serif; font-size:14px; color:var(--text-dark); resize:none; min-height:38px; outline:none; border-radius:2px; }
+.comment-input:focus { border-color:var(--gold); }
+.comment-submit { background:var(--navy); color:#fff; border:none; padding:9px 16px; font-family:'Crimson Pro',serif; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background 0.15s; }
+.comment-submit:hover { background:var(--navy-light); }
+
+/* POLL CARD */
+.poll-card { background:#fff; border:1px solid var(--border); border-radius:2px; padding:22px 24px; }
+.poll-title { display:flex; align-items:center; gap:8px; font-family:'Playfair Display',serif; font-size:17px; font-weight:700; color:var(--navy); margin-bottom:16px; }
+.poll-options { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.poll-option { position:relative; border:1px solid var(--border); border-radius:2px; overflow:hidden; cursor:pointer; transition:border-color 0.15s; }
+.poll-option:hover:not(.voted) { border-color:var(--navy); }
+.poll-option.voted-for { border-color:var(--gold); }
+.poll-bar { position:absolute; top:0; left:0; height:100%; background:rgba(201,168,76,0.15); transition:width 0.5s ease; z-index:0; }
+.poll-bar.voted-bar { background:rgba(201,168,76,0.28); }
+.poll-option-content { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; padding:11px 14px; }
+.poll-option-label { display:flex; align-items:center; gap:8px; font-size:15px; color:var(--text-dark); }
+.poll-check { width:16px; height:16px; color:var(--gold); flex-shrink:0; }
+.poll-pct { font-family:'Space Mono',monospace; font-size:11px; font-weight:700; color:var(--text-muted); }
+.poll-pct.gold { color:var(--gold); }
+.poll-footer { font-size:13px; color:var(--text-muted); display:flex; justify-content:space-between; }
+
+/* EMPTY STATE */
+.empty-state { padding:40px; text-align:center; border:1.5px dashed #ccc; border-radius:2px; background:#fff; }
+.empty-text { font-family:'Playfair Display',serif; font-style:italic; font-size:15px; color:#9ca3af; }
+
+/* ── MODAL OVERLAY ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+
+.modal { background:var(--cream); border-radius:3px; width:100%; max-width:620px; padding:36px 36px 28px; position:relative; max-height:90vh; overflow-y:auto; }
+.modal-sm { max-width:460px; }
+.modal-title { font-family:'Playfair Display',serif; font-size:22px; font-weight:900; color:var(--navy); margin-bottom:24px; }
+.modal-close { position:absolute; top:16px; right:16px; background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:20px; line-height:1; transition:color 0.15s; }
+.modal-close:hover { color:var(--navy); }
+
+.form-group { margin-bottom:18px; }
+.form-label { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.08em; color:var(--navy); margin-bottom:7px; display:block; }
+.form-input { width:100%; border:1px solid var(--border); background:#fff; padding:11px 14px; font-family:'Crimson Pro',serif; font-size:15px; color:var(--text-dark); outline:none; border-radius:2px; transition:border-color 0.15s; }
+.form-input:focus { border-color:var(--gold); }
+.form-textarea { width:100%; border:1px solid var(--border); background:#fff; padding:11px 14px; font-family:'Crimson Pro',serif; font-size:15px; color:var(--text-dark); outline:none; border-radius:2px; resize:vertical; min-height:130px; transition:border-color 0.15s; }
+.form-textarea:focus { border-color:var(--gold); }
+.attach-area { border:1.5px dashed #ccc; border-radius:2px; padding:14px 16px; display:flex; align-items:center; gap:10px; cursor:pointer; background:#fff; font-size:14px; color:var(--text-muted); transition:border-color 0.15s; }
+.attach-area:hover { border-color:var(--gold); color:var(--gold); }
+.attach-preview { margin-top:8px; font-size:12px; color:var(--gold); font-family:'Space Mono',monospace; }
+.btn-full { width:100%; padding:14px; background:var(--navy); color:#fff; border:none; font-family:'Crimson Pro',serif; font-size:16px; font-weight:600; cursor:pointer; transition:background 0.2s; margin-top:6px; }
+.btn-full:hover { background:var(--navy-light); }
+
+/* Poll option inputs */
+.poll-option-inputs { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+.poll-opt-row { display:flex; gap:8px; align-items:center; }
+.poll-opt-row .form-input { flex:1; padding:9px 12px; }
+.remove-opt { background:none; border:none; cursor:pointer; color:#ccc; font-size:18px; transition:color 0.15s; line-height:1; padding:0 4px; }
+.remove-opt:hover { color:#dc2626; }
+.add-option-btn { background:none; border:none; cursor:pointer; font-family:'Crimson Pro',serif; font-size:14px; color:var(--navy); display:flex; align-items:center; gap:6px; padding:4px 0; transition:opacity 0.15s; }
+.add-option-btn:hover { opacity:0.7; }
+
+/* FOOTER */
+footer { background:var(--cream-dark); border-top:1px solid #ddd; padding:28px 64px; display:flex; align-items:center; justify-content:space-between; margin-top:auto; }
+.footer-brand .name { font-family:'Space Mono',monospace; font-size:12px; font-weight:700; letter-spacing:0.12em; color:var(--navy); }
+.footer-brand .sub { font-size:13px; color:var(--text-muted); margin-top:2px; }
+.footer-social { display:flex; gap:10px; }
+.social-btn { width:34px; height:34px; border:1px solid #d1d5db; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--navy); transition:all 0.15s; text-decoration:none; }
+.social-btn:hover { background:var(--navy); color:#fff; border-color:var(--navy); }
+.footer-bottom { background:var(--cream-dark); border-top:1px solid #e5e7eb; padding:14px 64px; display:flex; align-items:center; justify-content:space-between; }
+.footer-copy { font-size:12px; color:var(--text-muted); }
+.footer-disc { font-family:'Space Mono',monospace; font-size:9px; color:var(--text-muted); border:1px solid #d1d5db; padding:4px 10px; letter-spacing:0.06em; }
+
+/* hidden file input */
+#fileInput { display:none; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">TEF</div>
+    <div class="logo-text"><span class="top">THE ECONOMIC</span><span class="bot">FORUM</span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">MAIN</div>
+    <a class="nav-item" href="economic-forum.html"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>The Nexus</a>
+    <a class="nav-item" href="trading-floor.html"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg></span>Trading Floor</a>
+    <a class="nav-item" href="about-us.html"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>About Us</a>
+    <div class="nav-label" style="margin-top:14px;">FORUM SUITE</div>
+    <a class="nav-item active" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>The Floor</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>Weekly Feature</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>Perspectives</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>The Academy</a>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v2"/><path d="M4 22a2 2 0 01-2-2V6a2 2 0 012-2"/></svg></span>The Bulletin</a>
+    <div class="nav-label" style="margin-top:14px;">EXEC BOARD</div>
+    <a class="nav-item" href="#"><span class="nav-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg></span>Admin Panel</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="avatar">KP</div>
+      <div><div class="user-name">Kartikeya Pant</div><div class="user-role">EXEC</div></div>
+    </div>
+    <button class="logout-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-header">
+    <h1>The Floor</h1>
+    <p class="subtitle">Open discussion, debates, and real-time economic discourse. Speak your mind.</p>
+    <div class="header-rule"></div>
+  </div>
+
+  <div class="content">
+    <!-- ACTION BAR -->
+    <div class="action-bar">
+      <button class="btn-primary" onclick="openModal('discussModal')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Start Discussion
+      </button>
+      <button class="btn-outline" onclick="openModal('pollModal')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        New Poll
+      </button>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" id="tabDiscussions" onclick="switchTab('discussions')">DISCUSSIONS</button>
+      <button class="tab" id="tabPolls" onclick="switchTab('polls')">POLLS</button>
+    </div>
+
+    <!-- FILTER TAGS (discussions only) -->
+    <div class="filter-bar" id="filterBar">
+      <span class="filter-label">FILTER:</span>
+      <button class="filter-tag active" onclick="filterByTag(this,'all')">All</button>
+      <button class="filter-tag" onclick="filterByTag(this,'macroeconomics')">macroeconomics</button>
+      <button class="filter-tag" onclick="filterByTag(this,'fed-policy')">fed-policy</button>
+      <button class="filter-tag" onclick="filterByTag(this,'trade')">trade</button>
+      <button class="filter-tag" onclick="filterByTag(this,'inflation')">inflation</button>
+      <button class="filter-tag" onclick="filterByTag(this,'debate')">debate</button>
+    </div>
+
+    <!-- DISCUSSIONS PANEL -->
+    <div id="panelDiscussions">
+      <div class="posts-list" id="discussionsList"></div>
+    </div>
+
+    <!-- POLLS PANEL (hidden initially) -->
+    <div id="panelPolls" style="display:none">
+      <div class="posts-list" id="pollsList"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-brand">
+      <div class="name">THE ECONOMIC FORUM</div>
+      <div class="sub">Watchung Hills Regional High School</div>
+    </div>
+    <div class="footer-social">
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none"/></svg></a>
+      <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></a>
+    </div>
+  </footer>
+  <div class="footer-bottom">
+    <span class="footer-copy">© 2026 The Economic Forum. All rights reserved.</span>
+    <span class="footer-disc">Not affiliated with WHRHS</span>
+  </div>
+</main>
+
+<!-- ── START DISCUSSION MODAL ── -->
+<div class="modal-overlay" id="discussModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('discussModal')">×</button>
+    <div class="modal-title">Start Discussion</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="discTitle" type="text" placeholder="Enter a compelling title...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Content</label>
+      <textarea class="form-textarea" id="discContent" placeholder="Write your post... Use @username to mention someone"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tags (comma separated)</label>
+      <input class="form-input" id="discTags" type="text" placeholder="macroeconomics, fed-policy, debate...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Attachments</label>
+      <div class="attach-area" onclick="document.getElementById('fileInput').click()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        Attach files or images
+      </div>
+      <input type="file" id="fileInput" accept="image/*" onchange="previewFile(this)">
+      <div class="attach-preview" id="attachPreview"></div>
+    </div>
+    <button class="btn-full" onclick="publishDiscussion()">Publish Post</button>
+  </div>
+</div>
+
+<!-- ── NEW POLL MODAL ── -->
+<div class="modal-overlay" id="pollModal">
+  <div class="modal modal-sm">
+    <button class="modal-close" onclick="closeModal('pollModal')">×</button>
+    <div class="modal-title">Create a Poll</div>
+    <div class="form-group">
+      <label class="form-label">Question</label>
+      <input class="form-input" id="pollQuestion" type="text" placeholder="What should we debate?">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Options</label>
+      <div class="poll-option-inputs" id="pollOptionInputs">
+        <div class="poll-opt-row"><input class="form-input" type="text" placeholder="Option 1"><button class="remove-opt" onclick="removeOpt(this)" title="Remove">×</button></div>
+        <div class="poll-opt-row"><input class="form-input" type="text" placeholder="Option 2"><button class="remove-opt" onclick="removeOpt(this)" title="Remove">×</button></div>
+      </div>
+      <button class="add-option-btn" onclick="addPollOption()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Option
+      </button>
+    </div>
+    <button class="btn-full" onclick="publishPoll()">Create Poll</button>
+  </div>
+</div>
+
+<script>
+// ── DATA STORE ──
+let discussions = [
+  {
+    id: 1, title: "Should the Fed prioritize inflation control over employment?",
+    body: "With inflation still above the 2% target and unemployment ticking up, the Fed faces a classic dual-mandate tension. Which should take precedence in 2026, and why?",
+    author: "Kartikeya Pant", authorInitials: "KP", timeAgo: "2 hours ago",
+    tags: ["macroeconomics","fed-policy","debate"],
+    image: null, likes: 4, dislikes: 1, liked: false, disliked: false,
+    comments: [
+      { author: "Aryan S.", initials: "AS", text: "Employment should be the priority given current labor market softness." }
+    ],
+    commentsOpen: false
+  },
+  {
+    id: 2, title: "Is free trade always beneficial? The case of semiconductor tariffs.",
+    body: "Recent U.S. tariffs on semiconductors have reignited the debate about comparative advantage vs. strategic industry protection. Where do you stand?",
+    author: "Mia Chen", authorInitials: "MC", timeAgo: "5 hours ago",
+    tags: ["trade","macroeconomics"],
+    image: null, likes: 7, dislikes: 2, liked: false, disliked: false,
+    comments: [], commentsOpen: false
+  }
+];
+
+let polls = [
+  {
+    id: 1, question: "Which topic should the next Weekly Feature cover?",
+    options: [
+      { label: "Central Bank Digital Currencies", votes: 5 },
+      { label: "The Economics of Climate Change", votes: 8 },
+      { label: "Income Inequality & Redistribution", votes: 3 },
+      { label: "Trade Wars & Geopolitics", votes: 4 }
+    ],
+    votedIndex: null, timeAgo: "1 day ago"
+  },
+  {
+    id: 2, question: "Should the U.S. pursue a universal basic income?",
+    options: [
+      { label: "Yes — it would reduce poverty", votes: 6 },
+      { label: "No — it's fiscally unsustainable", votes: 9 },
+      { label: "Maybe — with significant reform", votes: 7 }
+    ],
+    votedIndex: null, timeAgo: "3 days ago"
+  }
+];
+
+let attachedImageData = null;
+let activeTag = 'all';
+
+// ── RENDER ──
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + ' min ago';
+  if (s < 86400) return Math.floor(s/3600) + ' hours ago';
+  return Math.floor(s/86400) + ' days ago';
+}
+
+function renderDiscussions() {
+  const list = document.getElementById('discussionsList');
+  const filtered = activeTag === 'all'
+    ? discussions
+    : discussions.filter(d => d.tags.includes(activeTag));
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><p class="empty-text">No discussions yet. Be the first to start one!</p></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(d => `
+    <div class="disc-card" id="disc-${d.id}">
+      ${d.image ? `<img src="${d.image}" class="disc-image" alt="Attached image">` : ''}
+      <div class="disc-title">${escHtml(d.title)}</div>
+      <div class="disc-body">${escHtml(d.body)}</div>
+      ${d.tags.length ? `<div class="disc-tags">${d.tags.map(t=>`<span class="tag-pill">${escHtml(t)}</span>`).join('')}</div>` : ''}
+      <div class="disc-meta">
+        <span class="author">
+          <span class="author-av">${d.authorInitials}</span>
+          ${escHtml(d.author)}
+        </span>
+        <span>·</span>
+        <span>${d.timeAgo}</span>
+        <span>·</span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        ${d.comments.length}
+      </div>
+      <div class="disc-actions">
+        <button class="action-btn ${d.liked?'liked':''}" onclick="reactDisc(${d.id},'like')">
+          <svg width="14" height="14" fill="${d.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+          ${d.likes}
+        </button>
+        <button class="action-btn ${d.disliked?'disliked':''}" onclick="reactDisc(${d.id},'dislike')">
+          <svg width="14" height="14" fill="${d.disliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+          ${d.dislikes}
+        </button>
+        <button class="action-btn" onclick="toggleComments(${d.id})">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          ${d.comments.length} comment${d.comments.length !== 1 ? 's' : ''}
+        </button>
+      </div>
+      <div class="comments-section ${d.commentsOpen?'open':''}" id="comments-${d.id}">
+        <div id="comment-list-${d.id}">
+          ${d.comments.map(c=>`
+            <div class="comment">
+              <div class="comment-av">${c.initials}</div>
+              <div class="comment-body">
+                <div class="comment-author">${escHtml(c.author)}</div>
+                <div class="comment-text">${escHtml(c.text)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="comment-input-row">
+          <textarea class="comment-input" id="cinput-${d.id}" placeholder="Add a comment..." rows="1"></textarea>
+          <button class="comment-submit" onclick="submitComment(${d.id})">Post</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderPolls() {
+  const list = document.getElementById('pollsList');
+  if (polls.length === 0) {
+    list.innerHTML = `<div class="empty-state"><p class="empty-text">No polls yet. Create one!</p></div>`;
+    return;
+  }
+
+  list.innerHTML = polls.map(p => {
+    const totalVotes = p.options.reduce((a,o)=>a+o.votes, 0);
+    const optionsHtml = p.options.map((o, i) => {
+      const pct = totalVotes ? Math.round(o.votes / totalVotes * 100) : 0;
+      const isVoted = p.votedIndex === i;
+      const hasVoted = p.votedIndex !== null;
+      return `
+        <div class="poll-option ${isVoted?'voted-for':''}" onclick="votePoll(${p.id},${i})" style="${hasVoted?'cursor:default':''}">
+          <div class="poll-bar ${isVoted?'voted-bar':''}" style="width:${hasVoted?pct:0}%"></div>
+          <div class="poll-option-content">
+            <div class="poll-option-label">
+              ${isVoted ? `<svg class="poll-check" width="16" height="16" fill="none" stroke="#c9a84c" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+              ${escHtml(o.label)}
+            </div>
+            ${hasVoted ? `<span class="poll-pct ${isVoted?'gold':''}">${pct}%</span>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="poll-card">
+        <div class="poll-title">
+          <svg width="16" height="16" fill="none" stroke="#c9a84c" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          ${escHtml(p.question)}
+        </div>
+        <div class="poll-options">${optionsHtml}</div>
+        <div class="poll-footer">
+          <span>${p.options.reduce((a,o)=>a+o.votes,0)} vote${p.options.reduce((a,o)=>a+o.votes,0)!==1?'s':''}</span>
+          <span>${p.timeAgo}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── INTERACTIONS ──
+function reactDisc(id, type) {
+  const d = discussions.find(x=>x.id===id);
+  if (!d) return;
+  if (type === 'like') {
+    if (d.liked) { d.liked=false; d.likes--; }
+    else { d.liked=true; d.likes++; if(d.disliked){d.disliked=false;d.dislikes--;} }
+  } else {
+    if (d.disliked) { d.disliked=false; d.dislikes--; }
+    else { d.disliked=true; d.dislikes++; if(d.liked){d.liked=false;d.likes--;} }
+  }
+  renderDiscussions();
+}
+
+function toggleComments(id) {
+  const d = discussions.find(x=>x.id===id);
+  if (d) { d.commentsOpen = !d.commentsOpen; renderDiscussions(); }
+}
+
+function submitComment(id) {
+  const d = discussions.find(x=>x.id===id);
+  const input = document.getElementById(`cinput-${id}`);
+  if (!d || !input || !input.value.trim()) return;
+  d.comments.push({ author: "Kartikeya Pant", initials: "KP", text: input.value.trim() });
+  d.commentsOpen = true;
+  renderDiscussions();
+}
+
+function votePoll(pollId, optIndex) {
+  const p = polls.find(x=>x.id===pollId);
+  if (!p || p.votedIndex !== null) return;
+  p.votedIndex = optIndex;
+  p.options[optIndex].votes++;
+  renderPolls();
+}
+
+function filterByTag(btn, tag) {
+  activeTag = tag;
+  document.querySelectorAll('.filter-tag').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDiscussions();
+}
+
+function switchTab(tab) {
+  document.getElementById('tabDiscussions').classList.toggle('active', tab==='discussions');
+  document.getElementById('tabPolls').classList.toggle('active', tab==='polls');
+  document.getElementById('panelDiscussions').style.display = tab==='discussions' ? '' : 'none';
+  document.getElementById('panelPolls').style.display = tab==='polls' ? '' : 'none';
+  document.getElementById('filterBar').style.display = tab==='discussions' ? '' : 'none';
+}
+
+// ── MODALS ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+// ── PUBLISH DISCUSSION ──
+function previewFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    attachedImageData = e.target.result;
+    document.getElementById('attachPreview').textContent = '📎 ' + file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function publishDiscussion() {
+  const title = document.getElementById('discTitle').value.trim();
+  const body  = document.getElementById('discContent').value.trim();
+  const tagsRaw = document.getElementById('discTags').value.trim();
+  if (!title) { document.getElementById('discTitle').focus(); return; }
+  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+  discussions.unshift({
+    id: Date.now(), title, body, author: "Kartikeya Pant", authorInitials: "KP",
+    timeAgo: "just now", tags, image: attachedImageData,
+    likes: 0, dislikes: 0, liked: false, disliked: false,
+    comments: [], commentsOpen: false
+  });
+  // Add any new tags to filter bar
+  tags.forEach(t => {
+    const existing = [...document.querySelectorAll('.filter-tag')].map(b=>b.dataset?.tag||b.textContent.trim());
+    if (!existing.includes(t)) {
+      const btn = document.createElement('button');
+      btn.className = 'filter-tag';
+      btn.textContent = t;
+      btn.onclick = () => filterByTag(btn, t);
+      document.getElementById('filterBar').appendChild(btn);
+    }
+  });
+  document.getElementById('discTitle').value = '';
+  document.getElementById('discContent').value = '';
+  document.getElementById('discTags').value = '';
+  document.getElementById('attachPreview').textContent = '';
+  document.getElementById('fileInput').value = '';
+  attachedImageData = null;
+  closeModal('discussModal');
+  renderDiscussions();
+}
+
+// ── PUBLISH POLL ──
+function addPollOption() {
+  const container = document.getElementById('pollOptionInputs');
+  const count = container.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'poll-opt-row';
+  row.innerHTML = `<input class="form-input" type="text" placeholder="Option ${count}"><button class="remove-opt" onclick="removeOpt(this)" title="Remove">×</button>`;
+  container.appendChild(row);
+}
+
+function removeOpt(btn) {
+  const container = document.getElementById('pollOptionInputs');
+  if (container.children.length <= 2) return;
+  btn.parentElement.remove();
+}
+
+function publishPoll() {
+  const question = document.getElementById('pollQuestion').value.trim();
+  if (!question) { document.getElementById('pollQuestion').focus(); return; }
+  const inputs = [...document.querySelectorAll('#pollOptionInputs .form-input')];
+  const options = inputs.map(i=>i.value.trim()).filter(Boolean).map(label=>({label,votes:0}));
+  if (options.length < 2) return;
+  polls.unshift({ id: Date.now(), question, options, votedIndex: null, timeAgo: 'just now' });
+  document.getElementById('pollQuestion').value = '';
+  document.querySelectorAll('#pollOptionInputs .form-input').forEach(i=>i.value='');
+  closeModal('pollModal');
+  switchTab('polls');
+  renderPolls();
+}
+
+// ── UTILS ──
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INIT ──
+renderDiscussions();
+renderPolls();
+</script>
+</body>
+</html>
