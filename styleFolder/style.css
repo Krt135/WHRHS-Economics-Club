@@ -1,13 +1,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --navy: #0f1f3d; --navy-light: #1a2e52;
-    --gold: #c9a84c; --gold-light: #e2c47a; --gold-bg: #fdf8ee;
-    --cream: #f5f0e8; --cream-dark: #ede7d9;
-    --text-dark: #0f1f3d; --text-muted: #6b7280;
-    --sidebar-width: 195px; --border: #e5e7eb;
-    --green: #16a34a; --green-bg: #f0fdf4; --green-border: #bbf7d0;
-    --red: #dc2626; --red-bg: #fff1f2; --red-border: #fecdd3;
-  }
+:root {
+  --navy: #0f1f3d; --navy-light: #1a2e52;
+  --gold: #c9a84c; --gold-bg: #fdf8ee; --gold-light: #e2c47a;
+  --cream: #f5f0e8; --cream-dark: #ede7d9;
+  --text-dark: #0f1f3d; --text-muted: #6b7280;
+  --sidebar-width: 195px; --border: #e5e7eb;
+  --green: #16a34a; --green-bg: #f0fdf4; --green-border: #bbf7d0;
+  --red: #dc2626; --red-bg: #fff1f2; --red-border: #fecdd3;
+  --beginner: #16a34a; --beginner-bg: #dcfce7;
+  --intermediate: #d97706; --intermediate-bg: #fef3c7;
+  --advanced: #dc2626; --advanced-bg: #fee2e2;
+}
   body { font-family: 'Crimson Pro', Georgia, serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; display: flex; overflow-x: hidden; position: relative;}
 
   /* SIDEBAR */
