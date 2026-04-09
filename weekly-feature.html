@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="styleFolder/weekly-feature.css">
 <script src="scriptFolder/footer.js" defer></script>
 <script src="scriptFolder/sidebar.js" defer></script>
+<script type="module" src="scriptFolder/weekly-feature.js" defer></script>
 </head>
 <body>
 
@@ -27,7 +28,7 @@
       <div class="header-rule"></div>
     </div>
     <div class="list-content">
-      <button class="btn-publish" onclick="openModal('publishModal')">
+      <button class="btn-publish" onclick="window.openModal('publishModal')">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Publish Feature
       </button>
@@ -49,16 +50,16 @@
   <!-- ── ARTICLE VIEW ── -->
   <div class="view" id="viewArticle">
     <div class="article-topbar">
-      <button class="back-btn" onclick="showList()">
+      <button class="back-btn" onclick="window.showList()">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Weekly Feature
       </button>
       <div class="topbar-actions">
-        <button class="topbar-btn btn-edit" onclick="openEditModal()">
+        <button class="topbar-btn btn-edit" onclick="window.openEditModal()">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Edit
         </button>
-        <button class="topbar-btn btn-delete" onclick="openConfirmDelete()">
+        <button class="topbar-btn btn-delete" onclick="window.openConfirmDelete()">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
           Delete
         </button>
@@ -72,7 +73,7 @@
 <!-- ── PUBLISH MODAL ── -->
 <div class="modal-overlay" id="publishModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('publishModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('publishModal')">×</button>
     <div class="modal-title">Publish Feature</div>
     <div class="modal-subtitle">Write your weekly academic essay. It will appear on The Weekly Feature page.</div>
     <div class="form-group">
@@ -89,14 +90,14 @@
       <textarea class="form-textarea" id="pubContent" placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved." oninput="updateWordCount()"></textarea>
       <div class="word-count" id="wordCount">0 words</div>
     </div>
-    <button class="btn-full" onclick="publishFeature()">Publish Feature</button>
+    <button class="btn-full" onclick="window.publishFeature()">Publish Feature</button>
   </div>
 </div>
 
 <!-- ── EDIT MODAL ── -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('editModal')">×</button>
     <div class="modal-title">Edit Feature</div>
     <div class="modal-subtitle">Make changes to your published essay.</div>
     <div class="form-group">
@@ -109,10 +110,10 @@
     </div>
     <div class="form-group">
       <label class="form-label">Essay Content</label>
-      <textarea class="form-textarea" id="editContent" oninput="updateEditWordCount()"></textarea>
+      <textarea class="form-textarea" id="editContent" oninput="window.updateEditWordCount()"></textarea>
       <div class="word-count" id="editWordCount">0 words</div>
     </div>
-    <button class="btn-full" onclick="saveEdit()">Save Changes</button>
+    <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
   </div>
 </div>
 
@@ -123,8 +124,8 @@
     <div class="confirm-title">Delete this feature?</div>
     <div class="confirm-desc">This will permanently remove the essay and all its comments. This action cannot be undone.</div>
     <div class="confirm-btns">
-      <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
-      <button class="btn-confirm-delete" onclick="deleteFeature()">Yes, Delete</button>
+      <button class="btn-cancel" onclick="window.closeModal('confirmModal')">Cancel</button>
+      <button class="btn-confirm-delete" onclick="window.deleteFeature()">Yes, Delete</button>
     </div>
   </div>
 </div>
@@ -132,12 +133,12 @@
 <!-- ── REACTIONS MODAL ── -->
 <div class="modal-overlay" id="reactionsModal">
   <div class="modal reactions-modal">
-    <button class="modal-close" onclick="closeModal('reactionsModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('reactionsModal')">×</button>
     <div class="modal-title">Reactions</div>
     <div class="reactions-list" id="reactionsList"></div>
   </div>
 </div>
 
-<script src="scriptFolder/weekly-feature.js"></script>
+
 </body>
 </html>
