@@ -13,6 +13,7 @@
     <link rel = "stylesheet" href = "styleFolder/economic-forum.css">
     <script src="scriptFolder/footer.js" defer></script>
     <script src="scriptFolder/sidebar.js" defer></script>
+    <script type="module" src="scriptFolder/index.js" defer></script>
 </head>
 
 <body>
@@ -34,8 +35,8 @@
         <p class="hero-desc">A forum for rigorous economic discourse, weekly features, and collaborative learning at
           Watchung Hills Regional High School.</p>
         <div class="hero-actions">
-          <a href="#" class="btn-primary">Enter The Floor &nbsp;→</a>
-          <a href="#" class="btn-secondary">About The Forum</a>
+          <a href="the-floor.html" class="btn-primary">Enter The Floor &nbsp;→</a>
+          <a href="about-us.html" class="btn-secondary">About The Forum</a>
         </div>
       </div>
 
@@ -100,84 +101,86 @@
     <!-- CONTENT GRID -->
     <div class="content-grid">
 
-      <!-- Latest from The Floor -->
-      <div class="floor-section">
-        <div class="section-header">
-          <div class="section-title">
-            <svg width="18" height="18" fill="none" stroke="#c9a84c" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-            </svg>
-            Latest from The Floor
-          </div>
-          <a href="#" class="view-all">VIEW ALL &nbsp;→</a>
-        </div>
-        <div class="floor-card">
-          <p class="floor-empty">The Floor is quiet. Be the first to start a discussion.</p>
-        </div>
+  <div class="floor-section">
+    <div class="section-header">
+      <div class="section-title">
+        <svg width="18" height="18" fill="none" stroke="#c9a84c" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+        </svg>
+        Latest from The Floor
       </div>
-
-      <!-- Quick Links -->
-      <div>
-        <div class="quick-links-card">
-          <div class="quick-links-title">QUICK LINKS</div>
-
-          <a href="the-floor.html" class="quick-link-item">
-            <div class="ql-icon">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-              </svg>
-            </div>
-            <div class="ql-text">
-              <div class="ql-name">The Floor</div>
-              <div class="ql-sub">Open Discussion</div>
-            </div>
-          </a>
-
-          <a href="weekly-feature.html" class="quick-link-item">
-            <div class="ql-icon">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-            </div>
-            <div class="ql-text">
-              <div class="ql-name">Weekly Feature</div>
-              <div class="ql-sub">Academic Essays</div>
-            </div>
-          </a>
-
-          <a href="the-academy.html" class="quick-link-item">
-            <div class="ql-icon">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-                <path d="M6 12v5c3 3 9 3 12 0v-5" />
-              </svg>
-            </div>
-            <div class="ql-text">
-              <div class="ql-name">The Academy</div>
-              <div class="ql-sub">Learn Economics</div>
-            </div>
-          </a>
-
-          <a href="trading-floor.html" class="quick-link-item">
-            <div class="ql-icon">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <polyline points="8 21 12 17 16 21" />
-              </svg>
-            </div>
-            <div class="ql-text">
-              <div class="ql-name">Trading Floor</div>
-              <div class="ql-sub">Economics Games</div>
-            </div>
-          </a>
-
-        </div>
-      </div>
-
+      <a href="the-floor.html" class="view-all">VIEW ALL &nbsp;→</a>
     </div>
+    
+    <div id="latestFloorPosts">
+        <p class="floor-empty">The Floor is quiet. Be the first to start a discussion.</p>
+    </div>
+  </div> <div class="quick-links-container">
+    <div class="quick-links-card">
+      <div class="quick-links-title">QUICK LINKS</div>
+
+      <a href="the-floor.html" class="quick-link-item">
+        <div class="ql-icon">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          </svg>
+        </div>
+        <div class="ql-text">
+          <div class="ql-name">The Floor</div>
+          <div class="ql-sub">Open Discussion</div>
+        </div>
+      </a>
+
+      <a href="weekly-feature.html" class="quick-link-item">
+        <div class="ql-icon">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+        </div>
+        <div class="ql-text">
+          <div class="ql-name">Weekly Feature</div>
+          <div class="ql-sub">Academic Essays</div>
+        </div>
+      </a>
+
+      <a href="the-academy.html" class="quick-link-item">
+        <div class="ql-icon">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+            <path d="M6 12v5c3 3 9 3 12 0v-5" />
+          </svg>
+        </div>
+        <div class="ql-text">
+          <div class="ql-name">The Academy</div>
+          <div class="ql-sub">Learn Economics</div>
+        </div>
+      </a>
+
+      <a href="trading-floor.html" class="quick-link-item">
+        <div class="ql-icon">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <polyline points="8 21 12 17 16 21" />
+          </svg>
+        </div>
+        <div class="ql-text">
+          <div class="ql-name">Trading Floor</div>
+          <div class="ql-sub">Economics Games</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+
+<div class="content-grid">
+  <div class="floor-section"></div>
+  </div> </div>
+
 
     <!-- FOOTER -->
     <tef-footer></tef-footer>

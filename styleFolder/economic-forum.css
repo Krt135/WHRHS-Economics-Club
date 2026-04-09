@@ -224,7 +224,6 @@
 }
 
 /* The Floor section */
-.floor-section {}
 
 .section-header {
   display: flex;
@@ -327,8 +326,6 @@
   color: var(--navy);
 }
 
-.ql-text {}
-
 .ql-name {
   font-size: 14px;
   font-weight: 600;
@@ -341,4 +338,90 @@
   font-size: 9px;
   color: var(--gold);
   letter-spacing: 0.05em;
+}
+
+/* --- Latest from The Floor Section Styles --- */
+
+#latestFloorPosts {
+    display: flex;
+    flex-direction: column;
+    gap: 16px; /* Space between cards */
+}
+
+.home-post-card {
+    background-color: #fcf6e5; /* Beige/cream background */
+    border-left: 4px solid #c9a84c; /* Gold accent border */
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border-radius: 0 4px 4px 0;
+    text-align: left;
+}
+
+.home-post-card:hover {
+    background-color: #f7eed5; /* Slightly darker beige on hover */
+    transform: translateX(6px); /* Nudge to the right */
+    box-shadow: 4px 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Typography & Content Inside Cards */
+.hp-title {
+    color: #0f1f3d;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+}
+
+.hp-body {
+    color: #4a5568;
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+/* Metadata (Author, Time, Comments) */
+.hp-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 0.8rem;
+    color: #718096;
+    margin-bottom: 12px;
+}
+
+.hp-author {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.hp-av {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #c9a84c;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Reactions (Likes/Dislikes) */
+.hp-reactions {
+    display: flex;
+    gap: 15px;
+    color: #a0aec0;
+}
+
+.hp-reactions span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85rem;
 }
