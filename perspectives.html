@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styleFolder/perspectives.css">
 <script src="scriptFolder/footer.js" defer></script>
 <script src="scriptFolder/sidebar.js" defer></script>
-<script src="scriptFolder/perspectives.js" defer></script>
+<script type="module" src="scriptFolder/perspectives.js" defer></script>
 
 
 </head>
@@ -26,12 +26,12 @@
 
     <!-- Announcement bar -->
     <div class="announce-bar" id="announceBar">
-      <button class="announce-btn" onclick="openModal('announceModal')">
+      <button class="announce-btn" onclick="window.openModal('announceModal')">
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Post Announcement
       </button>
       <span class="announce-text" id="announceText"></span>
-      <button class="announce-dismiss" onclick="dismissAnnounce()" title="Dismiss">×</button>
+      <button class="announce-dismiss" onclick="window.dismissAnnounce()" title="Dismiss">×</button>
     </div>
 
     <div class="page-header">
@@ -43,12 +43,12 @@
     <div class="list-content">
       <div class="toolbar">
         <div class="toolbar-left">
-          <button class="btn-write" onclick="openModal('writeModal')">
+          <button class="btn-write" onclick="window.openModal('writeModal')">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Write an Essay
           </button>
         </div>
-        <select class="sort-select" onchange="sortPosts(this.value)">
+        <select class="sort-select" onchange="window.sortPosts(this.value)">
           <option value="newest">NEWEST FIRST</option>
           <option value="oldest">OLDEST FIRST</option>
           <option value="popular">MOST LIKED</option>
@@ -62,7 +62,7 @@
 
       <div class="filter-bar" id="filterBar">
         <span class="filter-label">FILTER:</span>
-        <button class="filter-tag active" onclick="filterTag(this,'all')">All</button>
+        <button class="filter-tag active" onclick="window.filterTag(this,'all')">All</button>
       </div>
 
       <div id="postsList"></div>
@@ -77,7 +77,7 @@
   <!-- ── ARTICLE VIEW ── -->
   <div class="view" id="viewArticle">
     <div class="article-topbar">
-      <button class="back-btn" onclick="showList()">
+      <button class="back-btn" onclick="window.showList()">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Perspectives
       </button>
@@ -91,7 +91,7 @@
 <!-- ── WRITE MODAL ── -->
 <div class="modal-overlay" id="writeModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('writeModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('writeModal')">×</button>
     <div class="modal-title">Write an Essay</div>
     <div class="form-group">
       <label class="form-label">Title</label>
@@ -112,17 +112,17 @@
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
         Attach files or images
       </div>
-      <input type="file" id="fileInput" accept="image/*" onchange="previewImg(this,'wImgPreview','wImgData')">
+      <input type="file" id="fileInput" accept="image/*" onchange="window.previewImg(this,'wImgPreview','wImgData')">
       <div class="attach-preview" id="wImgPreview"></div>
     </div>
-    <button class="btn-full" onclick="publishPost()">Publish Post</button>
+    <button class="btn-full" onclick="window.publishPost()">Publish Post</button>
   </div>
 </div>
 
 <!-- ── EDIT MODAL ── -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('editModal')">×</button>
     <div class="modal-title">Edit Essay</div>
     <div class="form-group">
       <label class="form-label">Title</label>
@@ -130,7 +130,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">Content</label>
-      <textarea class="form-textarea" id="eContent" oninput="wc('eContent','eWC')"></textarea>
+      <textarea class="form-textarea" id="eContent" oninput="window.wc('eContent','eWC')"></textarea>
       <div class="word-count" id="eWC">0 words</div>
     </div>
     <div class="form-group">
@@ -143,10 +143,10 @@
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
         Attach new image
       </div>
-      <input type="file" id="editFileInput" accept="image/*" onchange="previewImg(this,'eImgPreview','eImgData')">
+      <input type="file" id="editFileInput" accept="image/*" onchange="window.previewImg(this,'eImgPreview','eImgData')">
       <div class="attach-preview" id="eImgPreview"></div>
     </div>
-    <button class="btn-full" onclick="saveEdit()">Save Changes</button>
+    <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
   </div>
 </div>
 
@@ -157,8 +157,8 @@
     <div class="confirm-title">Delete this essay?</div>
     <div class="confirm-desc">This will permanently remove the essay and all its comments. This action cannot be undone.</div>
     <div class="confirm-btns">
-      <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
-      <button class="btn-confirm-del" onclick="deletePost()">Yes, Delete</button>
+      <button class="btn-cancel" onclick="window.closeModal('confirmModal')">Cancel</button>
+      <button class="btn-confirm-del" onclick="window.deletePost()">Yes, Delete</button>
     </div>
   </div>
 </div>
@@ -166,13 +166,13 @@
 <!-- ── ANNOUNCE MODAL ── -->
 <div class="modal-overlay" id="announceModal">
   <div class="modal announce-modal">
-    <button class="modal-close" onclick="closeModal('announceModal')">×</button>
+    <button class="modal-close" onclick="window.closeModal('announceModal')">×</button>
     <div class="modal-title">Post Announcement</div>
     <div class="form-group">
       <label class="form-label">Announcement Text</label>
       <input class="form-input" id="announceInput" type="text" placeholder="e.g. Perspectives submissions open through Friday!">
     </div>
-    <button class="btn-full" onclick="postAnnounce()">Post to Banner</button>
+    <button class="btn-full" onclick="window.postAnnounce()">Post to Banner</button>
   </div>
 </div>
 

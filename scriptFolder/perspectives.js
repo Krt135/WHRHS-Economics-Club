@@ -1,45 +1,13 @@
-// ── COLOUR PALETTE for author avatars ──
-const COLOURS = ['#0f1f3d','#1a2e52','#7c3aed','#0369a1','#065f46','#92400e','#9f1239'];
-function avatarColour(name) { let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))%COLOURS.length; return COLOURS[h]; }
+// 1. ── IMPORTS & FIREBASE SETUP ──
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
+import { getDatabase, ref, push, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-database.js";
+import { firebaseConfig } from './app.js'; // Your centralized config!
 
-// ── DATA ──
-let posts = [
-  {
-    id: 1, title: "Why the Gig Economy Isn't as Free as It Looks",
-    content: `The rise of platform-mediated gig work — Uber, DoorDash, Fiverr, TaskRabbit — is often celebrated as the democratization of labor. Workers set their own hours, choose their clients, and escape the tyranny of the nine-to-five. The narrative is seductive. The economics, however, are more complicated.
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-Gig work externalizes virtually every cost of employment onto the worker. Benefits, payroll taxes, equipment, insurance, professional development — all transferred from the employer's balance sheet to the individual. The platform captures the economic surplus of the match (connecting supply and demand efficiently) while bearing none of the traditional obligations of an employer.
-
-From a macroeconomic standpoint, this represents a structural shift in how labor income is distributed. When workers are reclassified as contractors, their bargaining power collapses. There is no minimum wage floor, no overtime protection, no right to organize. The platform can reprice their labor downward with an algorithm update.
-
-The economic freedom of gig work is real at the margin — it suits parents needing flexibility, students earning supplemental income, retirees who want part-time engagement. But as a replacement for stable employment, it represents a deterioration in the quality of work, not an improvement in its nature.
-
-The policy question is not whether gig work should exist — it clearly serves genuine demand — but whether the current regulatory framework, designed for an industrial economy, adequately protects workers in a platform economy. That is a question our generation will need to answer.`,
-    author: "Aryan Shah", authorInitials: "AS",
-    tags: ["labor","gig-economy","policy"],
-    image: null, postedAt: new Date(Date.now()-2*3600000),
-    likes: 6, dislikes: 1, liked: false, disliked: false, featured: true,
-    comments: [{ id:1, author:"Kartikeya Pant", initials:"KP", text:"Really sharp analysis. The externalization of costs is the key insight.", postedAt: new Date(Date.now()-1*3600000), likes:2, liked:false }]
-  },
-  {
-    id: 2, title: "What Monopoly the Board Game Gets Wrong About Monopoly the Economic Concept",
-    content: `Monopoly teaches us that one player accumulates all the resources and everyone else goes bankrupt. This is a reasonably accurate description of how the game ends, and a catastrophically inaccurate description of how monopolies function in the real economy.
-
-Real monopolies rarely seek to bankrupt their customers — that would eliminate the revenue stream. Instead, they engage in rent extraction: charging prices above the competitive equilibrium while producing less output than a competitive market would. The harm is not visible bankruptcy but invisible inefficiency — goods and services that would have existed in a competitive market simply do not get produced.
-
-The game also misses the dynamic of regulatory capture. Actual monopolists in the 21st century spend enormous resources influencing the regulatory environment — lobbying for favorable legislation, challenging antitrust enforcement, funding think tanks that argue concentration is benign. These are activities that consume real resources and produce no social value, what economists call rent-seeking behavior.
-
-Perhaps most importantly, Monopoly treats the initial distribution of properties as random and fair. Real economic monopolization often has deeply historical roots — network effects that locked in early winners, regulatory decisions that created barriers to entry, and in some cases, straightforward anti-competitive behavior that was not prosecuted.
-
-None of this means Monopoly is a bad game. It is an excellent game for teaching property rights, negotiation, and the compounding power of early advantage. But it should come with a disclaimer: actual antitrust economics is considerably more interesting.`,
-    author: "Priya Mehta", authorInitials: "PM",
-    tags: ["microeconomics","antitrust","opinion"],
-    image: null, postedAt: new Date(Date.now()-18*3600000),
-    likes: 11, dislikes: 0, liked: false, disliked: false, featured: false,
-    comments: []
-  }
-];
-
+// 2. ── GLOBAL STATE & UTILS ──
+let posts = []; // This starts empty and gets filled by Firebase
 let currentPostId = null;
 let activeTag = 'all';
 let sortMode = 'newest';
@@ -47,15 +15,27 @@ let pendingImgData = null;
 let editImgData = null;
 let announceMsg = '';
 
-// ── WORD COUNT ──
-function wc(textareaId, countId) {
+const COLOURS = ['#0f1f3d','#1a2e52','#7c3aed','#0369a1','#065f46','#92400e','#9f1239'];
+function avatarColour(name) { let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))%COLOURS.length; return COLOURS[h]; }
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function rel(date){
+  const s=Math.floor((Date.now()-date)/1000);
+  if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';
+  if(s<86400)return Math.floor(s/3600)+' hours ago';return Math.floor(s/86400)+' days ago';
+}
+
+// 3. ── WINDOW BINDINGS (For HTML Elements) ──
+window.openModal = (id) => { document.getElementById(id).classList.add('open'); };
+window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+window.wc = (textareaId, countId) => {
   const v = document.getElementById(textareaId).value;
   const n = v.trim() ? v.trim().split(/\s+/).length : 0;
   document.getElementById(countId).textContent = n + ' words';
-}
+};
 
-// ── IMAGE PREVIEW ──
-function previewImg(input, previewId, dataKey) {
+window.previewImg = (input, previewId, dataKey) => {
   const file = input.files[0]; if(!file) return;
   const r = new FileReader();
   r.onload = e => {
@@ -64,67 +44,91 @@ function previewImg(input, previewId, dataKey) {
     document.getElementById(previewId).textContent = '📎 ' + file.name;
   };
   r.readAsDataURL(file);
-}
+};
 
-// ── MODAL ──
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
-
-// ── VIEWS ──
-function showList() {
+window.showList = () => {
   document.getElementById('viewList').classList.add('active');
   document.getElementById('viewArticle').classList.remove('active');
   currentPostId = null;
   renderList();
-}
-function showArticle(id) {
+};
+
+window.showArticle = (id) => {
   currentPostId = id;
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
-}
+};
 
-// ── FILTER / SORT / SEARCH ──
-function filterTag(btn, tag) {
+window.filterTag = (btn, tag) => {
   activeTag = tag;
   document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderList();
-}
-function sortPosts(mode) { sortMode = mode; renderList(); }
+};
 
+window.sortPosts = (mode) => { sortMode = mode; renderList(); };
+
+// 4. ── FIREBASE LISTENER (The Core Engine) ──
+const postsRef = ref(db, 'perspectives');
+onValue(postsRef, (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    posts = Object.keys(data).map(key => {
+      const post = data[key];
+      // Convert Firebase objects back into standard arrays
+      const commentsArray = post.comments ? Object.keys(post.comments).map(cId => ({id: cId, ...post.comments[cId]})) : [];
+      const tagsArray = post.tags ? post.tags : [];
+      return {
+        id: key,
+        ...post,
+        comments: commentsArray,
+        tags: tagsArray,
+        postedAt: new Date(post.postedAt) // Convert timestamp back to Date object
+      };
+    });
+  } else {
+    posts = [];
+  }
+  
+  // Re-render whatever view the user is currently looking at
+  if (currentPostId) renderArticle();
+  else renderList();
+});
+
+// 5. ── RENDER FUNCTIONS (Private) ──
 function rebuildFilterBar() {
   const bar = document.getElementById('filterBar');
   const allTags = [...new Set(posts.flatMap(p => p.tags))].sort();
-  // keep existing buttons that are still valid
   bar.innerHTML = `<span class="filter-label">FILTER:</span>
     <button class="filter-tag ${activeTag==='all'?'active':''}" onclick="filterTag(this,'all')">All</button>
     ${allTags.map(t=>`<button class="filter-tag ${activeTag===t?'active':''}" onclick="filterTag(this,'${t}')">${esc(t)}</button>`).join('')}`;
 }
 
-// ── RENDER LIST ──
 function renderList() {
   rebuildFilterBar();
-  const q = document.getElementById('searchInput').value.toLowerCase();
+  const q = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
   let filtered = posts.filter(p => {
     const matchTag = activeTag==='all' || p.tags.includes(activeTag);
-    const matchSearch = !q || p.title.toLowerCase().includes(q) || p.author.toLowerCase().includes(q) || p.tags.some(t=>t.includes(q));
+    const matchSearch = !q || p.title.toLowerCase().includes(q) || p.author.toLowerCase().includes(q) || p.tags.some(t=>t.toLowerCase().includes(q));
     return matchTag && matchSearch;
   });
+  
   if (sortMode==='oldest') filtered.sort((a,b)=>a.postedAt-b.postedAt);
   else if (sortMode==='popular') filtered.sort((a,b)=>b.likes-a.likes);
   else filtered.sort((a,b)=>b.postedAt-a.postedAt);
 
   const el = document.getElementById('postsList');
+  if (!el) return; // Safety check
   if (!filtered.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
     return;
   }
+  
   el.innerHTML = filtered.map(p => {
     const excerpt = p.content.split('\n\n')[0].slice(0,240) + (p.content.length>240?'…':'');
     return `
-    <div class="persp-card" onclick="showArticle(${p.id})">
+    <div class="persp-card" onclick="showArticle('${p.id}')">
       <div class="pc-header">
         <div class="pc-title">${esc(p.title)}</div>
         ${p.featured ? `<span class="featured-badge">FEATURED</span>` : ''}
@@ -143,11 +147,11 @@ function renderList() {
       </div>
       ${p.tags.length ? `<div class="pc-tags">${p.tags.map(t=>`<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
       <div class="pc-actions" onclick="event.stopPropagation()">
-        <button class="react-btn ${p.liked?'liked':''}" onclick="react(${p.id},'like')">
+        <button class="react-btn ${p.liked?'liked':''}" onclick="react('${p.id}','like')">
           <svg width="14" height="14" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
           ${p.likes}
         </button>
-        <button class="react-btn ${p.disliked?'disliked':''}" onclick="react(${p.id},'dislike')">
+        <button class="react-btn ${p.disliked?'disliked':''}" onclick="react('${p.id}','dislike')">
           <svg width="14" height="14" fill="${p.disliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
           ${p.dislikes}
         </button>
@@ -156,14 +160,12 @@ function renderList() {
   }).join('');
 }
 
-// ── RENDER ARTICLE ──
 function renderArticle() {
-  const p = posts.find(x=>x.id===currentPostId); if(!p) return showList();
+  const p = posts.find(x=>x.id===currentPostId); if(!p) return window.showList();
   const wds = p.content.trim().split(/\s+/).length;
   const readMin = Math.max(1,Math.round(wds/200));
   const paragraphs = p.content.split(/\n\n+/).map(s=>`<p>${esc(s.trim())}</p>`).join('');
 
-  // Only show edit/delete for the author (KP in this demo)
   const isAuthor = p.author==='Kartikeya Pant';
   document.getElementById('articleTopActions').innerHTML = isAuthor ? `
     <button class="topbar-btn btn-edit" onclick="openEditModal()">
@@ -180,15 +182,15 @@ function renderArticle() {
           <div class="comment-bubble">
             <div class="comment-header">
               <span class="comment-author">${esc(c.author)}</span>
-              <span class="comment-time">${rel(c.postedAt)}</span>
+              <span class="comment-time">${rel(new Date(c.postedAt))}</span>
             </div>
             <div class="comment-text">${esc(c.text)}</div>
             <div class="comment-actions-row">
-              <button class="comment-action ${c.liked?'liked':''}" onclick="likeComment(${p.id},${c.id})">
+              <button class="comment-action ${c.liked?'liked':''}" onclick="likeComment('${p.id}','${c.id}')">
                 <svg width="12" height="12" fill="${c.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
                 ${c.likes}
               </button>
-              <button class="comment-action del-comment" onclick="deleteComment(${p.id},${c.id})">
+              <button class="comment-action del-comment" onclick="deleteComment('${p.id}','${c.id}')">
                 <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Delete
               </button>
             </div>
@@ -212,11 +214,11 @@ function renderArticle() {
     ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
     <div class="article-content">${paragraphs}</div>
     <div class="reaction-bar">
-      <button class="react-btn ${p.liked?'liked':''}" onclick="react(${p.id},'like');renderArticle()">
+      <button class="react-btn ${p.liked?'liked':''}" onclick="react('${p.id}','like')">
         <svg width="15" height="15" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
         ${p.likes} likes
       </button>
-      <button class="react-btn ${p.disliked?'disliked':''}" onclick="react(${p.id},'dislike');renderArticle()">
+      <button class="react-btn ${p.disliked?'disliked':''}" onclick="react('${p.id}','dislike')">
         <svg width="15" height="15" fill="${p.disliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
         ${p.dislikes} dislikes
       </button>
@@ -229,63 +231,101 @@ function renderArticle() {
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:20px">
         <textarea class="new-comment-input" id="cmtInput" placeholder="Add a comment..."></textarea>
-        <button class="btn-post-comment" onclick="postComment(${p.id})">Post</button>
+        <button class="btn-post-comment" onclick="postComment('${p.id}')">Post</button>
       </div>
     </div>`;
 }
 
-// ── REACTIONS ──
-function react(id, type) {
-  const p = posts.find(x=>x.id===id); if(!p) return;
-  if(type==='like'){
-    if(p.liked){p.liked=false;p.likes--;}
-    else{p.liked=true;p.likes++;if(p.disliked){p.disliked=false;p.dislikes--;}}
-  } else {
-    if(p.disliked){p.disliked=false;p.dislikes--;}
-    else{p.disliked=true;p.dislikes++;if(p.liked){p.liked=false;p.likes--;}}
-  }
-  if(currentPostId===id) renderArticle(); else renderList();
-}
-
-// ── COMMENTS ──
-function postComment(postId) {
-  const p=posts.find(x=>x.id===postId);
-  const inp=document.getElementById('cmtInput');
-  if(!p||!inp||!inp.value.trim()) return;
-  p.comments.push({id:Date.now(),author:'Kartikeya Pant',initials:'KP',text:inp.value.trim(),postedAt:new Date(),likes:0,liked:false});
-  renderArticle();
-}
-function likeComment(postId,cmtId) {
-  const p=posts.find(x=>x.id===postId); if(!p) return;
-  const c=p.comments.find(x=>x.id===cmtId); if(!c) return;
-  c.liked=!c.liked; c.likes+=c.liked?1:-1; renderArticle();
-}
-function deleteComment(postId,cmtId) {
-  const p=posts.find(x=>x.id===postId); if(!p) return;
-  p.comments=p.comments.filter(c=>c.id!==cmtId); renderArticle();
-}
-
-// ── PUBLISH ──
-function publishPost() {
+// 6. ── DATABASE MUTATIONS (CRUD to Firebase) ──
+window.publishPost = () => {
   const title=document.getElementById('wTitle').value.trim();
   const content=document.getElementById('wContent').value.trim();
   const tagsRaw=document.getElementById('wTags').value.trim();
   if(!title){document.getElementById('wTitle').focus();return;}
   if(!content){document.getElementById('wContent').focus();return;}
+  
   const tags=tagsRaw?tagsRaw.split(',').map(t=>t.trim()).filter(Boolean):[];
-  posts.unshift({id:Date.now(),title,content,author:'Kartikeya Pant',authorInitials:'KP',tags,image:pendingImgData,postedAt:new Date(),likes:0,dislikes:0,liked:false,disliked:false,featured:false,comments:[]});
+  
+  // 1. Create a new unique ID in Firebase
+  const newPostRef = push(ref(db, 'perspectives'));
+  
+  // 2. Set the data
+  set(newPostRef, {
+    title, 
+    content, 
+    author: 'Kartikeya Pant', 
+    authorInitials: 'KP', 
+    tags, 
+    image: pendingImgData, 
+    postedAt: Date.now(), // Store as a number, not a Date object
+    likes: 0, 
+    dislikes: 0, 
+    liked: false, 
+    disliked: false, 
+    featured: false
+  });
+
+  // 3. Clean up UI
   pendingImgData=null;
   document.getElementById('wTitle').value='';
   document.getElementById('wContent').value='';
   document.getElementById('wTags').value='';
   document.getElementById('wImgPreview').textContent='';
   document.getElementById('wWC').textContent='0 words';
-  closeModal('writeModal');
-  renderList();
-}
+  window.closeModal('writeModal');
+};
 
-// ── EDIT ──
-function openEditModal() {
+window.react = (id, type) => {
+  const p = posts.find(x=>x.id===id); if(!p) return;
+  let { likes, dislikes, liked, disliked } = p;
+  
+  if(type==='like'){
+    if(liked){liked=false;likes--;}
+    else{liked=true;likes++;if(disliked){disliked=false;dislikes--;}}
+  } else {
+    if(disliked){disliked=false;dislikes--;}
+    else{disliked=true;dislikes++;if(liked){liked=false;likes--;}}
+  }
+  
+  // Send the updated reaction numbers to the database
+  update(ref(db, `perspectives/${id}`), { likes, dislikes, liked, disliked });
+};
+
+window.postComment = (postId) => {
+  const inp=document.getElementById('cmtInput');
+  if(!inp||!inp.value.trim()) return;
+  
+  const newCommentRef = push(ref(db, `perspectives/${postId}/comments`));
+  set(newCommentRef, {
+    author: 'Kartikeya Pant',
+    initials: 'KP',
+    text: inp.value.trim(),
+    postedAt: Date.now(),
+    likes: 0,
+    liked: false
+  });
+  
+  inp.value = '';
+};
+
+window.likeComment = (postId, cmtId) => {
+  const p = posts.find(x=>x.id===postId); if(!p) return;
+  const c = p.comments.find(x=>x.id===cmtId); if(!c) return;
+  
+  const newLiked = !c.liked;
+  const newLikes = c.likes + (newLiked ? 1 : -1);
+  
+  update(ref(db, `perspectives/${postId}/comments/${cmtId}`), {
+    liked: newLiked,
+    likes: newLikes
+  });
+};
+
+window.deleteComment = (postId, cmtId) => {
+  remove(ref(db, `perspectives/${postId}/comments/${cmtId}`));
+};
+
+window.openEditModal = () => {
   const p=posts.find(x=>x.id===currentPostId); if(!p) return;
   document.getElementById('eTitle').value=p.title;
   document.getElementById('eContent').value=p.content;
@@ -293,44 +333,44 @@ function openEditModal() {
   document.getElementById('eWC').textContent=p.content.trim().split(/\s+/).length+' words';
   document.getElementById('eImgPreview').textContent='';
   editImgData=null;
-  openModal('editModal');
-}
-function saveEdit() {
+  window.openModal('editModal');
+};
+
+window.saveEdit = () => {
   const p=posts.find(x=>x.id===currentPostId); if(!p) return;
-  p.title=document.getElementById('eTitle').value.trim()||p.title;
-  p.content=document.getElementById('eContent').value.trim()||p.content;
-  p.tags=document.getElementById('eTags').value.split(',').map(t=>t.trim()).filter(Boolean);
-  if(editImgData) p.image=editImgData;
-  closeModal('editModal');
-  renderArticle();
-}
+  const updatedData = {
+    title: document.getElementById('eTitle').value.trim() || p.title,
+    content: document.getElementById('eContent').value.trim() || p.content,
+    tags: document.getElementById('eTags').value.split(',').map(t=>t.trim()).filter(Boolean)
+  };
+  
+  if(editImgData) updatedData.image = editImgData;
+  
+  update(ref(db, `perspectives/${currentPostId}`), updatedData).then(() => {
+    window.closeModal('editModal');
+  });
+};
 
-// ── DELETE ──
-function deletePost() {
-  posts=posts.filter(x=>x.id!==currentPostId);
-  closeModal('confirmModal');
-  showList();
-}
+window.deletePost = () => {
+  if (currentPostId) {
+    remove(ref(db, `perspectives/${currentPostId}`)).then(() => {
+      window.closeModal('confirmModal');
+      window.showList();
+    });
+  }
+};
 
-// ── ANNOUNCE ──
-function postAnnounce() {
+window.postAnnounce = () => {
   const v=document.getElementById('announceInput').value.trim(); if(!v) return;
+  // Note: If you want announcements synced globally, you'll need to push this to Firebase too!
+  // For now, this just updates the local DOM as your original code did.
   announceMsg=v;
   document.getElementById('announceText').textContent=v;
   document.getElementById('announceInput').value='';
-  closeModal('announceModal');
-}
-function dismissAnnounce() {
+  window.closeModal('announceModal');
+};
+
+window.dismissAnnounce = () => {
   announceMsg='';
   document.getElementById('announceText').textContent='';
-}
-
-// ── UTILS ──
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function rel(date){
-  const s=Math.floor((Date.now()-date)/1000);
-  if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';
-  if(s<86400)return Math.floor(s/3600)+' hours ago';return Math.floor(s/86400)+' days ago';
-}
-
-renderList();
+};

@@ -13,7 +13,8 @@
   <link rel="stylesheet" href="styleFolder/academy.css">
   <script src="scriptFolder/footer.js" defer></script>
   <script src="scriptFolder/sidebar.js" defer></script>
-  <script src="scriptFolder/academy.js" defer></script>
+  <script type="module" src="scriptFolder/academy.js" defer></script>
+  
 </head>
 
 <body>
@@ -26,7 +27,7 @@
     <!-- ── LIST VIEW ── -->
     <div class="view active" id="viewList">
       <div class="announce-bar">
-        <button class="announce-btn" onclick="openModal('announceModal')">
+        <button class="announce-btn" onclick="window.openModal('announceModal')">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -46,14 +47,14 @@
 
       <div class="list-content">
         <div class="toolbar">
-          <button class="btn-create" onclick="openModal('createModal')">
+          <button class="btn-create" onclick="window.openModal('createModal')">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             Create Lesson
           </button>
-          <select class="sort-select" onchange="sortMode=this.value;renderList()">
+          <select class="sort-select" onchange="window.setSortMode(this.value)">
             <option value="newest">NEWEST FIRST</option>
             <option value="oldest">OLDEST FIRST</option>
             <option value="popular">MOST LIKED</option>
@@ -61,41 +62,43 @@
         </div>
 
         <div class="search-wrap">
-          <span class="search-icon"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
-              viewBox="0 0 24 24">
+          <span class="search-icon">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg></span>
+            </svg>
+          </span>
           <input class="search-input" id="searchInput" type="text"
-            placeholder="Search lessons by title, topic, or level..." oninput="renderList()">
+            placeholder="Search lessons by title, topic, or level..."
+            oninput="window.renderList()">
         </div>
 
         <div class="filter-bar">
           <span class="filter-label">TOPIC:</span>
-          <button class="filter-chip active" onclick="setTopicFilter(this,'all')">All</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'macro')">Macro</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'micro')">Micro</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'trade')">Trade</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'money')">Money</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'markets')">Markets</button>
-          <button class="filter-chip" onclick="setTopicFilter(this,'policy')">Policy</button>
+          <button class="filter-chip active" onclick="window.setTopicFilter(this,'all')">All</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'macro')">Macro</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'micro')">Micro</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'trade')">Trade</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'money')">Money</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'markets')">Markets</button>
+          <button class="filter-chip" onclick="window.setTopicFilter(this,'policy')">Policy</button>
           &nbsp;
           <span class="filter-label">LEVEL:</span>
-          <button class="level-chip all active" onclick="setLevelFilter(this,'all')">All Levels</button>
-          <button class="level-chip beginner" onclick="setLevelFilter(this,'Beginner')">Beginner</button>
-          <button class="level-chip intermediate" onclick="setLevelFilter(this,'Intermediate')">Intermediate</button>
-          <button class="level-chip advanced" onclick="setLevelFilter(this,'Advanced')">Advanced</button>
+          <button class="level-chip all active" onclick="window.setLevelFilter(this,'all')">All Levels</button>
+          <button class="level-chip beginner" onclick="window.setLevelFilter(this,'Beginner')">Beginner</button>
+          <button class="level-chip intermediate" onclick="window.setLevelFilter(this,'Intermediate')">Intermediate</button>
+          <button class="level-chip advanced" onclick="window.setLevelFilter(this,'Advanced')">Advanced</button>
         </div>
 
         <div class="lessons-grid" id="lessonsList"></div>
 
-      </div> 
-      
       </div>
-      
+    </div>
+
+    <!-- ── LESSON VIEW ── -->
     <div class="view" id="viewLesson">
       <div class="lesson-topbar">
-        <button class="back-btn" onclick="showList()">
+        <button class="back-btn" onclick="window.showList()">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -112,7 +115,7 @@
   <!-- ── CREATE LESSON MODAL ── -->
   <div class="modal-overlay" id="createModal">
     <div class="modal">
-      <button class="modal-close" onclick="closeModal('createModal')">×</button>
+      <button class="modal-close" onclick="window.closeModal('createModal')">×</button>
       <div class="modal-title">Create Lesson</div>
 
       <div class="form-group">
@@ -157,18 +160,17 @@ Consumer spending"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Lesson Content</label>
-        <textarea class="form-textarea" id="cContent" oninput="updateWC()"
+        <textarea class="form-textarea" id="cContent" oninput="window.updateWC()"
           placeholder="Write your lesson here in simple, accessible language. Use blank lines between paragraphs.&#10;&#10;Use === Section Title === to add section headers.&#10;Use [EXAMPLE] Your example text [/EXAMPLE] to add highlighted example boxes."></textarea>
         <div class="wc" id="cWC">0 words</div>
-        <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples
-        </div>
+        <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
       </div>
 
       <div class="form-group">
         <div class="quiz-builder">
           <div class="quiz-builder-title">📝 COMPREHENSION QUIZ (OPTIONAL)</div>
           <div id="quizBuilder"></div>
-          <button class="add-q-btn" onclick="addQuizQuestion()">
+          <button class="add-q-btn" onclick="window.addQuizQuestion()">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -178,19 +180,22 @@ Consumer spending"></textarea>
         </div>
       </div>
 
-      <button class="btn-full" onclick="publishLesson()">Publish Lesson</button>
+      <button class="btn-full" onclick="window.publishLesson()">Publish Lesson</button>
     </div>
   </div>
 
   <!-- ── EDIT MODAL ── -->
   <div class="modal-overlay" id="editModal">
     <div class="modal">
-      <button class="modal-close" onclick="closeModal('editModal')">×</button>
+      <button class="modal-close" onclick="window.closeModal('editModal')">×</button>
       <div class="modal-title">Edit Lesson</div>
-      <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="eTitle" type="text">
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" id="eTitle" type="text">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="form-group"><label class="form-label">Topic</label>
+        <div class="form-group">
+          <label class="form-label">Topic</label>
           <select class="form-select" id="eTopic">
             <option value="macro">Macro</option>
             <option value="micro">Micro</option>
@@ -200,7 +205,8 @@ Consumer spending"></textarea>
             <option value="policy">Policy</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Level</label>
+        <div class="form-group">
+          <label class="form-label">Level</label>
           <select class="form-select" id="eLevel">
             <option value="Beginner">Beginner</option>
             <option value="Intermediate">Intermediate</option>
@@ -208,17 +214,24 @@ Consumer spending"></textarea>
           </select>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Emoji Icon</label><input class="form-input" id="eIcon"
-          type="text" maxlength="4" style="font-size:22px;width:80px"></div>
-      <div class="form-group"><label class="form-label">Short Description</label><input class="form-input" id="eDesc"
-          type="text"></div>
-      <div class="form-group"><label class="form-label">Key Concepts (one per line)</label><textarea
-          class="form-textarea" id="eConcepts" style="min-height:80px"></textarea></div>
-      <div class="form-group"><label class="form-label">Content</label><textarea class="form-textarea" id="eContent"
-          oninput="updateEWC()"></textarea>
+      <div class="form-group">
+        <label class="form-label">Emoji Icon</label>
+        <input class="form-input" id="eIcon" type="text" maxlength="4" style="font-size:22px;width:80px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Short Description</label>
+        <input class="form-input" id="eDesc" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Key Concepts (one per line)</label>
+        <textarea class="form-textarea" id="eConcepts" style="min-height:80px"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Content</label>
+        <textarea class="form-textarea" id="eContent" oninput="window.updateEWC()"></textarea>
         <div class="wc" id="eWC">0 words</div>
       </div>
-      <button class="btn-full" onclick="saveEdit()">Save Changes</button>
+      <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
     </div>
   </div>
 
@@ -229,8 +242,8 @@ Consumer spending"></textarea>
       <div class="confirm-title">Delete this lesson?</div>
       <div class="confirm-desc">This will permanently remove the lesson and all comments. This cannot be undone.</div>
       <div class="confirm-btns">
-        <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
-        <button class="btn-conf-del" onclick="deleteLesson()">Yes, Delete</button>
+        <button class="btn-cancel" onclick="window.closeModal('confirmModal')">Cancel</button>
+        <button class="btn-conf-del" onclick="window.deleteLesson()">Yes, Delete</button>
       </div>
     </div>
   </div>
@@ -238,14 +251,16 @@ Consumer spending"></textarea>
   <!-- ── ANNOUNCE MODAL ── -->
   <div class="modal-overlay" id="announceModal">
     <div class="modal" style="max-width:480px">
-      <button class="modal-close" onclick="closeModal('announceModal')">×</button>
+      <button class="modal-close" onclick="window.closeModal('announceModal')">×</button>
       <div class="modal-title">Post Announcement</div>
-      <div class="form-group"><label class="form-label">Announcement Text</label><input class="form-input"
-          id="announceInput" type="text" placeholder="e.g. New beginner lesson on inflation published!"></div>
-      <button class="btn-full" onclick="postAnnounce()">Post to Banner</button>
+      <div class="form-group">
+        <label class="form-label">Announcement Text</label>
+        <input class="form-input" id="announceInput" type="text"
+          placeholder="e.g. New beginner lesson on inflation published!">
+      </div>
+      <button class="btn-full" onclick="window.postAnnounce()">Post to Banner</button>
     </div>
   </div>
-
 
 
 </body>
