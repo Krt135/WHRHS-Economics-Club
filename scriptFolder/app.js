@@ -1,6 +1,7 @@
 // Your web app's Firebase configuration
 //DO NOT TOUCH THIS CODE UNLESS YOU KNOW WHAT YOU ARE DOING
 //I will slime u if u do
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
 export const firebaseConfig = {
     apiKey: "AIzaSyC5Z_nOxxYA-iiPGnaCbH2KmY8sJRR1IfQ",
@@ -12,3 +13,5 @@ export const firebaseConfig = {
     appId: "1:778776708527:web:d928789b77a6c621619b5a",
     measurementId: "G-N696PM6TSC"
   };
+
+export const app = initializeApp(firebaseConfig);

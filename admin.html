@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - The Economic Forum</title>
+    <link rel="stylesheet" href="styleFolder/style.css">
+    <link rel="stylesheet" href="styleFolder/admin.css">
+    <script src="scriptFolder/footer.js" defer></script>
+    <script type="module" src="scriptFolder/sidebar.js" defer></script>
+</head>
+<body>
+    <tef-sidebar active-page="admin"></tef-sidebar>
+
+    <main class="main">
+        <section class="admin-container">
+            <header class="admin-header">
+                <h1>🛡️ Exec Board Panel</h1>
+            </header>
+
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="switchTab('approvals')">
+                    👤 APPROVALS (<span id="count-pending">0</span>)
+                </button>
+                <button class="tab-btn" onclick="switchTab('members')">
+                    👥 MEMBERS
+                </button>
+                <button class="tab-btn" onclick="switchTab('moderation')">
+                    📑 MODERATION
+                </button>
+            </div>
+
+            <div id="tab-content" class="tab-pane">
+                <div class="loading-state">Loading records...</div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="scriptFolder/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - The Economic Forum</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styleFolder/style.css">
+    <link rel="stylesheet" href="styleFolder/auth.css">
+    
+</head>
+<body class="auth-body">
+
+    <div class="auth-container">
+        
+        <div id="signInView" class="auth-card">
+            <div class="auth-logo">
+                <svg width="24" height="24" viewBox="0 0 200 200" fill="none">
+                    <circle cx="100" cy="100" r="90" stroke="#c9a84c" stroke-width="4"/>
+                    <path d="M100 30 L100 170 M40 100 L160 100" stroke="#c9a84c" stroke-width="4"/>
+                </svg>
+            </div>
+            <h2>Welcome to The Economic Forum</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+
+            <button class="auth-google-btn" id="googleSignInBtn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18">
+                Continue with Google
+            </button>
+
+            <div class="auth-divider"><span>OR</span></div>
+
+            <form id="signInForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="signInEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="signInPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="auth-submit-btn">Sign in</button>
+            </form>
+
+            <div class="auth-footer">
+                <a href="#" class="auth-link">Forgot password?</a>
+                <span>Need an account? <a href="#" class="auth-link bold" onclick="toggleAuthView()">Sign up</a></span>
+            </div>
+        </div>
+
+        <div id="signUpView" class="auth-card hidden">
+            <a href="#" class="back-link" onclick="toggleAuthView()">← Back to sign in</a>
+            <h2>Create your account</h2>
+
+            <form id="signUpForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="signUpEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="signUpPassword" placeholder="Min. 8 characters" required minlength="8">
+                </div>
+                <div class="input-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="signUpConfirm" placeholder="Re-enter password" required>
+                </div>
+                <button type="submit" class="auth-submit-btn">Create account</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // Simple UI toggle for the forms
+        function toggleAuthView() {
+            document.getElementById('signInView').classList.toggle('hidden');
+            document.getElementById('signUpView').classList.toggle('hidden');
+        }
+    </script>
+    <script type="module" src="scriptFolder/auth.js"></script>
+</body>
+</html>

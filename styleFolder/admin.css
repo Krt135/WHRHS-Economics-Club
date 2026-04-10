@@ -1,0 +1,86 @@
+.admin-container {
+    padding: 40px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.admin-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: #0f1f3d;
+    margin-bottom: 30px;
+}
+
+/* Tab Styling from your screenshot */
+.admin-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 40px;
+}
+
+.tab-btn {
+    background: #e5e7eb;
+    border: 1px solid #d1d5db;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #4b5563;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.tab-btn.active {
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Table / List Styling */
+.admin-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent;
+    padding: 15px 0;
+    border-bottom: 1px solid #d1d5db;
+}
+
+.user-info {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    color: #4b5563;
+    font-size: 1.1rem;
+}
+
+.admin-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-approve {
+    color: #10b981;
+    background: none;
+    border: 1px solid #10b981;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-deny {
+    color: #ef4444;
+    background: none;
+    border: 1px solid #ef4444;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.empty-state {
+    text-align: center;
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    color: #9ca3af;
+    margin-top: 50px;
+    font-size: 1.2rem;
+}
