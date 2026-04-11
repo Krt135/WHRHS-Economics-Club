@@ -17,17 +17,24 @@ window.switchTab = switchTab; // Make it global for the HTML
 
 function loadData() {
     const usersRef = ref(db, 'users');
+    const content = document.getElementById('tab-content');
+    const pendingCount = document.getElementById('count-pending');
+
+    // Show a loading message immediately when switching tabs
+    content.innerHTML = `<p class="empty-state">Fetching data from the Forum...</p>`;
+
     onValue(usersRef, (snapshot) => {
         const data = snapshot.val();
-        const content = document.getElementById('tab-content');
-        const pendingCount = document.getElementById('count-pending');
         
         if (!data) {
-            content.innerHTML = `<p class="empty-state">No records found.</p>`;
+            pendingCount.innerText = "0";
+            content.innerHTML = `<p class="empty-state">No records found in the database.</p>`;
             return;
         }
 
         const userArray = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        
+        // Filter pending users
         const pending = userArray.filter(u => u.status === 'pending');
         pendingCount.innerText = pending.length;
 
@@ -38,6 +45,15 @@ function loadData() {
         } else {
             content.innerHTML = `<p class="empty-state">No pending moderation flags.</p>`;
         }
+    }, (error) => {
+        // This part triggers if your Security Rules block the Admin's access
+        console.error("Firebase Read Error:", error);
+        content.innerHTML = `
+            <div class="empty-state" style="color: #ff4d4d; border: 1px solid #ff4d4d; padding: 20px; border-radius: 8px;">
+                <p><strong>Access Denied</strong></p>
+                <p>The database refused to load user records. Ensure your account is set to 'admin' in the database.</p>
+                <small>${error.message}</small>
+            </div>`;
     });
 }
 
