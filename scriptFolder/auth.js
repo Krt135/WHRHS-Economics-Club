@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } 
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getDatabase, ref, set, get } 
+import { getDatabase, ref, set, get }
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './app.js';
 
@@ -11,7 +11,7 @@ const db = getDatabase(app);
 
 // 1. HARDCODED EXEC EMAILS
 const execEmails = [
-    "kartikeyapant2009@gmail.com", 
+    "kartikeyapant2009@gmail.com",
     "besada.a.265@gmail.com",
     "placeholder3@gmail.com", // Replace these when ready
     "placeholder4@gmail.com"
@@ -33,26 +33,33 @@ document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
 
-        // Determine if they are an Exec or Pending
         const isExec = execEmails.includes(email.toLowerCase());
+
+        // Define the initial database entry
         const userData = {
             email: email,
             role: isExec ? "admin" : "member",
-            status: isExec ? "approved" : "pending"
+            status: isExec ? "approved" : "pending",
+            uid: user.uid // Storing this helps with lookups later
         };
 
-        // Save to database
+        // CRITICAL: We must wait for the database to save before redirecting
         await set(ref(db, 'users/' + user.uid), userData);
 
         if (isExec) {
-            alert("Exec account created! Redirecting...");
+            alert("Exec Board identity verified. Welcome.");
             window.location.href = "index.html";
         } else {
-            alert("Request sent! An admin will review your account soon.");
-            window.location.href = "auth.html"; // Stay here or go to a "pending" page
+            alert("Request submitted. Please wait for Exec Board approval.");
+            // Log them out so they can't browse the site until approved
+            await auth.signOut();
+            window.location.reload();
         }
     } catch (error) {
-        alert(error.message);
+        // If you see 'auth/operation-not-allowed', double-check that 'Email/Password' 
+        // toggle one more time! 
+        console.error(error.code);
+        alert("Error: " + error.message);
     }
 });
 
