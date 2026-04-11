@@ -92,9 +92,58 @@ onValue(ref(db, "polls"), snapshot => {
   renderPolls();
 });
 
+// Listen for ALL changes
+onValue(ref(db), (snapshot) => {
+    const data = snapshot.val();
+    discussions = data.discussions || {};
+    // Update local variables for other pages if needed
+    
+    autoRenderAll(); // Run the check to see which page we are currently viewing
+});
 // ─────────────────────────────────────────────
 //  RENDER — DISCUSSION LIST
 // ─────────────────────────────────────────────
+
+// --- DYNAMIC CONTENT LOADER ---
+// This function ensures that no matter what page you are on, 
+// the script checks for the right container and fills it.
+
+function autoRenderAll() {
+    // 1. Check for Discussions (The Floor)
+    if (document.getElementById("discussionsList")) {
+        renderDiscussions();
+    }
+
+    // 2. Check for Perspectives
+    if (document.getElementById("perspectivesList")) {
+        renderOtherPage("perspectivesList", "perspectives");
+    }
+
+    // 3. Check for Weekly Feature
+    if (document.getElementById("featuresList")) {
+        renderOtherPage("featuresList", "features");
+    }
+}
+
+// Helper to fetch and render for any page
+async function renderOtherPage(containerId, dbPath) {
+    const list = document.getElementById(containerId);
+    const snapshot = await get(ref(db, dbPath));
+    const data = snapshot.val() || {};
+    
+    const items = Object.entries(data)
+        .map(([k, v]) => ({ ...v, _key: k }))
+        .sort((a, b) => b.postedAt - a.postedAt);
+
+    list.innerHTML = items.map(item => `
+        <div class="disc-card" onclick="window.showDiscussion('${item._key}')">
+            <div class="disc-title">${esc(item.title)}</div>
+            <div class="disc-body">${esc(item.body)}</div>
+            <div class="disc-meta">
+                <span>${esc(item.author)}</span> · <span>${rel(item.postedAt)}</span>
+            </div>
+        </div>`).join("");
+}
 
 function renderDiscussions() {
   const list = document.getElementById("discussionsList");
