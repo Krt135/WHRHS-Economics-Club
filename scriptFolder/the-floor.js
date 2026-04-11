@@ -1,47 +1,67 @@
 // ─────────────────────────────────────────────
-//  the-floor.js  —  Firebase Realtime Database
+//  the-floor.js — Fully Integrated & Secure
 // ─────────────────────────────────────────────
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import {
-  getDatabase, ref, push, set, onValue, remove, update
+  getDatabase, ref, push, set, onValue, remove, update, get
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+import { 
+  getAuth, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './app.js'; 
 
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
+const auth = getAuth(app);
 
 // ─────────────────────────────────────────────
-//  CONSTANTS
+//  STATE & AUTH TRACKING
 // ─────────────────────────────────────────────
 
-const CURRENT_USER = { name: "Kartikeya Pant", initials: "KP" };
-
-const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
-function avColour(name) {
-  let h = 0;
-  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
-  return COLOURS[h];
-}
-
-// ─────────────────────────────────────────────
-//  STATE
-// ─────────────────────────────────────────────
+let currentUser = null;
+let userRole = "public"; 
+let userProfile = null;
 
 let discussions   = {}; 
 let polls         = {}; 
 let currentDiscId = null; 
 let activeTag     = "all";
 let attachedImageData = null;
+let isEditMode = false; // Tracks if the modal is for a NEW post or EDITING one
+
+// Listen for Login/Logout
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        currentUser = user;
+        const snapshot = await get(ref(db, `users/${user.uid}`));
+        if (snapshot.exists()) {
+            userProfile = snapshot.val();
+            userRole = userProfile.role || "member";
+        }
+    } else {
+        currentUser = null;
+        userRole = "public";
+        userProfile = null;
+    }
+    if (currentDiscId) renderDiscussionView();
+    renderDiscussions();
+    renderPolls();
+});
 
 // ─────────────────────────────────────────────
-//  UTILS
+//  UTILITIES
 // ─────────────────────────────────────────────
+
+const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
+function avColour(name) {
+  let h = 0;
+  for (let c of (name || '')) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
+  return COLOURS[h];
+}
 
 function esc(s) {
-  return String(s)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 function rel(ts) {
@@ -73,24 +93,6 @@ onValue(ref(db, "polls"), snapshot => {
 });
 
 // ─────────────────────────────────────────────
-//  VIEWS
-// ─────────────────────────────────────────────
-
-function showList() {
-  currentDiscId = null;
-  document.getElementById("viewList").classList.add("active");
-  document.getElementById("viewDiscussion").classList.remove("active");
-  renderDiscussions();
-}
-
-function showDiscussion(firebaseKey) {
-  currentDiscId = firebaseKey;
-  document.getElementById("viewList").classList.remove("active");
-  document.getElementById("viewDiscussion").classList.add("active");
-  renderDiscussionView();
-}
-
-// ─────────────────────────────────────────────
 //  RENDER — DISCUSSION LIST
 // ─────────────────────────────────────────────
 
@@ -107,7 +109,7 @@ function renderDiscussions() {
   }
 
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><p class="empty-text">No discussions yet. Be the first to start one!</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p class="empty-text">No discussions yet.</p></div>`;
     return;
   }
 
@@ -116,34 +118,20 @@ function renderDiscussions() {
     const tags = Array.isArray(d.tags) ? d.tags : [];
     return `
     <div class="disc-card" onclick="window.showDiscussion('${d._key}')">
-      ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="Attached image">` : ""}
+      ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
       <div class="disc-title">${esc(d.title)}</div>
       <div class="disc-body">${esc(d.body)}</div>
       ${tags.length ? `<div class="disc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="disc-meta">
         <span class="author">
-          <span class="author-av" style="background:${avColour(d.author||'')}">${esc(d.authorInitials||"?")}</span>
-          ${esc(d.author||"")}
+          <span class="author-av" style="background:${avColour(d.author)}">${esc(d.authorInitials || "?")}</span>
+          ${esc(d.author)}
         </span>
         <span>·</span>
         <span>${rel(d.postedAt)}</span>
         <span>·</span>
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
         ${commentCount}
-      </div>
-      <div class="disc-actions" onclick="event.stopPropagation()">
-        <button class="action-btn ${d.liked ? "liked" : ""}" onclick="reactDisc('${d._key}','like')">
-          <svg width="14" height="14" fill="${d.liked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-          ${d.likes || 0}
-        </button>
-        <button class="action-btn ${d.disliked ? "disliked" : ""}" onclick="reactDisc('${d._key}','dislike')">
-          <svg width="14" height="14" fill="${d.disliked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-          ${d.dislikes || 0}
-        </button>
-        <button class="action-btn" onclick="window.showDiscussion('${d._key}')">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-          ${commentCount}
-        </button>
       </div>
     </div>`;
   }).join("");
@@ -157,81 +145,50 @@ function renderDiscussionView() {
   const d = discussions[currentDiscId];
   if (!d) return showList();
 
-  const tags = Array.isArray(d.tags) ? d.tags : [];
   const commentEntries = d.comments
-    ? Object.entries(d.comments)
-        .map(([k, v]) => ({ ...v, _key: k }))
-        .sort((a, b) => a.postedAt - b.postedAt)
+    ? Object.entries(d.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
     : [];
 
-  const isAuthor = d.author === CURRENT_USER.name;
+  const canModify = currentUser && (d.authorId === currentUser.uid || userRole === 'admin');
 
-  document.getElementById("discTopActions").innerHTML = isAuthor ? `
+  document.getElementById("discTopActions").innerHTML = canModify ? `
+    <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Edit
+    </button>
     <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
       Delete
     </button>` : "";
 
-  const commentsHtml = commentEntries.length
-    ? commentEntries.map(c => `
+  const commentsHtml = commentEntries.map(c => {
+    const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+    return `
         <div class="comment-item">
-          <div class="comment-av" style="background:${avColour(c.author||"")}">${esc(c.initials||"?")}</div>
+          <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials || "?")}</div>
           <div class="comment-bubble">
             <div class="comment-hdr">
-              <span class="comment-author">${esc(c.author||"")}</span>
+              <span class="comment-author">${esc(c.author)}</span>
               <span class="comment-time">${rel(c.postedAt)}</span>
             </div>
             <div class="comment-text">${esc(c.text)}</div>
-            <div class="comment-acts">
-              <button class="cmt-act ${c.liked ? "liked" : ""}"
-                onclick="likeComment('${currentDiscId}','${c._key}',${!!c.liked},${c.likes||0})">
-                <svg width="12" height="12" fill="${c.liked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
-                ${c.likes || 0}
-              </button>
-              <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-                Delete
-              </button>
-            </div>
+            ${canDeleteComment ? `
+              <div class="comment-acts">
+                <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">Delete</button>
+              </div>` : ""}
           </div>
-        </div>`)
-      .join("")
-    : `<p class="empty-comments">No comments yet. Be the first to respond!</p>`;
+        </div>`;
+  }).join("");
 
   document.getElementById("discussionBody").innerHTML = `
-    <div class="disc-view-eyebrow">THE FLOOR · DISCUSSION</div>
     <div class="disc-view-title">${esc(d.title)}</div>
     <div class="disc-view-meta">
-      <span class="author-chip">
-        <span class="author-av" style="background:${avColour(d.author||"")};width:24px;height:24px;font-size:9px">${esc(d.authorInitials||"?")}</span>
-        <strong>${esc(d.author||"")}</strong>
-      </span>
-      <span>·</span>
-      <span>${rel(d.postedAt)}</span>
-      <span>·</span>
-      <span>${commentEntries.length} comment${commentEntries.length !== 1 ? "s" : ""}</span>
+      <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentEntries.length} comments
     </div>
-    ${tags.length ? `<div class="disc-view-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
-    <div class="disc-view-divider"></div>
     ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
     <div class="disc-view-body">${esc(d.body)}</div>
-
-    <div class="disc-reaction-bar">
-      <button class="react-btn ${d.liked ? "liked" : ""}" onclick="reactDisc('${currentDiscId}','like')">
-        <svg width="15" height="15" fill="${d.liked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-        ${d.likes || 0} likes
-      </button>
-      <button class="react-btn ${d.disliked ? "disliked" : ""}" onclick="reactDisc('${currentDiscId}','dislike')">
-        <svg width="15" height="15" fill="${d.disliked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-        ${d.dislikes || 0} dislikes
-      </button>
-    </div>
-
     <div class="comments-area">
-      <div class="comments-title">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${commentEntries.length} Comment${commentEntries.length !== 1 ? "s" : ""}
-      </div>
+      <div class="comments-title">${commentEntries.length} Comments</div>
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:16px">
         <textarea class="new-comment-input" id="cmtInput" placeholder="Join the discussion..."></textarea>
@@ -241,302 +198,238 @@ function renderDiscussionView() {
 }
 
 // ─────────────────────────────────────────────
-//  RENDER — POLLS (FIXED)
+//  ACTION FUNCTIONS
+// ─────────────────────────────────────────────
+
+async function handleMainButtonClick() {
+    if (isEditMode) {
+        await saveEditDiscussion();
+    } else {
+        await publishDiscussion();
+    }
+}
+
+async function publishDiscussion() {
+  if (!currentUser) return alert("Please log in to post.");
+  const title = document.getElementById("discTitle").value.trim();
+  const body  = document.getElementById("discContent").value.trim();
+  const tagsRaw = document.getElementById("discTags").value.trim();
+  if (!title) return;
+
+  const name = userProfile ? userProfile.email.split('@')[0] : currentUser.email.split('@')[0];
+  const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
+
+  const newRef = push(ref(db, "discussions"));
+  await set(newRef, {
+    title, body, tags,
+    author:         name,
+    authorId:       currentUser.uid,
+    authorInitials: name.substring(0,2).toUpperCase(),
+    image:          attachedImageData || null,
+    postedAt:       Date.now()
+  });
+
+  closeModal("discussModal");
+}
+
+function openEditModal() {
+  const d = discussions[currentDiscId];
+  if (!d) return;
+  isEditMode = true;
+  
+  // 1. Populate Inputs
+  document.getElementById("discTitle").value = d.title;
+  document.getElementById("discContent").value = d.body;
+  if (d.tags) document.getElementById("discTags").value = d.tags.join(", ");
+  
+  // 2. Update Modal Title (Now searching for the .modal-title class)
+  const modalTitle = document.querySelector("#discussModal .modal-title");
+  if (modalTitle) {
+    modalTitle.innerText = "Edit Discussion";
+  }
+  
+  // 3. Update Button Text
+  const btn = document.getElementById("mainSubmitBtn");
+  if (btn) {
+    btn.innerText = "Save Changes";
+  }
+  
+  openModal("discussModal");
+}
+
+async function saveEditDiscussion() {
+  const title = document.getElementById("discTitle").value.trim();
+  const body = document.getElementById("discContent").value.trim();
+  const tagsRaw = document.getElementById("discTags").value.trim();
+  
+  if (!title || !body) return;
+  const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
+
+  try {
+    // We only update the content. We do NOT send a new authorId.
+    // This keeps the original ownership intact and satisfies the Security Rules.
+    await update(ref(db, `discussions/${currentDiscId}`), {
+      title: title,
+      body: body,
+      tags: tags,
+      lastEdited: Date.now()
+    });
+    
+    closeModal("discussModal");
+    alert("Changes saved successfully!");
+  } catch (error) {
+    console.error("Firebase Error:", error);
+    alert("Permission Denied: You can only edit your own posts.");
+  }
+}
+
+async function deleteDiscussion() {
+  if (confirm("Delete this discussion permanently?")) {
+    await remove(ref(db, `discussions/${currentDiscId}`));
+    showList();
+  }
+}
+
+async function postComment() {
+  if (!currentUser) return alert("Please log in to comment.");
+  const inp = document.getElementById("cmtInput");
+  if (!inp.value.trim()) return;
+
+  const name = userProfile ? userProfile.email.split('@')[0] : currentUser.email.split('@')[0];
+  const cmtRef = push(ref(db, `discussions/${currentDiscId}/comments`));
+  
+  await set(cmtRef, {
+    author:   name,
+    authorId: currentUser.uid,
+    initials: name.substring(0,2).toUpperCase(),
+    text:     inp.value.trim(),
+    postedAt: Date.now()
+  });
+  inp.value = "";
+}
+
+async function deleteComment(discKey, cmtKey) {
+  if (confirm("Delete this comment?")) {
+    await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  POLLS
 // ─────────────────────────────────────────────
 
 function renderPolls() {
   const list = document.getElementById("pollsList");
   if (!list) return;
 
-  const items = Object.entries(polls)
-    .map(([key, val]) => ({ ...val, _key: key }))
-    .sort((a, b) => b.postedAt - a.postedAt);
-
+  const items = Object.entries(polls).map(([key, val]) => ({ ...val, _key: key })).sort((a, b) => b.postedAt - a.postedAt);
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><p class="empty-text">No polls yet. Create one!</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p class="empty-text">No polls yet.</p></div>`;
     return;
   }
 
   list.innerHTML = items.map(p => {
     const options = Array.isArray(p.options) ? p.options : [];
     const totalVotes = options.reduce((a, o) => a + (o.votes || 0), 0);
-    
-    // FIX: Check localStorage to see if this user has voted
     const localVotedIndex = localStorage.getItem(`voted_${p._key}`);
     const hasVoted = localVotedIndex !== null;
-    const userVoteIndex = hasVoted ? parseInt(localVotedIndex) : null;
 
     const optionsHtml = options.map((o, i) => {
       const pct = totalVotes ? Math.round((o.votes || 0) / totalVotes * 100) : 0;
-      const isVotedFor = userVoteIndex === i; 
-      
       return `
-        <div class="poll-option ${isVotedFor ? "voted-for" : ""}"
-          onclick="window.votePoll('${p._key}',${i})"
-          style="${hasVoted ? "cursor:default" : ""}">
-          <div class="poll-bar ${isVotedFor ? "voted-bar" : ""}" style="width:${hasVoted ? pct : 0}%"></div>
+        <div class="poll-option" onclick="window.votePoll('${p._key}',${i})">
+          <div class="poll-bar" style="width:${hasVoted ? pct : 0}%"></div>
           <div class="poll-option-content">
-            <div class="poll-option-label">
-              ${isVotedFor ? `<svg class="poll-check" width="16" height="16" fill="none" stroke="#c9a84c" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
-              ${esc(o.label)}
-            </div>
-            ${hasVoted ? `<span class="poll-pct ${isVotedFor ? "gold" : ""}">${pct}%</span>` : ""}
+            <div class="poll-option-label">${esc(o.label)}</div>
+            ${hasVoted ? `<span class="poll-pct">${pct}%</span>` : ""}
           </div>
         </div>`;
     }).join("");
 
-    return `
-      <div class="poll-card">
-        <div class="poll-title">
-          <svg width="16" height="16" fill="none" stroke="#c9a84c" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          ${esc(p.question)}
-        </div>
-        <div class="poll-options">${optionsHtml}</div>
-        <div class="poll-footer">
-          <span>${totalVotes} vote${totalVotes !== 1 ? "s" : ""}</span>
-          <span>·</span>
-          <span>${rel(p.postedAt)}</span>
-        </div>
-      </div>`;
+    return `<div class="poll-card"><div class="poll-title">${esc(p.question)}</div>${optionsHtml}</div>`;
   }).join("");
 }
 
-// ─────────────────────────────────────────────
-//  ACTIONS (REACTIONS / COMMENTS)
-// ─────────────────────────────────────────────
-
-async function reactDisc(key, type) {
-  const d = discussions[key]; if (!d) return;
-  let { likes = 0, dislikes = 0, liked = false, disliked = false } = d;
-
-  if (type === "like") {
-    if (liked) { liked = false; likes--; }
-    else { liked = true; likes++; if (disliked) { disliked = false; dislikes--; } }
-  } else {
-    if (disliked) { disliked = false; dislikes--; }
-    else { disliked = true; dislikes++; if (liked) { liked = false; likes--; } }
-  }
-
-  await update(ref(db, `discussions/${key}`), { likes, dislikes, liked, disliked });
-}
-
-async function postComment() {
-  const inp = document.getElementById("cmtInput");
-  if (!inp || !inp.value.trim()) return;
-
-  const cmtRef = push(ref(db, `discussions/${currentDiscId}/comments`));
-  await set(cmtRef, {
-    author:   CURRENT_USER.name,
-    initials: CURRENT_USER.initials,
-    text:     inp.value.trim(),
-    postedAt: Date.now(),
-    likes:    0,
-    liked:    false
-  });
-  inp.value = "";
-}
-
-async function likeComment(discKey, cmtKey, currentlyLiked, currentLikes) {
-  const newLiked = !currentlyLiked;
-  await update(ref(db, `discussions/${discKey}/comments/${cmtKey}`), {
-    liked: newLiked,
-    likes: newLiked ? currentLikes + 1 : currentLikes - 1
-  });
-}
-
-async function deleteComment(discKey, cmtKey) {
-  await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
-}
-
-// ─────────────────────────────────────────────
-//  PUBLISH DISCUSSION
-// ─────────────────────────────────────────────
-
-function previewFile(input) {
-  const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    attachedImageData = e.target.result;
-    document.getElementById("attachPreview").textContent = "📎 " + file.name;
-  };
-  reader.readAsDataURL(file);
-}
-
-async function publishDiscussion() {
-  const title   = document.getElementById("discTitle").value.trim();
-  const body    = document.getElementById("discContent").value.trim();
-  const tagsRaw = document.getElementById("discTags").value.trim();
-  if (!title) { document.getElementById("discTitle").focus(); return; }
-
-  const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
-
-  const newRef = push(ref(db, "discussions"));
-  await set(newRef, {
-    title, body,
-    author:         CURRENT_USER.name,
-    authorInitials: CURRENT_USER.initials,
-    tags,
-    image:    attachedImageData || null,
-    postedAt: Date.now(),
-    likes: 0, dislikes: 0, liked: false, disliked: false
-  });
-
-  document.getElementById("discTitle").value   = "";
-  document.getElementById("discContent").value = "";
-  document.getElementById("discTags").value    = "";
-  document.getElementById("attachPreview").textContent = "";
-  document.getElementById("fileInput").value   = "";
-  attachedImageData = null;
-  closeModal("discussModal");
-}
-
-async function deleteDiscussion() {
-  if (!currentDiscId) return;
-  await remove(ref(db, `discussions/${currentDiscId}`));
-  showList();
-}
-
-// ─────────────────────────────────────────────
-//  POLLS (FIXED)
-// ─────────────────────────────────────────────
-
-function addPollOption() {
-  const container = document.getElementById("pollOptionInputs");
-  const count = container.children.length + 1;
-  const row = document.createElement("div");
-  row.className = "poll-opt-row";
-  row.innerHTML = `<input class="form-input" type="text" placeholder="Option ${count}">
-    <button class="remove-opt" onclick="window.removeOpt(this)" title="Remove">×</button>`;
-  container.appendChild(row);
-}
-
-function removeOpt(btn) {
-  const container = document.getElementById("pollOptionInputs");
-  if (container.children.length <= 2) return;
-  btn.parentElement.remove();
-}
-
-async function publishPoll() {
-  const question = document.getElementById("pollQuestion").value.trim();
-  if (!question) { document.getElementById("pollQuestion").focus(); return; }
-
-  const inputs  = [...document.querySelectorAll("#pollOptionInputs .form-input")];
-  const options = inputs.map(i => i.value.trim()).filter(Boolean).map(label => ({ label, votes: 0 }));
-  if (options.length < 2) return;
-
-  const newRef = push(ref(db, "polls"));
-  await set(newRef, { 
-    question, 
-    options, 
-    postedAt: Date.now() 
-  });
-
-  document.getElementById("pollQuestion").value = "";
-  document.querySelectorAll("#pollOptionInputs .form-input").forEach(i => i.value = "");
-  closeModal("pollModal");
-  switchTab("polls");
-}
-
 async function votePoll(pollKey, optIndex) {
+  if (localStorage.getItem(`voted_${pollKey}`)) return;
   const p = polls[pollKey];
+  const options = [...p.options];
+  options[optIndex].votes = (options[optIndex].votes || 0) + 1;
   
-  // 1. Check localStorage to see if user has already voted
-  const hasVoted = localStorage.getItem(`voted_${pollKey}`);
-  
-  // If they already voted or the poll doesn't exist, stop here
-  if (!p || hasVoted !== null) return;
-
-  // 2. Prepare the updated options array by incrementing the specific index
-  const options = [...(p.options || [])];
-  options[optIndex] = { 
-    ...options[optIndex], 
-    votes: (options[optIndex].votes || 0) + 1 
-  };
-
-  try {
-    // 3. Record the vote locally FIRST for instant feedback
-    localStorage.setItem(`voted_${pollKey}`, optIndex);
-    
-    // 4. Update Firebase
-    await update(ref(db, `polls/${pollKey}`), { options });
-
-    // 5. MANUALLY TRIGGER RENDER
-    // This forces the UI to look at localStorage again and show the bars immediately
-    renderPolls(); 
-    
-  } catch (error) {
-    console.error("Vote failed:", error);
-    // If the database update fails, remove the local restriction so they can try again
-    localStorage.removeItem(`voted_${pollKey}`);
-  }
+  localStorage.setItem(`voted_${pollKey}`, optIndex);
+  await update(ref(db, `polls/${pollKey}`), { options });
+  renderPolls();
 }
 
 // ─────────────────────────────────────────────
 //  UI HELPERS
 // ─────────────────────────────────────────────
 
+function showList() {
+  currentDiscId = null;
+  document.getElementById("viewList").classList.add("active");
+  document.getElementById("viewDiscussion").classList.remove("active");
+  renderDiscussions();
+}
+
+function showDiscussion(key) {
+  currentDiscId = key;
+  document.getElementById("viewList").classList.remove("active");
+  document.getElementById("viewDiscussion").classList.add("active");
+  renderDiscussionView();
+}
+
 function switchTab(tab) {
   document.getElementById("tabDiscussions").classList.toggle("active", tab === "discussions");
   document.getElementById("tabPolls").classList.toggle("active", tab === "polls");
   document.getElementById("panelDiscussions").style.display = tab === "discussions" ? "" : "none";
-  document.getElementById("panelPolls").style.display       = tab === "polls"        ? "" : "none";
-  document.getElementById("filterBar").style.display        = tab === "discussions"  ? "" : "none";
-}
-
-function filterByTag(btn, tag) {
-  activeTag = tag;
-  document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  renderDiscussions();
+  document.getElementById("panelPolls").style.display = tab === "polls" ? "" : "none";
 }
 
 function openModal(id)  { document.getElementById(id).classList.add("open"); }
-function closeModal(id) { document.getElementById(id).classList.remove("open"); }
 
-document.querySelectorAll(".modal-overlay").forEach(o =>
-  o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); })
-);
-
-async function checkDeepLink() {
-  const params = new URLSearchParams(window.location.search);
-  const postId = params.get('post');
-
-  if (postId) {
-    // Wait a brief moment for the onValue listener to populate the 'discussions' object
-    setTimeout(() => {
-      if (discussions[postId]) {
-        window.showDiscussion(postId);
-      }
-    }, 600); 
-  }
+function closeModal(id) { 
+    document.getElementById(id).classList.remove("open");
+    
+    // Reset the modal if it's the discussion modal
+    if (id === "discussModal") {
+        isEditMode = false;
+        
+        // Reset Modal Title back to default
+        const modalTitle = document.querySelector("#discussModal .modal-title");
+        if (modalTitle) modalTitle.innerText = "Start Discussion";
+        
+        // Reset Button back to default
+        const btn = document.getElementById("mainSubmitBtn");
+        if (btn) btn.innerText = "Publish Discussion";
+        
+        // Clear Inputs
+        document.getElementById("discTitle").value = "";
+        document.getElementById("discContent").value = "";
+        document.getElementById("discTags").value = "";
+        document.getElementById("attachPreview").textContent = "";
+        attachedImageData = null;
+    }
 }
 
-
+function previewFile(input) {
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => { 
+    attachedImageData = e.target.result; 
+    document.getElementById("attachPreview").textContent = "📎 " + file.name;
+  };
+  if(file) reader.readAsDataURL(file);
+}
 
 // ─────────────────────────────────────────────
-//  EXPOSE TO HTML
-// ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
-//  EXPOSE TO HTML
+//  EXPOSE TO GLOBAL
 // ─────────────────────────────────────────────
 
 Object.assign(window, {
-  showList, showDiscussion,
-  openModal, closeModal,
-  switchTab, filterByTag,
-  reactDisc,
-  postComment, likeComment, deleteComment,
-  deleteDiscussion,
-  previewFile, publishDiscussion,
-  addPollOption, removeOpt, publishPoll, votePoll,
-  renderList: renderDiscussions,
-  checkDeepLink, // <--- Add this line
+  showList, showDiscussion, switchTab,
+  openModal, closeModal, previewFile,
+  postComment, deleteComment,
+  publishDiscussion, deleteDiscussion,
+  votePoll, openEditModal, handleMainButtonClick
 });
-
-// ─────────────────────────────────────────────
-//  INITIALIZATION
-// ─────────────────────────────────────────────
-
-// Run this at the very bottom of the file to check for deep links on load
-checkDeepLink();
