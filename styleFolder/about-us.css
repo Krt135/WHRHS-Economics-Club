@@ -67,13 +67,7 @@
     gap: 12px;
   }
 
-  .mission-badge-svg { width: 160px; height: 160px; }
-  .mission-badge-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px; font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--navy);
-  }
+  .mission-badge-svg { width: 300px; height: 300px; }
 
   .mission-text-col { padding: 60px 56px; }
 

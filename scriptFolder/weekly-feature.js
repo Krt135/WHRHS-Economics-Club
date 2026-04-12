@@ -215,24 +215,53 @@ function renderArticle() {
 }
 
 // 8. ── DATABASE MUTATIONS ──
-window.publishFeature = () => {
+window.publishFeature = async () => {
   if (!currentUser) return alert("Please log in to post.");
+
+  // 1. Fetch user role from database before allowing the post
+  try {
+    const userRef = ref(db, `users/${currentUser.uid}`);
+    const userSnapshot = await get(userRef);
+    const userData = userSnapshot.val();
+
+    if (!userData || userData.role !== 'admin') {
+      alert("Access Denied: Only Exec Board members can publish Weekly Features.");
+      window.closeModal('publishModal');
+      return;
+    }
+  } catch (error) {
+    console.error("Error verifying permissions:", error);
+    return alert("System error. Please try again later.");
+  }
+
+  // 2. Proceed with validation
   const title   = document.getElementById('pubTitle').value.trim();
   const content = document.getElementById('pubContent').value.trim();
   const tag     = document.getElementById('pubTag').value.trim();
+
   if (!title)   { document.getElementById('pubTitle').focus();   return; }
   if (!content) { document.getElementById('pubContent').focus(); return; }
+
+  // 3. Perform the mutation
   const name = getDisplayName(currentUser);
   set(push(ref(db, 'features')), {
     title, content, tag,
-    author: name, authorInitials: name.substring(0,2).toUpperCase(), authorId: currentUser.uid,
-    postedAt: Date.now(), likes: 0, dislikes: 0
+    author: name, 
+    authorInitials: name.substring(0,2).toUpperCase(), 
+    authorId: currentUser.uid,
+    postedAt: Date.now(), 
+    likes: 0, 
+    dislikes: 0
+  }).then(() => {
+    // 4. Cleanup UI
+    document.getElementById('pubTitle').value = '';
+    document.getElementById('pubContent').value = '';
+    document.getElementById('pubTag').value = '';
+    document.getElementById('wordCount').textContent = '0 words';
+    window.closeModal('publishModal');
+  }).catch((error) => {
+    alert("Publish failed: " + error.message);
   });
-  document.getElementById('pubTitle').value = '';
-  document.getElementById('pubContent').value = '';
-  document.getElementById('pubTag').value = '';
-  document.getElementById('wordCount').textContent = '0 words';
-  window.closeModal('publishModal');
 };
 
 window.reactFeature = (id, type) => {

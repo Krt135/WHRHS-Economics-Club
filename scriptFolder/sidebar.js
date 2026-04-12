@@ -17,7 +17,7 @@ class SpecialSidebar extends HTMLElement {
         <aside class="sidebar">
 
         <div class="sidebar-logo">
-                <div class="logo-icon">TEF</div>
+                <img class="logo-icon" src="images/TEF-image.jpeg" alt="Logo">
                 <div class="logo-text">
                     <span class="top">THE ECONOMIC</span>
                     <span class="bot">FORUM</span>
@@ -86,7 +86,7 @@ class SpecialSidebar extends HTMLElement {
     The Academy
 </a>
 
-<a class="nav-item ${active === 'bulletin' ? 'active' : ''}" href="the-bulletin.html">
+<a class="nav-item ${active === 'bulletin' ? 'active' : ''}" href="bulletin.html">
     <span class="nav-icon">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5L6 9H2V15H6L11 19V5Z" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>
     </span>

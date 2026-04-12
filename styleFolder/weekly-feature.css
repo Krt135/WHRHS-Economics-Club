@@ -130,3 +130,9 @@
 .reaction-row:last-child { border-bottom:none; }
 .reaction-row .avatar-sm { width:28px; height:28px; border-radius:50%; background:var(--navy); display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:9px; color:rgba(255,255,255,0.8); flex-shrink:0; }
 .reaction-type { margin-left:auto; font-size:16px; }
+
+#admin-only-controls {
+    margin-bottom: 20px;
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1); /* Optional separator */
+}

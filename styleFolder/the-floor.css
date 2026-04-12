@@ -188,3 +188,21 @@
 .new-comment-input:focus { border-color:var(--gold); }
 .btn-post-cmt { background:var(--navy); color:#fff; border:none; padding:10px 20px; font-family:'Crimson Pro',serif; font-size:14px; font-weight:600; cursor:pointer; transition:background 0.2s; align-self:flex-start; margin-top:2px; white-space:nowrap; }
 .btn-post-cmt:hover { background:var(--navy-light); }
+
+/* ── PIN TO BULLETIN BUTTON (add to the-floor.css) ── */
+
+.btn-pin-tb {
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(201, 168, 76, 0.4) !important;
+}
+.btn-pin-tb:hover {
+  background: rgba(201, 168, 76, 0.3);
+}
+.btn-pin-tb.pinned {
+  background: var(--gold);
+  color: var(--navy);
+}
+.btn-pin-tb.pinned:hover {
+  background: var(--gold-light);
+}

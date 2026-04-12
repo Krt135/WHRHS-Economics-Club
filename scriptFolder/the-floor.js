@@ -6,13 +6,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import {
   getDatabase, ref, push, set, onValue, remove, update, get
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-import { 
-  getAuth, onAuthStateChanged 
+import {
+  getAuth, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { firebaseConfig } from './app.js'; 
+import { firebaseConfig } from './app.js';
 
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
 const auth = getAuth(app);
 
 // ─────────────────────────────────────────────
@@ -20,33 +20,33 @@ const auth = getAuth(app);
 // ─────────────────────────────────────────────
 
 let currentUser = null;
-let userRole = "public"; 
+let userRole    = "public";
 let userProfile = null;
 
-let discussions   = {}; 
-let polls         = {}; 
-let currentDiscId = null; 
-let activeTag     = "all";
+let discussions       = {};
+let polls             = {};
+let currentDiscId     = null;
+let activeTag         = "all";
 let attachedImageData = null;
-let isEditMode = false; // Tracks if the modal is for a NEW post or EDITING one
+let isEditMode        = false;
 
 // Listen for Login/Logout
 onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        currentUser = user;
-        const snapshot = await get(ref(db, `users/${user.uid}`));
-        if (snapshot.exists()) {
-            userProfile = snapshot.val();
-            userRole = userProfile.role || "member";
-        }
-    } else {
-        currentUser = null;
-        userRole = "public";
-        userProfile = null;
+  if (user) {
+    currentUser = user;
+    const snapshot = await get(ref(db, `users/${user.uid}`));
+    if (snapshot.exists()) {
+      userProfile = snapshot.val();
+      userRole    = userProfile.role || "member";
     }
-    if (currentDiscId) renderDiscussionView();
-    renderDiscussions();
-    renderPolls();
+  } else {
+    currentUser = null;
+    userRole    = "public";
+    userProfile = null;
+  }
+  if (currentDiscId) renderDiscussionView();
+  renderDiscussions();
+  renderPolls();
 });
 
 // ─────────────────────────────────────────────
@@ -56,7 +56,7 @@ onAuthStateChanged(auth, async (user) => {
 const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
 function avColour(name) {
   let h = 0;
-  for (let c of (name || '')) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
+  for (let c of (name || "")) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
   return COLOURS[h];
 }
 
@@ -68,9 +68,9 @@ function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60)    return "just now";
-  if (s < 3600)  return Math.floor(s / 60)    + " min ago";
-  if (s < 86400) return Math.floor(s / 3600)  + " hours ago";
-  return              Math.floor(s / 86400) + " days ago";
+  if (s < 3600)  return Math.floor(s / 60)   + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
+  return Math.floor(s / 86400) + " days ago";
 }
 
 // ─────────────────────────────────────────────
@@ -92,58 +92,29 @@ onValue(ref(db, "polls"), snapshot => {
   renderPolls();
 });
 
-// Listen for ALL changes
-onValue(ref(db), (snapshot) => {
-    const data = snapshot.val();
-    discussions = data.discussions || {};
-    // Update local variables for other pages if needed
-    
-    autoRenderAll(); // Run the check to see which page we are currently viewing
+// ─────────────────────────────────────────────
+//  DEEP-LINK FROM BULLETIN
+//  If the user clicked a bulletin card, sessionStorage
+//  has the discussion ID we should open immediately.
+// ─────────────────────────────────────────────
+
+window.addEventListener("DOMContentLoaded", () => {
+  const targetId = sessionStorage.getItem("openDiscussion");
+  if (targetId) {
+    sessionStorage.removeItem("openDiscussion");
+    // Wait for the Firebase listener to populate discussions, then open
+    const unsubscribe = onValue(ref(db, `discussions/${targetId}`), snapshot => {
+      if (snapshot.exists()) {
+        showDiscussion(targetId);
+        unsubscribe(); // stop listening after first open
+      }
+    });
+  }
 });
+
 // ─────────────────────────────────────────────
 //  RENDER — DISCUSSION LIST
 // ─────────────────────────────────────────────
-
-// --- DYNAMIC CONTENT LOADER ---
-// This function ensures that no matter what page you are on, 
-// the script checks for the right container and fills it.
-
-function autoRenderAll() {
-    // 1. Check for Discussions (The Floor)
-    if (document.getElementById("discussionsList")) {
-        renderDiscussions();
-    }
-
-    // 2. Check for Perspectives
-    if (document.getElementById("perspectivesList")) {
-        renderOtherPage("perspectivesList", "perspectives");
-    }
-
-    // 3. Check for Weekly Feature
-    if (document.getElementById("featuresList")) {
-        renderOtherPage("featuresList", "features");
-    }
-}
-
-// Helper to fetch and render for any page
-async function renderOtherPage(containerId, dbPath) {
-    const list = document.getElementById(containerId);
-    const snapshot = await get(ref(db, dbPath));
-    const data = snapshot.val() || {};
-    
-    const items = Object.entries(data)
-        .map(([k, v]) => ({ ...v, _key: k }))
-        .sort((a, b) => b.postedAt - a.postedAt);
-
-    list.innerHTML = items.map(item => `
-        <div class="disc-card" onclick="window.showDiscussion('${item._key}')">
-            <div class="disc-title">${esc(item.title)}</div>
-            <div class="disc-body">${esc(item.body)}</div>
-            <div class="disc-meta">
-                <span>${esc(item.author)}</span> · <span>${rel(item.postedAt)}</span>
-            </div>
-        </div>`).join("");
-}
 
 function renderDiscussions() {
   const list = document.getElementById("discussionsList");
@@ -198,35 +169,48 @@ function renderDiscussionView() {
     ? Object.entries(d.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
     : [];
 
-  const canModify = currentUser && (d.authorId === currentUser.uid || userRole === 'admin');
+  const canModify = currentUser && (d.authorId === currentUser.uid || userRole === "admin");
+  const isAdmin   = userRole === "admin";
 
-  document.getElementById("discTopActions").innerHTML = canModify ? `
-    <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      Edit
-    </button>
-    <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-      Delete
-    </button>` : "";
+  // Check if already pinned (look it up in bulletin node)
+  get(ref(db, "bulletin")).then(snap => {
+    const bulletinData = snap.val() || {};
+    const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId);
+
+    document.getElementById("discTopActions").innerHTML = `
+      ${canModify ? `
+        <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          Delete
+        </button>` : ""}
+      ${isAdmin ? `
+        <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
+          <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+        </button>` : ""}`;
+  });
 
   const commentsHtml = commentEntries.map(c => {
-    const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+    const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === "admin");
     return `
-        <div class="comment-item">
-          <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials || "?")}</div>
-          <div class="comment-bubble">
-            <div class="comment-hdr">
-              <span class="comment-author">${esc(c.author)}</span>
-              <span class="comment-time">${rel(c.postedAt)}</span>
-            </div>
-            <div class="comment-text">${esc(c.text)}</div>
-            ${canDeleteComment ? `
-              <div class="comment-acts">
-                <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">Delete</button>
-              </div>` : ""}
-          </div>
-        </div>`;
+    <div class="comment-item">
+      <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials || "?")}</div>
+      <div class="comment-bubble">
+        <div class="comment-hdr">
+          <span class="comment-author">${esc(c.author)}</span>
+          <span class="comment-time">${rel(c.postedAt)}</span>
+        </div>
+        <div class="comment-text">${esc(c.text)}</div>
+        ${canDeleteComment ? `
+          <div class="comment-acts">
+            <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">Delete</button>
+          </div>` : ""}
+      </div>
+    </div>`;
   }).join("");
 
   document.getElementById("discussionBody").innerHTML = `
@@ -247,25 +231,58 @@ function renderDiscussionView() {
 }
 
 // ─────────────────────────────────────────────
+//  PIN / UNPIN
+// ─────────────────────────────────────────────
+
+async function togglePin(discId, alreadyPinned) {
+  if (alreadyPinned) {
+    // Find the bulletin key for this discussion and remove it
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === discId);
+    if (entry) {
+      await remove(ref(db, `bulletin/${entry[0]}`));
+    }
+  } else {
+    // Pin it — copy the key fields from the discussion into bulletin
+    const d = discussions[discId];
+    if (!d) return;
+    const commentCount = d.comments ? Object.keys(d.comments).length : 0;
+    const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
+    await set(push(ref(db, "bulletin")), {
+      discussionId:   discId,
+      title:          d.title,
+      body:           d.body || "",
+      author:         d.author,
+      authorInitials: d.authorInitials || "?",
+      tags:           d.tags || [],
+      postedAt:       d.postedAt,
+      commentCount,
+      pinnedAt:       Date.now(),
+      pinnedBy:       name
+    });
+  }
+  // Re-render the topbar to reflect the new pin state
+  renderDiscussionView();
+}
+
+// ─────────────────────────────────────────────
 //  ACTION FUNCTIONS
 // ─────────────────────────────────────────────
 
 async function handleMainButtonClick() {
-    if (isEditMode) {
-        await saveEditDiscussion();
-    } else {
-        await publishDiscussion();
-    }
+  if (isEditMode) await saveEditDiscussion();
+  else await publishDiscussion();
 }
 
 async function publishDiscussion() {
   if (!currentUser) return alert("Please log in to post.");
-  const title = document.getElementById("discTitle").value.trim();
-  const body  = document.getElementById("discContent").value.trim();
+  const title   = document.getElementById("discTitle").value.trim();
+  const body    = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
   if (!title) return;
 
-  const name = userProfile ? userProfile.email.split('@')[0] : currentUser.email.split('@')[0];
+  const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   const newRef = push(ref(db, "discussions"));
@@ -273,7 +290,7 @@ async function publishDiscussion() {
     title, body, tags,
     author:         name,
     authorId:       currentUser.uid,
-    authorInitials: name.substring(0,2).toUpperCase(),
+    authorInitials: name.substring(0, 2).toUpperCase(),
     image:          attachedImageData || null,
     postedAt:       Date.now()
   });
@@ -285,45 +302,40 @@ function openEditModal() {
   const d = discussions[currentDiscId];
   if (!d) return;
   isEditMode = true;
-  
-  // 1. Populate Inputs
-  document.getElementById("discTitle").value = d.title;
+
+  document.getElementById("discTitle").value   = d.title;
   document.getElementById("discContent").value = d.body;
   if (d.tags) document.getElementById("discTags").value = d.tags.join(", ");
-  
-  // 2. Update Modal Title (Now searching for the .modal-title class)
+
   const modalTitle = document.querySelector("#discussModal .modal-title");
-  if (modalTitle) {
-    modalTitle.innerText = "Edit Discussion";
-  }
-  
-  // 3. Update Button Text
+  if (modalTitle) modalTitle.innerText = "Edit Discussion";
+
   const btn = document.getElementById("mainSubmitBtn");
-  if (btn) {
-    btn.innerText = "Save Changes";
-  }
-  
+  if (btn) btn.innerText = "Save Changes";
+
   openModal("discussModal");
 }
 
 async function saveEditDiscussion() {
-  const title = document.getElementById("discTitle").value.trim();
-  const body = document.getElementById("discContent").value.trim();
+  const title   = document.getElementById("discTitle").value.trim();
+  const body    = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
-  
   if (!title || !body) return;
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   try {
-    // We only update the content. We do NOT send a new authorId.
-    // This keeps the original ownership intact and satisfies the Security Rules.
     await update(ref(db, `discussions/${currentDiscId}`), {
-      title: title,
-      body: body,
-      tags: tags,
-      lastEdited: Date.now()
+      title, body, tags, lastEdited: Date.now()
     });
-    
+
+    // Also update the bulletin snapshot if this post is pinned
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
+    if (entry) {
+      await update(ref(db, `bulletin/${entry[0]}`), { title, body, tags });
+    }
+
     closeModal("discussModal");
     alert("Changes saved successfully!");
   } catch (error) {
@@ -334,6 +346,12 @@ async function saveEditDiscussion() {
 
 async function deleteDiscussion() {
   if (confirm("Delete this discussion permanently?")) {
+    // Also remove from bulletin if pinned
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
+    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
+
     await remove(ref(db, `discussions/${currentDiscId}`));
     showList();
   }
@@ -344,23 +362,43 @@ async function postComment() {
   const inp = document.getElementById("cmtInput");
   if (!inp.value.trim()) return;
 
-  const name = userProfile ? userProfile.email.split('@')[0] : currentUser.email.split('@')[0];
+  const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
   const cmtRef = push(ref(db, `discussions/${currentDiscId}/comments`));
-  
   await set(cmtRef, {
     author:   name,
     authorId: currentUser.uid,
-    initials: name.substring(0,2).toUpperCase(),
+    initials: name.substring(0, 2).toUpperCase(),
     text:     inp.value.trim(),
     postedAt: Date.now()
   });
   inp.value = "";
+
+  // Update comment count snapshot in bulletin if pinned
+  const snap = await get(ref(db, "bulletin"));
+  const bulletinData = snap.val() || {};
+  const entry = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId);
+  if (entry) {
+    const d = discussions[currentDiscId];
+    const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
+    await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
+  }
 }
 
 async function deleteComment(discKey, cmtKey) {
   if (confirm("Delete this comment?")) {
     await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
   }
+}
+
+// ─────────────────────────────────────────────
+//  FILTER
+// ─────────────────────────────────────────────
+
+function filterByTag(btn, tag) {
+  activeTag = tag;
+  document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderDiscussions();
 }
 
 // ─────────────────────────────────────────────
@@ -371,7 +409,10 @@ function renderPolls() {
   const list = document.getElementById("pollsList");
   if (!list) return;
 
-  const items = Object.entries(polls).map(([key, val]) => ({ ...val, _key: key })).sort((a, b) => b.postedAt - a.postedAt);
+  const items = Object.entries(polls)
+    .map(([key, val]) => ({ ...val, _key: key }))
+    .sort((a, b) => b.postedAt - a.postedAt);
+
   if (!items.length) {
     list.innerHTML = `<div class="empty-state"><p class="empty-text">No polls yet.</p></div>`;
     return;
@@ -404,7 +445,6 @@ async function votePoll(pollKey, optIndex) {
   const p = polls[pollKey];
   const options = [...p.options];
   options[optIndex].votes = (options[optIndex].votes || 0) + 1;
-  
   localStorage.setItem(`voted_${pollKey}`, optIndex);
   await update(ref(db, `polls/${pollKey}`), { options });
   renderPolls();
@@ -432,43 +472,35 @@ function switchTab(tab) {
   document.getElementById("tabDiscussions").classList.toggle("active", tab === "discussions");
   document.getElementById("tabPolls").classList.toggle("active", tab === "polls");
   document.getElementById("panelDiscussions").style.display = tab === "discussions" ? "" : "none";
-  document.getElementById("panelPolls").style.display = tab === "polls" ? "" : "none";
+  document.getElementById("panelPolls").style.display       = tab === "polls"       ? "" : "none";
 }
 
 function openModal(id)  { document.getElementById(id).classList.add("open"); }
 
-function closeModal(id) { 
-    document.getElementById(id).classList.remove("open");
-    
-    // Reset the modal if it's the discussion modal
-    if (id === "discussModal") {
-        isEditMode = false;
-        
-        // Reset Modal Title back to default
-        const modalTitle = document.querySelector("#discussModal .modal-title");
-        if (modalTitle) modalTitle.innerText = "Start Discussion";
-        
-        // Reset Button back to default
-        const btn = document.getElementById("mainSubmitBtn");
-        if (btn) btn.innerText = "Publish Discussion";
-        
-        // Clear Inputs
-        document.getElementById("discTitle").value = "";
-        document.getElementById("discContent").value = "";
-        document.getElementById("discTags").value = "";
-        document.getElementById("attachPreview").textContent = "";
-        attachedImageData = null;
-    }
+function closeModal(id) {
+  document.getElementById(id).classList.remove("open");
+  if (id === "discussModal") {
+    isEditMode = false;
+    const modalTitle = document.querySelector("#discussModal .modal-title");
+    if (modalTitle) modalTitle.innerText = "Start Discussion";
+    const btn = document.getElementById("mainSubmitBtn");
+    if (btn) btn.innerText = "Publish Discussion";
+    document.getElementById("discTitle").value   = "";
+    document.getElementById("discContent").value = "";
+    document.getElementById("discTags").value    = "";
+    document.getElementById("attachPreview").textContent = "";
+    attachedImageData = null;
+  }
 }
 
 function previewFile(input) {
   const file = input.files[0];
   const reader = new FileReader();
-  reader.onload = e => { 
-    attachedImageData = e.target.result; 
+  reader.onload = e => {
+    attachedImageData = e.target.result;
     document.getElementById("attachPreview").textContent = "📎 " + file.name;
   };
-  if(file) reader.readAsDataURL(file);
+  if (file) reader.readAsDataURL(file);
 }
 
 // ─────────────────────────────────────────────
@@ -480,5 +512,6 @@ Object.assign(window, {
   openModal, closeModal, previewFile,
   postComment, deleteComment,
   publishDiscussion, deleteDiscussion,
-  votePoll, openEditModal, handleMainButtonClick
+  votePoll, openEditModal, handleMainButtonClick,
+  filterByTag, togglePin
 });
