@@ -112,7 +112,7 @@
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-  transform: translateX(-250px);
+  transform: translateX(-150px);
 }
 
 .badge-circle {

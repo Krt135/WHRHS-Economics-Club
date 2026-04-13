@@ -34,6 +34,18 @@
   .user-role { font-size:10px; color:rgba(255,255,255,0.4); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
   .logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.4); padding:4px; transition:color 0.15s; }
   .logout-btn:hover { color:rgba(255,255,255,0.7); }
+  .sidebar-signin-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+.sidebar-signin-btn:active {
+    transform: translateY(0px);
+}
+
+.logout-btn:hover {
+    color: var(--red, #fca5a5) !important; /* Turns soft red on hover */
+    transform: translateX(2px); /* Subtle nudge effect */
+}
 
   /* FOOTER */
   footer { background:var(--cream-dark); border-top:1px solid #ddd; padding:28px 64px; display:flex; align-items:center; justify-content:space-between; margin-top:auto; }

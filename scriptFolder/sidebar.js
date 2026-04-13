@@ -5,6 +5,7 @@ import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/12.11.
 
 // 2. Pass 'app' into the getters
 const auth = getAuth(app);
+window.auth = auth;
 const db = getDatabase(app);
 
 class SpecialSidebar extends HTMLElement {
@@ -104,7 +105,7 @@ class SpecialSidebar extends HTMLElement {
 </div>
 </nav>
 
-            <div class="sidebar-footer">
+            <div class="sidebar-footer" id="sidebar-footer-content">
                 <div class="user-info" onclick="handleLogout()" style="cursor:pointer">
                     <div class="avatar" id="user-avatar">??</div>
                     <div>
@@ -122,33 +123,70 @@ class SpecialSidebar extends HTMLElement {
 
     async checkAccess() {
     onAuthStateChanged(auth, async (user) => {
-        const avatar = this.querySelector('#user-avatar');
-        const nameLabel = this.querySelector('#user-display-name');
-        const roleLabel = this.querySelector('#user-display-role');
+        const footerContent = this.querySelector('#sidebar-footer-content');
+        const execSection = this.querySelector('#exec-section');
 
         if (user) {
             const snapshot = await get(ref(db, 'users/' + user.uid));
             const data = snapshot.val();
             
             if (data) {
-                // SUCCESS: User recognized
-                if (data.role === "admin") {
-                    this.querySelector('#exec-section').style.display = "block";
+                // Admin logic
+                if (execSection) {
+                    execSection.style.display = data.role === "admin" ? "block" : "none";
                 }
-                avatar.innerText = data.email.substring(0,2).toUpperCase();
-                nameLabel.innerText = data.email.split('@')[0];
-                roleLabel.innerText = data.role.toUpperCase();
-            } else {
-                // ERROR: Logged in but no database entry found
-                nameLabel.innerText = "Unknown User";
-                roleLabel.innerText = "No Role Assigned";
+
+                // Render Profile View
+                const initials = data.email.substring(0, 2).toUpperCase();
+                const displayName = data.email.split('@')[0];
+                const displayRole = data.role.toUpperCase();
+
+                footerContent.innerHTML = `
+                    <div class="user-profile-block" style="display: flex; align-items: center; gap: 12px;">
+                        <div class="avatar-circle" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 12px;">
+                            ${initials}
+                        </div>
+                        <div class="user-info">
+                            <div style="font-weight: 700; color: #fff; font-size: 14px;">${displayName}</div>
+                            <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--gold);">${displayRole}</div>
+                            
+                        </div>
+                        <button onclick="auth.signOut()" class="logout-btn" title="Sign Out" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; transition: color 0.2s;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
             }
         } else {
-            // LOGGED OUT: Default state
-            this.querySelector('#exec-section').style.display = "none";
-            avatar.innerText = "??";
-            nameLabel.innerText = "Guest";
-            roleLabel.innerText = "Public";
+            // LOGGED OUT: Show Big Sign In Button
+            if (execSection) execSection.style.display = "none";
+
+            footerContent.innerHTML = `
+                <button class="sidebar-signin-btn" onclick="window.location.href='auth.html'" style="
+                    width: 100%;
+                    background: var(--gold);
+                    color: #0c1221;
+                    border: none;
+                    padding: 12px;
+                    border-radius: 4px;
+                    font-family: 'Space Mono', monospace;
+                    font-weight: 700;
+                    font-size: 13px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: opacity 0.2s;
+                ">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4m-7-7l5-5m-5 5l5 5m-5-5h12" />
+                    </svg>
+                    SIGN IN
+                </button>
+            `;
         }
     });
 }
