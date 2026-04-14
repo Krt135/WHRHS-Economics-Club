@@ -14,6 +14,9 @@ let userRole     = "public";
 let userProfile  = null;
 
 onAuthStateChanged(auth, async (user) => {
+  // Grab the container, not just the button
+  const adminControls = document.getElementById('admin-only-controls');
+
   if (user) {
     currentUser = user;
     const snapshot = await get(ref(db, `users/${user.uid}`));
@@ -26,6 +29,12 @@ onAuthStateChanged(auth, async (user) => {
     userRole    = "public";
     userProfile = null;
   }
+
+  // Toggle the entire container based on the admin role
+  if (adminControls) {
+    adminControls.style.display = (userRole === 'admin') ? 'block' : 'none';
+  }
+
   if (currentFeatureId) renderArticle();
   else renderList();
 });
