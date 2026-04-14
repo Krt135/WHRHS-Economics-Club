@@ -144,7 +144,7 @@
 .ticker-inner {
   display: flex;
   width: max-content;
-  animation: ticker 28s linear infinite;
+  animation: ticker 42s linear infinite;
 }
 
 .ticker-inner:hover {
