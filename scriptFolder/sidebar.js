@@ -17,7 +17,7 @@ class SpecialSidebar extends HTMLElement {
         
         <aside class="sidebar">
 
-        <div class="sidebar-logo">
+        <div class="sidebar-logo" onclick="window.location.href='index.html'" style="cursor:pointer">
                 <img class="logo-icon" src="images/TEF-image.jpeg" alt="Logo">
                 <div class="logo-text">
                     <span class="top">THE ECONOMIC</span>
@@ -35,7 +35,7 @@ class SpecialSidebar extends HTMLElement {
                 <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
         </span>
-        The Nexus
+        Home
     </a>
 
     <a class="nav-item ${active === 'trading' ? 'active' : ''}" href="trading-floor.html">
@@ -45,7 +45,7 @@ class SpecialSidebar extends HTMLElement {
                 <polyline points="8 21 12 17 16 21" />
             </svg>
         </span>
-        Trading Floor
+        Game Hub
     </a>
 
     <a class="nav-item ${active === 'about' ? 'active' : ''}" href="about-us.html">
@@ -122,26 +122,26 @@ class SpecialSidebar extends HTMLElement {
     }
 
     async checkAccess() {
-    onAuthStateChanged(auth, async (user) => {
-        const footerContent = this.querySelector('#sidebar-footer-content');
-        const execSection = this.querySelector('#exec-section');
+        onAuthStateChanged(auth, async (user) => {
+            const footerContent = this.querySelector('#sidebar-footer-content');
+            const execSection = this.querySelector('#exec-section');
 
-        if (user) {
-            const snapshot = await get(ref(db, 'users/' + user.uid));
-            const data = snapshot.val();
-            
-            if (data) {
-                // Admin logic
-                if (execSection) {
-                    execSection.style.display = data.role === "admin" ? "block" : "none";
-                }
+            if (user) {
+                const snapshot = await get(ref(db, 'users/' + user.uid));
+                const data = snapshot.val();
 
-                // Render Profile View
-                const initials = data.email.substring(0, 2).toUpperCase();
-                const displayName = data.email.split('@')[0];
-                const displayRole = data.role.toUpperCase();
+                if (data) {
+                    // Admin logic
+                    if (execSection) {
+                        execSection.style.display = data.role === "admin" ? "block" : "none";
+                    }
 
-                footerContent.innerHTML = `
+                    // Render Profile View
+                    const initials = data.email.substring(0, 2).toUpperCase();
+                    const displayName = data.email.split('@')[0];
+                    const displayRole = data.role.toUpperCase();
+
+                    footerContent.innerHTML = `
                     <div class="user-profile-block" style="display: flex; align-items: center; gap: 12px;">
                         <div class="avatar-circle" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 12px;">
                             ${initials}
@@ -158,12 +158,12 @@ class SpecialSidebar extends HTMLElement {
                         </button>
                     </div>
                 `;
-            }
-        } else {
-            // LOGGED OUT: Show Big Sign In Button
-            if (execSection) execSection.style.display = "none";
+                }
+            } else {
+                // LOGGED OUT: Show Big Sign In Button
+                if (execSection) execSection.style.display = "none";
 
-            footerContent.innerHTML = `
+                footerContent.innerHTML = `
                 <button class="sidebar-signin-btn" onclick="window.location.href='auth.html'" style="
                     width: 100%;
                     background: var(--gold);
@@ -187,9 +187,9 @@ class SpecialSidebar extends HTMLElement {
                     SIGN IN
                 </button>
             `;
-        }
-    });
-}
+            }
+        });
+    }
 }
 
 // Define the element

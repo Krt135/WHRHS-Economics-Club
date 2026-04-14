@@ -19,10 +19,9 @@ const auth = getAuth(app);
 //  STATE & AUTH TRACKING
 // ─────────────────────────────────────────────
 
-let currentUser = null;
-let userRole    = "public";
-let userProfile = null;
-
+let currentUser       = null;
+let userRole          = "public";
+let userProfile       = null;
 let discussions       = {};
 let polls             = {};
 let currentDiscId     = null;
@@ -30,7 +29,6 @@ let activeTag         = "all";
 let attachedImageData = null;
 let isEditMode        = false;
 
-// Listen for Login/Logout
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
@@ -59,11 +57,9 @@ function avColour(name) {
   for (let c of (name || "")) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
   return COLOURS[h];
 }
-
 function esc(s) {
   return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-
 function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -94,19 +90,16 @@ onValue(ref(db, "polls"), snapshot => {
 
 // ─────────────────────────────────────────────
 //  DEEP-LINK FROM BULLETIN
-//  If the user clicked a bulletin card, sessionStorage
-//  has the discussion ID we should open immediately.
 // ─────────────────────────────────────────────
 
 window.addEventListener("DOMContentLoaded", () => {
   const targetId = sessionStorage.getItem("openDiscussion");
   if (targetId) {
     sessionStorage.removeItem("openDiscussion");
-    // Wait for the Firebase listener to populate discussions, then open
     const unsubscribe = onValue(ref(db, `discussions/${targetId}`), snapshot => {
       if (snapshot.exists()) {
         showDiscussion(targetId);
-        unsubscribe(); // stop listening after first open
+        unsubscribe();
       }
     });
   }
@@ -172,9 +165,9 @@ function renderDiscussionView() {
   const canModify = currentUser && (d.authorId === currentUser.uid || userRole === "admin");
   const isAdmin   = userRole === "admin";
 
-  // Check if already pinned (look it up in bulletin node)
+  // Async pin check — fills the topbar once resolved
   get(ref(db, "bulletin")).then(snap => {
-    const bulletinData = snap.val() || {};
+    const bulletinData  = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId);
 
     document.getElementById("discTopActions").innerHTML = `
@@ -236,15 +229,11 @@ function renderDiscussionView() {
 
 async function togglePin(discId, alreadyPinned) {
   if (alreadyPinned) {
-    // Find the bulletin key for this discussion and remove it
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === discId);
-    if (entry) {
-      await remove(ref(db, `bulletin/${entry[0]}`));
-    }
+    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
   } else {
-    // Pin it — copy the key fields from the discussion into bulletin
     const d = discussions[discId];
     if (!d) return;
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
@@ -262,12 +251,11 @@ async function togglePin(discId, alreadyPinned) {
       pinnedBy:       name
     });
   }
-  // Re-render the topbar to reflect the new pin state
   renderDiscussionView();
 }
 
 // ─────────────────────────────────────────────
-//  ACTION FUNCTIONS
+//  PUBLISH DISCUSSION
 // ─────────────────────────────────────────────
 
 async function handleMainButtonClick() {
@@ -297,6 +285,66 @@ async function publishDiscussion() {
 
   closeModal("discussModal");
 }
+
+// ─────────────────────────────────────────────
+//  PUBLISH POLL
+// ─────────────────────────────────────────────
+
+async function publishPoll() {
+  if (!currentUser) return alert("Please log in to post a poll.");
+
+  const question     = document.getElementById("pollQuestion").value.trim();
+  const optionInputs = document.querySelectorAll("#pollOptionInputs .form-input");
+  const options      = Array.from(optionInputs)
+    .map(input => input.value.trim())
+    .filter(label => label !== "")
+    .map(label => ({ label, votes: 0 }));
+
+  if (!question)          return alert("Please enter a question.");
+  if (options.length < 2) return alert("Please provide at least two valid options.");
+
+  try {
+    await set(push(ref(db, "polls")), {
+      question,
+      options,
+      authorId: currentUser.uid,
+      postedAt: Date.now()
+    });
+    document.getElementById("pollQuestion").value = "";
+    optionInputs.forEach(input => input.value = "");
+    closeModal("pollModal");
+  } catch (error) {
+    console.error("Error publishing poll:", error);
+    alert("System error. Please try again.");
+  }
+}
+
+// ─────────────────────────────────────────────
+//  POLL OPTIONS (add / remove rows in modal)
+// ─────────────────────────────────────────────
+
+function addPollOption() {
+  const container = document.getElementById("pollOptionInputs");
+  const newRow    = document.createElement("div");
+  newRow.className = "poll-opt-row";
+  newRow.innerHTML = `
+    <input class="form-input" type="text" placeholder="New Option">
+    <button class="remove-opt" onclick="window.removeOpt(this)" title="Remove">×</button>`;
+  container.appendChild(newRow);
+}
+
+function removeOpt(btn) {
+  const container = document.getElementById("pollOptionInputs");
+  if (container.children.length > 2) {
+    btn.parentElement.remove();
+  } else {
+    alert("Polls must have at least two options.");
+  }
+}
+
+// ─────────────────────────────────────────────
+//  EDIT / DELETE DISCUSSION
+// ─────────────────────────────────────────────
 
 function openEditModal() {
   const d = discussions[currentDiscId];
@@ -328,13 +376,11 @@ async function saveEditDiscussion() {
       title, body, tags, lastEdited: Date.now()
     });
 
-    // Also update the bulletin snapshot if this post is pinned
-    const snap = await get(ref(db, "bulletin"));
-    const data = snap.val() || {};
+    // Keep the bulletin snapshot in sync if pinned
+    const snap  = await get(ref(db, "bulletin"));
+    const data  = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
-    if (entry) {
-      await update(ref(db, `bulletin/${entry[0]}`), { title, body, tags });
-    }
+    if (entry) await update(ref(db, `bulletin/${entry[0]}`), { title, body, tags });
 
     closeModal("discussModal");
     alert("Changes saved successfully!");
@@ -346,9 +392,9 @@ async function saveEditDiscussion() {
 
 async function deleteDiscussion() {
   if (confirm("Delete this discussion permanently?")) {
-    // Also remove from bulletin if pinned
-    const snap = await get(ref(db, "bulletin"));
-    const data = snap.val() || {};
+    // Remove from bulletin if pinned
+    const snap  = await get(ref(db, "bulletin"));
+    const data  = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
 
@@ -357,14 +403,33 @@ async function deleteDiscussion() {
   }
 }
 
+// ─────────────────────────────────────────────
+//  DELETE POLL (admin only)
+// ─────────────────────────────────────────────
+
+async function deletePoll(pollKey) {
+  if (!currentUser || userRole !== "admin") return alert("Access Denied: Admins only.");
+  if (confirm("Delete this poll permanently?")) {
+    try {
+      await remove(ref(db, `polls/${pollKey}`));
+    } catch (error) {
+      console.error("Error deleting poll:", error);
+      alert("Failed to delete poll.");
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  COMMENTS
+// ─────────────────────────────────────────────
+
 async function postComment() {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById("cmtInput");
   if (!inp.value.trim()) return;
 
   const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
-  const cmtRef = push(ref(db, `discussions/${currentDiscId}/comments`));
-  await set(cmtRef, {
+  await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
     author:   name,
     authorId: currentUser.uid,
     initials: name.substring(0, 2).toUpperCase(),
@@ -373,12 +438,12 @@ async function postComment() {
   });
   inp.value = "";
 
-  // Update comment count snapshot in bulletin if pinned
-  const snap = await get(ref(db, "bulletin"));
+  // Keep bulletin comment count in sync
+  const snap        = await get(ref(db, "bulletin"));
   const bulletinData = snap.val() || {};
-  const entry = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId);
+  const entry       = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId);
   if (entry) {
-    const d = discussions[currentDiscId];
+    const d        = discussions[currentDiscId];
     const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
     await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
   }
@@ -402,7 +467,7 @@ function filterByTag(btn, tag) {
 }
 
 // ─────────────────────────────────────────────
-//  POLLS
+//  POLLS RENDER
 // ─────────────────────────────────────────────
 
 function renderPolls() {
@@ -418,11 +483,12 @@ function renderPolls() {
     return;
   }
 
+  const isAdmin = userRole === "admin";
+
   list.innerHTML = items.map(p => {
-    const options = Array.isArray(p.options) ? p.options : [];
+    const options    = Array.isArray(p.options) ? p.options : [];
     const totalVotes = options.reduce((a, o) => a + (o.votes || 0), 0);
-    const localVotedIndex = localStorage.getItem(`voted_${p._key}`);
-    const hasVoted = localVotedIndex !== null;
+    const hasVoted   = localStorage.getItem(`voted_${p._key}`) !== null;
 
     const optionsHtml = options.map((o, i) => {
       const pct = totalVotes ? Math.round((o.votes || 0) / totalVotes * 100) : 0;
@@ -436,7 +502,17 @@ function renderPolls() {
         </div>`;
     }).join("");
 
-    return `<div class="poll-card"><div class="poll-title">${esc(p.question)}</div>${optionsHtml}</div>`;
+    const deleteBtnHtml = isAdmin ? `
+      <button onclick="window.deletePoll('${p._key}')" style="position:absolute;right:16px;top:16px;background:none;border:none;color:#ef4444;cursor:pointer;padding:4px;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+      </button>` : "";
+
+    return `
+      <div class="poll-card" style="position:relative;">
+        ${deleteBtnHtml}
+        <div class="poll-title" style="padding-right:24px;">${esc(p.question)}</div>
+        ${optionsHtml}
+      </div>`;
   }).join("");
 }
 
@@ -473,6 +549,8 @@ function switchTab(tab) {
   document.getElementById("tabPolls").classList.toggle("active", tab === "polls");
   document.getElementById("panelDiscussions").style.display = tab === "discussions" ? "" : "none";
   document.getElementById("panelPolls").style.display       = tab === "polls"       ? "" : "none";
+  const filterBar = document.getElementById("filterBar");
+  if (filterBar) filterBar.style.display = tab === "discussions" ? "" : "none";
 }
 
 function openModal(id)  { document.getElementById(id).classList.add("open"); }
@@ -512,6 +590,7 @@ Object.assign(window, {
   openModal, closeModal, previewFile,
   postComment, deleteComment,
   publishDiscussion, deleteDiscussion,
+  publishPoll, addPollOption, removeOpt, deletePoll,
   votePoll, openEditModal, handleMainButtonClick,
   filterByTag, togglePin
 });
