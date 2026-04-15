@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getDatabase, ref, query, orderByChild, limitToLast, onValue } 
   from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-import { firebaseConfig } from './app.js'; // Make sure this path is correct!
+import { firebaseConfig } from './config.js';
 
 // 1. You MUST do this first on every page
 const app = initializeApp(firebaseConfig);

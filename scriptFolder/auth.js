@@ -3,7 +3,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, on
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get }
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-import { firebaseConfig } from './app.js';
+import { firebaseConfig } from './config.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
