@@ -39,14 +39,15 @@ class SpecialSidebar extends HTMLElement {
     </a>
 
     <a class="nav-item ${active === 'trading' ? 'active' : ''}" href="trading-floor.html">
-        <span class="nav-icon">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <polyline points="8 21 12 17 16 21" />
-            </svg>
-        </span>
-        Game Hub
-    </a>
+    <span class="nav-icon">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <path d="M11.5 5.5H12.5" /> <path d="M6 8V6.5C6 4.567 7.567 3 9.5 3H14.5C16.433 3 18 4.567 18 6.5V8C20.2091 8 22 9.79086 22 12V17C22 19.2091 20.2091 21 18 21H16C13.7909 21 12 19.2091 12 17V15H12V17C12 19.2091 10.2091 21 8 21H6C3.79086 21 2 19.2091 2 17V12C2 9.79086 3.79086 8 6 8Z" />
+            <path d="M7 11.5V14.5" />
+            <path d="M5.5 13H8.5" />
+            <path d="M16.5 11V11" stroke-width="2.5" /> <path d="M16.5 15V15" stroke-width="2.5" /> <path d="M18.5 13V13" stroke-width="2.5" /> <path d="M14.5 13V13" stroke-width="2.5" /> </svg>
+    </span>
+    Game Hub
+</a>
 
     <a class="nav-item ${active === 'about' ? 'active' : ''}" href="about-us.html">
         <span class="nav-icon">

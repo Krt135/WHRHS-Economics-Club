@@ -25,40 +25,59 @@
   max-width: 560px;
 }
 
+/* Eyebrow styling */
 .hero-eyebrow {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--text-muted);
-  margin-bottom: 24px;
-  padding-left: 14px;
-  border-left: 2px solid var(--text-muted);
+  font-family: 'Inter', sans-serif; /* Clean sans-serif */
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.5rem;
 }
 
+.accent-line {
+  width: 2px;
+  height: 20px;
+  background-color: #c1a062; /* Gold color */
+}
+
+/* Main Title: "The Economic Forum" */
 .hero-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 58px;
-  font-weight: 900;
-  line-height: 1.05;
-  margin-bottom: 24px;
+  font-family: "Playfair Display", serif;
+  font-size: 5.0rem; /* Make it very large */
+  line-height: 0.9;
+  font-weight: 800;
+  margin-bottom: 1rem;
 }
 
-.hero-title .dark {
-  color: var(--navy);
+/* Subtitle: "Understand Economics..." */
+.hero-subtitle {
+  font-family: "Playfair Display", serif;
+  font-size: 2.25rem; /* Noticeably smaller than the main title */
+  line-height: 1.2;
+  font-weight: 700;
+  margin-bottom: 2rem;
 }
 
-.hero-title .gold {
-  color: var(--gold);
+/* Color Classes */
+.dark {
+  color: #001f3f; /* Deep Navy */
 }
 
+.gold {
+  color: #c1a062; /* Gold */
+}
+
+/* Description text - stays serif to match the image */
 .hero-desc {
-  font-size: 17px;
-  color: #4b5563;
-  line-height: 1.7;
-  margin-bottom: 36px;
-  font-weight: 300;
-  max-width: 480px;
+  font-family: "Playfair Display", serif;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: #475569;
+  max-width: 580px;
+  margin-bottom: 3rem;
 }
 
 .hero-actions {
@@ -126,8 +145,8 @@
 
 /* SVG globe/arrow icon placeholder */
 .badge-svg {
-  width: 400px;
-  height: 400px;
+  width: 500px;
+  height: 500px;
 }
 
 
@@ -144,7 +163,7 @@
 .ticker-inner {
   display: flex;
   width: max-content;
-  animation: ticker 42s linear infinite;
+  animation: ticker 80s linear infinite;
 }
 
 .ticker-inner:hover {
@@ -159,7 +178,7 @@
 
 .ticker-item {
   font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.14em;
   color: rgba(255, 255, 255, 0.8);

@@ -459,12 +459,15 @@ async function deleteComment(discKey, cmtKey) {
 //  FILTER
 // ─────────────────────────────────────────────
 
+/*
 function filterByTag(btn, tag) {
   activeTag = tag;
   document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   renderDiscussions();
 }
+  We may use this code ltr, don't remove
+  */
 
 // ─────────────────────────────────────────────
 //  POLLS RENDER
@@ -592,5 +595,5 @@ Object.assign(window, {
   publishDiscussion, deleteDiscussion,
   publishPoll, addPollOption, removeOpt, deletePoll,
   votePoll, openEditModal, handleMainButtonClick,
-  filterByTag, togglePin
+  /*filterByTag*/ togglePin
 });
