@@ -119,51 +119,74 @@ function rebuildFilterBar() {
 
 function renderList() {
   rebuildFilterBar();
-  const q = document.getElementById('searchInput')?document.getElementById('searchInput').value.toLowerCase():'';
-  let filtered = posts.filter(p=>{
-    const matchTag    = activeTag==='all'||p.tags.includes(activeTag);
-    const matchSearch = !q||p.title.toLowerCase().includes(q)||p.author.toLowerCase().includes(q)||p.tags.some(t=>t.toLowerCase().includes(q));
-    return matchTag&&matchSearch;
-  });
-  if(sortMode==='oldest')       filtered.sort((a,b)=>a.postedAt-b.postedAt);
-  else if(sortMode==='popular') filtered.sort((a,b)=>(b.likes||0)-(a.likes||0));
-  else                          filtered.sort((a,b)=>b.postedAt-a.postedAt);
+  const searchInput = document.getElementById('searchInput');
+  const q = searchInput ? searchInput.value.toLowerCase() : '';
 
-  const el = document.getElementById('postsList'); if(!el) return;
-  if(!filtered.length){
-    el.innerHTML=`<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
+  let filtered = posts.filter(p => {
+    const matchTag = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
+    // Added safety check for p.tags.some
+    const matchSearch = !q || 
+                        p.title.toLowerCase().includes(q) || 
+                        p.author.toLowerCase().includes(q) || 
+                        (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
+    return matchTag && matchSearch;
+  });
+
+  // Sorting
+  if (sortMode === 'oldest') filtered.sort((a, b) => a.postedAt - b.postedAt);
+  else if (sortMode === 'popular') filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  else filtered.sort((a, b) => b.postedAt - a.postedAt);
+
+  const el = document.getElementById('postsList');
+  if (!el) return;
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
     return;
   }
-  el.innerHTML = filtered.map(p=>{
-    const iLiked    = myLiked(p);
+
+  el.innerHTML = filtered.map(p => {
+    const iLiked = myLiked(p);
     const iDisliked = myDisliked(p);
-    const excerpt   = p.content.split('\n\n')[0].slice(0,240)+(p.content.length>240?'…':'');
+    // Safer excerpt generation
+    const excerpt = p.content ? (p.content.split('\n\n')[0].slice(0, 240) + (p.content.length > 240 ? '…' : '')) : '';
+
+    // THEME LOGIC
+    const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
+                    : (p.authorRole === "admin") ? "theme-exec" 
+                    : "theme-member";
+
     return `
-    <div class="persp-card" onclick="showArticle('${p.id}')">
+    <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
       <div class="pc-header">
         <div class="pc-title">${esc(p.title)}</div>
-        ${p.featured?`<span class="featured-badge">FEATURED</span>`:''}
+        ${p.featured ? `<span class="featured-badge">FEATURED</span>` : ''}
       </div>
-      ${p.image?`<img src="${p.image}" class="pc-image" alt="">`:''}
+      
+      ${p.image ? `<img src="${p.image}" class="pc-image" alt="Post Image" loading="lazy">` : ''}
+      
       <div class="pc-excerpt">${esc(excerpt)}</div>
+      
       <div class="pc-meta">
         <span class="author-chip">
-          <span class="author-av" style="background:${avatarColour(p.author)}">${esc(p.authorInitials||'?')}</span>
+          <span class="author-av" style="background:${avatarColour(p.author)}">${esc(p.authorInitials || '?')}</span>
           ${esc(p.author)}
         </span>
         <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${p.comments.length}
+        ${p.comments ? p.comments.length : 0}
       </div>
-      ${p.tags.length?`<div class="pc-tags">${p.tags.map(t=>`<span class="tag-pill">${esc(t)}</span>`).join('')}</div>`:''}
+
+      ${(p.tags && p.tags.length) ? `<div class="pc-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
+      
       <div class="pc-actions" onclick="event.stopPropagation()">
-        <button class="react-btn ${iLiked?'liked':''}" onclick="react('${p.id}','like')">
-          <svg width="14" height="14" fill="${iLiked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-          ${p.likes||0}
+        <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')" title="Like">
+          <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+          <span>${p.likes || 0}</span>
         </button>
-        <button class="react-btn ${iDisliked?'disliked':''}" onclick="react('${p.id}','dislike')">
-          <svg width="14" height="14" fill="${iDisliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-          ${p.dislikes||0}
+        <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')" title="Dislike">
+          <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+          <span>${p.dislikes || 0}</span>
         </button>
       </div>
     </div>`;
@@ -177,6 +200,9 @@ function renderArticle() {
   const paragraphs = p.content.split(/\n\n+/).map(s=>`<p>${esc(s.trim())}</p>`).join('');
   const iLiked     = myLiked(p);
   const iDisliked  = myDisliked(p);
+  const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
+                  : (p.authorRole === "admin") ? "theme-exec" 
+                  : "theme-member";
 
   // Only author or admin sees Edit/Delete
   const canModify = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
@@ -191,8 +217,9 @@ function renderArticle() {
   const commentsHtml = p.comments.length
     ? p.comments.map(c=>{
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+        const commentTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
         return `
-        <div class="comment-item">
+        <div class="comment-item ${commentTheme}">
           <div class="comment-av" style="background:${avatarColour(c.author)}">${esc(c.initials||'?')}</div>
           <div class="comment-bubble">
             <div class="comment-header">
@@ -215,6 +242,7 @@ function renderArticle() {
       }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
 
+document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
   document.getElementById('articleBody').innerHTML = `
     <div class="article-eyebrow">PERSPECTIVES${p.tags.length?' · '+p.tags[0].toUpperCase():''}</div>
     <div class="article-title">${esc(p.title)}</div>
@@ -251,6 +279,8 @@ function renderArticle() {
         <button class="btn-post-comment" onclick="postComment('${p.id}')">Post</button>
       </div>
     </div>`;
+
+    
 }
 
 // 7. ── DATABASE MUTATIONS ──
@@ -261,13 +291,23 @@ window.publishPost = () => {
   const tagsRaw = document.getElementById('wTags').value.trim();
   if(!title){document.getElementById('wTitle').focus();return;}
   if(!content){document.getElementById('wContent').focus();return;}
+  
   const name = getDisplayName(currentUser);
-  const tags = tagsRaw?tagsRaw.split(',').map(t=>t.trim()).filter(Boolean):[];
+  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+
   set(push(ref(db,'perspectives')),{
-    title, content, tags,
-    author: name, authorInitials: name.substring(0,2).toUpperCase(), authorId: currentUser.uid,
-    image: pendingImgData||null, postedAt: Date.now(),
-    likes: 0, dislikes: 0, featured: false
+    title, 
+    content, 
+    tags,
+    author: name, 
+    authorInitials: name.substring(0,2).toUpperCase(), 
+    authorId: currentUser.uid,
+    authorRole: userRole, // <--- ADD THIS LINE
+    image: pendingImgData||null, 
+    postedAt: Date.now(),
+    likes: 0, 
+    dislikes: 0, 
+    featured: false
   });
   pendingImgData=null;
   document.getElementById('wTitle').value='';

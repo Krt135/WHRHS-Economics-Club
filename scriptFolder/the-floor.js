@@ -129,8 +129,18 @@ function renderDiscussions() {
   list.innerHTML = items.map(d => {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
     const tags = Array.isArray(d.tags) ? d.tags : [];
+
+    // --- NEW COLOR LOGIC START ---
+    let cardTheme = "theme-member";
+    if (currentUser && d.authorId === currentUser.uid) {
+      cardTheme = "theme-me"; // Your post: Blue
+    } else if (d.authorRole === "admin") {
+      cardTheme = "theme-exec"; // Exec post: Gold
+    }
+    // --- NEW COLOR LOGIC END ---
+
     return `
-    <div class="disc-card" onclick="window.showDiscussion('${d._key}')">
+    <div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
       ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
       <div class="disc-title">${esc(d.title)}</div>
       <div class="disc-body">${esc(d.body)}</div>
@@ -155,6 +165,7 @@ function renderDiscussions() {
 // ─────────────────────────────────────────────
 
 function renderDiscussionView() {
+  // 1. Define 'd' and 'commentEntries' first!
   const d = discussions[currentDiscId];
   if (!d) return showList();
 
@@ -165,32 +176,52 @@ function renderDiscussionView() {
   const canModify = currentUser && (d.authorId === currentUser.uid || userRole === "admin");
   const isAdmin   = userRole === "admin";
 
-  // Async pin check — fills the topbar once resolved
+  // 2. Restore the Pin/Edit/Delete Topbar Actions
   get(ref(db, "bulletin")).then(snap => {
     const bulletinData  = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId);
 
-    document.getElementById("discTopActions").innerHTML = `
-      ${canModify ? `
-        <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>
-        <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-          Delete
-        </button>` : ""}
-      ${isAdmin ? `
-        <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
-          <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-          ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
-        </button>` : ""}`;
+    const topActions = document.getElementById("discTopActions");
+    if (topActions) {
+      topActions.innerHTML = `
+        ${canModify ? `
+          <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+          </button>
+          <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+            Delete
+          </button>` : ""}
+        ${isAdmin ? `
+          <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
+            <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+          </button>` : ""}`;
+    }
   });
 
+  // 3. Determine the theme for the main Discussion Post
+  let postTheme = "theme-member";
+  if (currentUser && d.authorId === currentUser.uid) {
+    postTheme = "theme-me"; // Blue: Self overrides everything
+  } else if (d.authorRole === "admin") {
+    postTheme = "theme-exec"; // Gold: Admin (but not you)
+  }
+
+  // 4. Determine the theme for each Comment
   const commentsHtml = commentEntries.map(c => {
     const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === "admin");
+    
+    let cmtTheme = "theme-member";
+    if (currentUser && c.authorId === currentUser.uid) {
+      cmtTheme = "theme-me";
+    } else if (c.authorRole === "admin") {
+      cmtTheme = "theme-exec";
+    }
+
     return `
-    <div class="comment-item">
+    <div class="comment-item ${cmtTheme}">
       <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials || "?")}</div>
       <div class="comment-bubble">
         <div class="comment-hdr">
@@ -206,13 +237,17 @@ function renderDiscussionView() {
     </div>`;
   }).join("");
 
+  // 5. Render everything, wrapping the main post in the new theme class
   document.getElementById("discussionBody").innerHTML = `
-    <div class="disc-view-title">${esc(d.title)}</div>
-    <div class="disc-view-meta">
-      <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentEntries.length} comments
+    <div class="main-post-wrapper ${postTheme}">
+      <div class="disc-view-title">${esc(d.title)}</div>
+      <div class="disc-view-meta">
+        <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentEntries.length} comments
+      </div>
+      ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
+      <div class="disc-view-body">${esc(d.body)}</div>
     </div>
-    ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
-    <div class="disc-view-body">${esc(d.body)}</div>
+    
     <div class="comments-area">
       <div class="comments-title">${commentEntries.length} Comments</div>
       ${commentsHtml}
@@ -278,6 +313,7 @@ async function publishDiscussion() {
     title, body, tags,
     author:         name,
     authorId:       currentUser.uid,
+    authorRole:     userRole, // <--- ADDED THIS SO MAIN POSTS HAVE COLORS TOO
     authorInitials: name.substring(0, 2).toUpperCase(),
     image:          attachedImageData || null,
     postedAt:       Date.now()
@@ -432,6 +468,7 @@ async function postComment() {
   await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
     author:   name,
     authorId: currentUser.uid,
+    authorRole: userRole,
     initials: name.substring(0, 2).toUpperCase(),
     text:     inp.value.trim(),
     postedAt: Date.now()
