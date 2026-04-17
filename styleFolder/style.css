@@ -57,30 +57,4 @@
   .footer-bottom { background:var(--cream-dark); border-top:1px solid #e5e7eb; padding:14px 64px; display:flex; align-items:center; justify-content:space-between; }
   .footer-copy { font-size:12px; color:var(--text-muted); }
   .footer-disc { font-family:'Space Mono',monospace; font-size:9px; color:var(--text-muted); border:1px solid #d1d5db; padding:4px 10px; letter-spacing:0.06em; }
-
-  /* --- THEME: MEMBER (DEFAULT) --- */
-/* --- UNIVERSAL THEME STYLES (The Floor & Perspectives) --- */
-
-/* Your own posts (Blue) */
-.disc-card.theme-me, 
-.persp-card.theme-me, 
-.article-container.theme-me,
-.comment-item.theme-me {
-  background-color: #f0f7ff !important;
-  box-shadow: inset 4px 0 0 0 #3b82f6 !important; /* Clean line on the left */
-}
-
-/* Exec Board / Admin posts (Gold) */
-.disc-card.theme-exec, 
-.persp-card.theme-exec, 
-.article-container.theme-exec,
-.comment-item.theme-exec {
-  background-color: #fcf9f2 !important;
-  box-shadow: inset 4px 0 0 0 #c1a062 !important; /* Clean line on the left */
-}
-
-/* Ensure these themes don't break the hover effect */
-.persp-card.theme-me:hover, .persp-card.theme-exec:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 4px 0 0 0 currentColor, 0 10px 15px -3px rgba(0,0,0,0.1);
-}
+  

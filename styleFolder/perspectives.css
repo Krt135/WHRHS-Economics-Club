@@ -164,3 +164,42 @@
 /* announce modal */
 .announce-modal { max-width:500px; }
 #fileInput, #editFileInput { display:none; }
+
+/* --- PERSPECTIVES: LAYOUT FIX --- */
+#articleBody.article-container {
+    max-width: 850px;       /* Prevents text from hitting the sidebar */
+    margin: 40px auto;     /* Centers the article on the page */
+    padding: 40px;
+    background: #ffffff;
+    border-radius: 12px;
+    line-height: 1.7;      /* Better readability for essays */
+}
+
+/* --- PERSPECTIVES: THEMES --- */
+
+/* ME (Blue Essay) */
+.article-container.theme-me,
+.persp-card.theme-me {
+    background-color: #f0f7ff !important;
+    box-shadow: inset 8px 0 0 0 #3b82f6 !important; /* Thick accent line */
+}
+
+/* EXEC (Gold Essay) */
+.article-container.theme-exec,
+.persp-card.theme-exec {
+    background-color: #fcf9f2 !important;
+    box-shadow: inset 8px 0 0 0 #c1a062 !important;
+}
+
+/* MEMBER (Standard) */
+.article-container.theme-member,
+.persp-card.theme-member {
+    background-color: #ffffff;
+    box-shadow: inset 8px 0 0 0 #e2e8f0;
+}
+
+/* Perspectives Hover Effect */
+.persp-card:hover {
+    transform: translateY(-3px);
+    transition: 0.2s ease-in-out;
+}

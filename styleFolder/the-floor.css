@@ -207,3 +207,42 @@
   background: var(--gold-light);
 }
 
+/* --- THE FLOOR: CARD & POST STYLING --- */
+.main-post-wrapper, .disc-card {
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0; /* Default border */
+}
+
+/* --- THE FLOOR: THEMES --- */
+
+/* ME (Blue Discussion) */
+.main-post-wrapper.theme-me,
+.disc-card.theme-me,
+.theme-me .comment-bubble {
+    background-color: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    border-left: 6px solid #3b82f6 !important;
+}
+
+/* EXEC (Gold Discussion) */
+.main-post-wrapper.theme-exec,
+.disc-card.theme-exec,
+.theme-exec .comment-bubble {
+    background-color: #fffbeb !important;
+    border: 1px solid #fef3c7 !important;
+    border-left: 6px solid #c1a062 !important;
+}
+
+/* MEMBER (Default Discussion) */
+.main-post-wrapper.theme-member,
+.disc-card.theme-member,
+.theme-member .comment-bubble {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+
+/* The Floor Author Names */
+.theme-me .comment-author-name { color: #1d4ed8; }
+.theme-exec .comment-author-name { color: #9c7b3c; }
