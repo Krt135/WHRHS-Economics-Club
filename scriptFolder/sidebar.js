@@ -139,7 +139,7 @@ class SpecialSidebar extends HTMLElement {
 
                     // Render Profile View
                     const initials = data.email.substring(0, 2).toUpperCase();
-                    const displayName = data.email.split('@')[0];
+                    const displayName = data.displayName || data.email.split('@')[0];
                     const displayRole = data.role.toUpperCase();
 
                     footerContent.innerHTML = `
@@ -147,7 +147,7 @@ class SpecialSidebar extends HTMLElement {
                         <div class="avatar-circle" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 12px;">
                             ${initials}
                         </div>
-                        <div class="user-info">
+                        <div class="user-info" onclick="window.location.href='profile.html'" style="cursor:pointer">
                             <div style="font-weight: 700; color: #fff; font-size: 14px;">${displayName}</div>
                             <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--gold);">${displayRole}</div>
                             
