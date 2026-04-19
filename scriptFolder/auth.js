@@ -70,7 +70,13 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
         const userCredential = await signInWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
 
-        
+        // Gate 1: email verified?
+        if (!user.emailVerified) {
+            await auth.signOut();
+            alert("Please verify your email address first. Check your inbox for a verification link.");
+            return;
+            
+        }
 
         // Gate 2: admin approved?
         const snapshot = await get(ref(db, 'users/' + user.uid));
