@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Verifying – The Economic Forum</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAuth, applyActionCode } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+    import { firebaseConfig } from './config.js';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+
+    const msg = document.getElementById('message');
+
+    if (mode === 'verifyEmail' && oobCode) {
+      applyActionCode(auth, oobCode)
+        .then(() => {
+          msg.textContent = "✅ Email verified! You can now close this tab and sign in once the Exec Board approves your account.";
+        })
+        .catch((err) => {
+          msg.textContent = "❌ Verification failed: " + err.message;
+        });
+    } else {
+      msg.textContent = "Invalid or missing action code.";
+    }
+  </script>
+</head>
+<body style="font-family: Georgia, serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f5f0e8; color: #0f1f3d;">
+  <div style="text-align: center; max-width: 480px; padding: 40px;">
+    <h2 style="margin-bottom: 16px;">The Economic Forum</h2>
+    <p id="message">Verifying your email...</p>
+    <a href="auth.html" style="display: inline-block; margin-top: 24px; color: #c9a84c;">Go to Sign In →</a>
+  </div>
+</body>
+</html>

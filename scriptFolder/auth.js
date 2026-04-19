@@ -6,6 +6,7 @@ import { getDatabase, ref, set, get }
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
 
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
@@ -27,8 +28,10 @@ document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
     if (pass !== confirm) return alert("Passwords do not match!");
 
     try {
+         console.log("1. Starting signup...");
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
+        console.log("2. User created:", user.uid);
 
         const isExec = execEmails.includes(email.toLowerCase());
 
@@ -46,6 +49,7 @@ document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
         } else {
             // Send verification email before anything else
             await sendEmailVerification(user);
+            console.log("Verification email sent to:", user.email);
             await auth.signOut();
             alert("Account created! Please check your email to verify your address, then wait for Exec Board approval before signing in.");
             window.location.reload();
@@ -71,6 +75,7 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
             await auth.signOut();
             alert("Please verify your email address first. Check your inbox for a verification link.");
             return;
+            
         }
 
         // Gate 2: admin approved?

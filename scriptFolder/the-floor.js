@@ -165,6 +165,7 @@ function renderDiscussions() {
 // ─────────────────────────────────────────────
 
 function renderDiscussionView() {
+  console.log("Testing");
   // 1. Define 'd' and 'commentEntries' first!
   const d = discussions[currentDiscId];
   if (!d) return showList();
