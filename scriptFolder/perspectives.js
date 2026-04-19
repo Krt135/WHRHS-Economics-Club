@@ -47,9 +47,15 @@ function rel(date) {
   if(s<86400)return Math.floor(s/3600)+' hours ago'; return Math.floor(s/86400)+' days ago';
 }
 
-function getDisplayName(user) {
-  if (userProfile && userProfile.displayName) return userProfile.displayName;
-  return user.email.split('@')[0];
+// NEW HELPER: Automatically gets the best name to display
+function getDisplayName() {
+  if (userProfile && userProfile.displayName) {
+    return userProfile.displayName;
+  }
+  if (currentUser && currentUser.email) {
+    return currentUser.email.split("@")[0];
+  }
+  return "Member";
 }
 
 // Per-user like helpers
@@ -292,7 +298,7 @@ window.publishPost = () => {
   if(!title){document.getElementById('wTitle').focus();return;}
   if(!content){document.getElementById('wContent').focus();return;}
   
-  const name = getDisplayName(currentUser);
+  const name = getDisplayName();
   const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
 
   set(push(ref(db,'perspectives')),{
@@ -320,37 +326,58 @@ window.publishPost = () => {
 
 window.react = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
-  const p   = posts.find(x=>x.id===id); if(!p) return;
+  const p = posts.find(x => x.id === id); 
+  if (!p) return;
+  
   const uid = currentUser.uid;
   const wasLiked    = !!(p.userLikes    && p.userLikes[uid]);
   const wasDisliked = !!(p.userDislikes && p.userDislikes[uid]);
   let likes    = p.likes    || 0;
   let dislikes = p.dislikes || 0;
-  const updates = {};
 
-  if (type==='like') {
-    if (wasLiked) { updates[`perspectives/${id}/userLikes/${uid}`]=null; likes--; }
-    else {
-      updates[`perspectives/${id}/userLikes/${uid}`]=true; likes++;
-      if (wasDisliked) { updates[`perspectives/${id}/userDislikes/${uid}`]=null; dislikes--; }
+  // 1. Target the specific post, NOT the root db
+  const postRef = ref(db, `perspectives/${id}`);
+  const updates = {}; // Keys will now be relative to the post
+
+  if (type === 'like') {
+    if (wasLiked) { 
+      updates[`userLikes/${uid}`] = null; 
+      likes--; 
+    } else {
+      updates[`userLikes/${uid}`] = true; 
+      likes++;
+      if (wasDisliked) { 
+        updates[`userDislikes/${uid}`] = null; 
+        dislikes--; 
+      }
     }
   } else {
-    if (wasDisliked) { updates[`perspectives/${id}/userDislikes/${uid}`]=null; dislikes--; }
-    else {
-      updates[`perspectives/${id}/userDislikes/${uid}`]=true; dislikes++;
-      if (wasLiked) { updates[`perspectives/${id}/userLikes/${uid}`]=null; likes--; }
+    if (wasDisliked) { 
+      updates[`userDislikes/${uid}`] = null; 
+      dislikes--; 
+    } else {
+      updates[`userDislikes/${uid}`] = true; 
+      dislikes++;
+      if (wasLiked) { 
+        updates[`userLikes/${uid}`] = null; 
+        likes--; 
+      }
     }
   }
-  updates[`perspectives/${id}/likes`]    = likes;
-  updates[`perspectives/${id}/dislikes`] = dislikes;
-  update(ref(db), updates);
+
+  // Update the counters
+  updates[`likes`] = likes;
+  updates[`dislikes`] = dislikes;
+  
+  // 2. Execute the update specifically on this post
+  update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
 
 window.postComment = (postId) => {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById('cmtInput');
   if (!inp||!inp.value.trim()) return;
-  const name = getDisplayName(currentUser);
+  const name = getDisplayName();
   set(push(ref(db,`perspectives/${postId}/comments`)),{
     author: name, initials: name.substring(0,2).toUpperCase(),
     authorId: currentUser.uid, text: inp.value.trim(),

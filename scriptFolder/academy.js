@@ -370,32 +370,63 @@ async function deleteLesson() {
 //  REACTIONS  (per-user)
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+//  REACTIONS  (Updated for the new Like System)
+// ─────────────────────────────────────────────
+
 async function reactLesson(type) {
   if (!currentUser) return alert("Please log in to react.");
-  const l = lessons[currentId]; if(!l) return;
+  
+  const l = lessons[currentId]; 
+  if (!l) return;
+
   const uid = currentUser.uid;
   const wasLiked    = !!(l.userLikes    && l.userLikes[uid]);
   const wasDisliked = !!(l.userDislikes && l.userDislikes[uid]);
+  
   let likes    = l.likes    || 0;
   let dislikes = l.dislikes || 0;
-  const updates = {};
 
-  if (type==="like") {
-    if (wasLiked) { updates[`lessons/${currentId}/userLikes/${uid}`]=null; likes--; }
-    else {
-      updates[`lessons/${currentId}/userLikes/${uid}`]=true; likes++;
-      if (wasDisliked) { updates[`lessons/${currentId}/userDislikes/${uid}`]=null; dislikes--; }
+  // 1. Target the specific lesson node
+  const lessonRef = ref(db, `lessons/${currentId}`);
+  const updates = {}; // Keys are now relative to the lessonRef
+
+  if (type === "like") {
+    if (wasLiked) { 
+      updates[`userLikes/${uid}`] = null; 
+      likes--; 
+    } else {
+      updates[`userLikes/${uid}`] = true; 
+      likes++;
+      if (wasDisliked) { 
+        updates[`userDislikes/${uid}`] = null; 
+        dislikes--; 
+      }
     }
   } else {
-    if (wasDisliked) { updates[`lessons/${currentId}/userDislikes/${uid}`]=null; dislikes--; }
-    else {
-      updates[`lessons/${currentId}/userDislikes/${uid}`]=true; dislikes++;
-      if (wasLiked) { updates[`lessons/${currentId}/userLikes/${uid}`]=null; likes--; }
+    if (wasDisliked) { 
+      updates[`userDislikes/${uid}`] = null; 
+      dislikes--; 
+    } else {
+      updates[`userDislikes/${uid}`] = true; 
+      dislikes++;
+      if (wasLiked) { 
+        updates[`userLikes/${uid}`] = null; 
+        likes--; 
+      }
     }
   }
-  updates[`lessons/${currentId}/likes`]    = likes;
-  updates[`lessons/${currentId}/dislikes`] = dislikes;
-  await update(ref(db), updates);
+
+  updates[`likes`]    = likes;
+  updates[`dislikes`] = dislikes;
+
+  // 2. Perform the targeted update
+  try {
+    await update(lessonRef, updates);
+  } catch (error) {
+    console.error("Failed to update reaction:", error);
+    alert("You don't have permission to do that.");
+  }
 }
 
 // ─────────────────────────────────────────────

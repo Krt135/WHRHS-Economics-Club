@@ -42,6 +42,12 @@ onAuthStateChanged(auth, async (user) => {
     userRole    = "public";
     userProfile = null;
   }
+
+  const pollBtn = document.getElementById("openPollModalBtn");
+  if (pollBtn) {
+    pollBtn.style.display = (userRole === "admin") ? "block" : "none";
+  }
+
   if (currentDiscId) renderDiscussionView();
   renderDiscussions();
   renderPolls();
@@ -50,6 +56,17 @@ onAuthStateChanged(auth, async (user) => {
 // ─────────────────────────────────────────────
 //  UTILITIES
 // ─────────────────────────────────────────────
+
+// NEW HELPER: Automatically gets the best name to display
+function getDisplayName() {
+  if (userProfile && userProfile.displayName) {
+    return userProfile.displayName;
+  }
+  if (currentUser && currentUser.email) {
+    return currentUser.email.split("@")[0];
+  }
+  return "Member";
+}
 
 const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
 function avColour(name) {
@@ -98,6 +115,7 @@ window.addEventListener("DOMContentLoaded", () => {
     sessionStorage.removeItem("openDiscussion");
     const unsubscribe = onValue(ref(db, `discussions/${targetId}`), snapshot => {
       if (snapshot.exists()) {
+        console.log("Tesintg!");
         showDiscussion(targetId);
         unsubscribe();
       }
@@ -130,14 +148,12 @@ function renderDiscussions() {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
     const tags = Array.isArray(d.tags) ? d.tags : [];
 
-    // --- NEW COLOR LOGIC START ---
     let cardTheme = "theme-member";
     if (currentUser && d.authorId === currentUser.uid) {
       cardTheme = "theme-me"; // Your post: Blue
     } else if (d.authorRole === "admin") {
       cardTheme = "theme-exec"; // Exec post: Gold
     }
-    // --- NEW COLOR LOGIC END ---
 
     return `
     <div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
@@ -165,8 +181,6 @@ function renderDiscussions() {
 // ─────────────────────────────────────────────
 
 function renderDiscussionView() {
-  console.log("Testing");
-  // 1. Define 'd' and 'commentEntries' first!
   const d = discussions[currentDiscId];
   if (!d) return showList();
 
@@ -177,7 +191,6 @@ function renderDiscussionView() {
   const canModify = currentUser && (d.authorId === currentUser.uid || userRole === "admin");
   const isAdmin   = userRole === "admin";
 
-  // 2. Restore the Pin/Edit/Delete Topbar Actions
   get(ref(db, "bulletin")).then(snap => {
     const bulletinData  = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId);
@@ -202,15 +215,13 @@ function renderDiscussionView() {
     }
   });
 
-  // 3. Determine the theme for the main Discussion Post
   let postTheme = "theme-member";
   if (currentUser && d.authorId === currentUser.uid) {
-    postTheme = "theme-me"; // Blue: Self overrides everything
+    postTheme = "theme-me";
   } else if (d.authorRole === "admin") {
-    postTheme = "theme-exec"; // Gold: Admin (but not you)
+    postTheme = "theme-exec";
   }
 
-  // 4. Determine the theme for each Comment
   const commentsHtml = commentEntries.map(c => {
     const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === "admin");
     
@@ -238,7 +249,6 @@ function renderDiscussionView() {
     </div>`;
   }).join("");
 
-  // 5. Render everything, wrapping the main post in the new theme class
   document.getElementById("discussionBody").innerHTML = `
     <div class="main-post-wrapper ${postTheme}">
       <div class="disc-view-title">${esc(d.title)}</div>
@@ -273,7 +283,10 @@ async function togglePin(discId, alreadyPinned) {
     const d = discussions[discId];
     if (!d) return;
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
-    const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
+    
+    // UPDATED: Use the new helper function
+    const name = getDisplayName();
+    
     await set(push(ref(db, "bulletin")), {
       discussionId:   discId,
       title:          d.title,
@@ -306,7 +319,8 @@ async function publishDiscussion() {
   const tagsRaw = document.getElementById("discTags").value.trim();
   if (!title) return;
 
-  const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
+  // UPDATED: Use the new helper function
+  const name = getDisplayName();
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   const newRef = push(ref(db, "discussions"));
@@ -314,7 +328,7 @@ async function publishDiscussion() {
     title, body, tags,
     author:         name,
     authorId:       currentUser.uid,
-    authorRole:     userRole, // <--- ADDED THIS SO MAIN POSTS HAVE COLORS TOO
+    authorRole:     userRole,
     authorInitials: name.substring(0, 2).toUpperCase(),
     image:          attachedImageData || null,
     postedAt:       Date.now()
@@ -330,29 +344,41 @@ async function publishDiscussion() {
 async function publishPoll() {
   if (!currentUser) return alert("Please log in to post a poll.");
 
-  const question     = document.getElementById("pollQuestion").value.trim();
+  if (userRole !== "admin") {
+    alert("Only Exec Board members can post polls.");
+    return;
+  }
+
+  const question = document.getElementById("pollQuestion").value.trim();
   const optionInputs = document.querySelectorAll("#pollOptionInputs .form-input");
-  const options      = Array.from(optionInputs)
+  const options = Array.from(optionInputs)
     .map(input => input.value.trim())
     .filter(label => label !== "")
     .map(label => ({ label, votes: 0 }));
 
-  if (!question)          return alert("Please enter a question.");
+  if (!question) return alert("Please enter a question.");
   if (options.length < 2) return alert("Please provide at least two valid options.");
+
+  // UPDATED: Use the new helper function for polls too!
+  const name = getDisplayName();
 
   try {
     await set(push(ref(db, "polls")), {
       question,
       options,
+      author: name,
+      authorInitials: name.substring(0, 2).toUpperCase(),
       authorId: currentUser.uid,
       postedAt: Date.now()
     });
+    
     document.getElementById("pollQuestion").value = "";
     optionInputs.forEach(input => input.value = "");
     closeModal("pollModal");
+    alert("Poll posted!");
   } catch (error) {
     console.error("Error publishing poll:", error);
-    alert("System error. Please try again.");
+    alert("You do not have permission to post polls.");
   }
 }
 
@@ -413,7 +439,6 @@ async function saveEditDiscussion() {
       title, body, tags, lastEdited: Date.now()
     });
 
-    // Keep the bulletin snapshot in sync if pinned
     const snap  = await get(ref(db, "bulletin"));
     const data  = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
@@ -429,7 +454,6 @@ async function saveEditDiscussion() {
 
 async function deleteDiscussion() {
   if (confirm("Delete this discussion permanently?")) {
-    // Remove from bulletin if pinned
     const snap  = await get(ref(db, "bulletin"));
     const data  = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
@@ -465,7 +489,9 @@ async function postComment() {
   const inp = document.getElementById("cmtInput");
   if (!inp.value.trim()) return;
 
-  const name = userProfile ? userProfile.email.split("@")[0] : currentUser.email.split("@")[0];
+  // UPDATED: Use the new helper function
+  const name = getDisplayName();
+
   await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
     author:   name,
     authorId: currentUser.uid,
@@ -476,7 +502,6 @@ async function postComment() {
   });
   inp.value = "";
 
-  // Keep bulletin comment count in sync
   const snap        = await get(ref(db, "bulletin"));
   const bulletinData = snap.val() || {};
   const entry       = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId);
@@ -492,20 +517,6 @@ async function deleteComment(discKey, cmtKey) {
     await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
   }
 }
-
-// ─────────────────────────────────────────────
-//  FILTER
-// ─────────────────────────────────────────────
-
-/*
-function filterByTag(btn, tag) {
-  activeTag = tag;
-  document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  renderDiscussions();
-}
-  We may use this code ltr, don't remove
-  */
 
 // ─────────────────────────────────────────────
 //  POLLS RENDER
@@ -633,5 +644,5 @@ Object.assign(window, {
   publishDiscussion, deleteDiscussion,
   publishPoll, addPollOption, removeOpt, deletePoll,
   votePoll, openEditModal, handleMainButtonClick,
-  /*filterByTag*/ togglePin
+  togglePin
 });

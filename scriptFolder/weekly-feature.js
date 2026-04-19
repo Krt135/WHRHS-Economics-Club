@@ -275,41 +275,62 @@ window.publishFeature = async () => {
 
 window.reactFeature = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
-  const f   = features.find(x => x.id === id); if (!f) return;
+  const f = features.find(x => x.id === id); 
+  if (!f) return;
+  
   const uid = currentUser.uid;
   const wasLiked    = !!(f.userLikes    && f.userLikes[uid]);
   const wasDisliked = !!(f.userDislikes && f.userDislikes[uid]);
   let likes    = f.likes    || 0;
   let dislikes = f.dislikes || 0;
-  const updates = {};
+  
+  // 1. Target the specific feature post, NOT the root db
+  const postRef = ref(db, `features/${id}`);
+  const updates = {}; // Keys will now be relative to the post
 
   if (type === 'like') {
-    if (wasLiked) { updates[`features/${id}/userLikes/${uid}`] = null; likes--; }
-    else {
-      updates[`features/${id}/userLikes/${uid}`] = true; likes++;
-      if (wasDisliked) { updates[`features/${id}/userDislikes/${uid}`] = null; dislikes--; }
+    if (wasLiked) { 
+      updates[`userLikes/${uid}`] = null; 
+      likes--; 
+    } else {
+      updates[`userLikes/${uid}`] = true; 
+      likes++;
+      if (wasDisliked) { 
+        updates[`userDislikes/${uid}`] = null; 
+        dislikes--; 
+      }
     }
   } else {
-    if (wasDisliked) { updates[`features/${id}/userDislikes/${uid}`] = null; dislikes--; }
-    else {
-      updates[`features/${id}/userDislikes/${uid}`] = true; dislikes++;
-      if (wasLiked) { updates[`features/${id}/userLikes/${uid}`] = null; likes--; }
+    if (wasDisliked) { 
+      updates[`userDislikes/${uid}`] = null; 
+      dislikes--; 
+    } else {
+      updates[`userDislikes/${uid}`] = true; 
+      dislikes++;
+      if (wasLiked) { 
+        updates[`userLikes/${uid}`] = null; 
+        likes--; 
+      }
     }
   }
-  updates[`features/${id}/likes`]    = likes;
-  updates[`features/${id}/dislikes`] = dislikes;
+  
+  updates[`likes`]    = likes;
+  updates[`dislikes`] = dislikes;
 
   // Update reactions list (for "See reactions" modal), keyed by uid
   const userName     = getDisplayName(currentUser);
   const userInitials = userName.substring(0,2).toUpperCase();
   const newType = type === 'like' ? '👍' : '👎';
-  const alreadyToggled = (type==='like'&&wasLiked)||(type==='dislike'&&wasDisliked);
+  const alreadyToggled = (type === 'like' && wasLiked) || (type === 'dislike' && wasDisliked);
+  
   if (alreadyToggled) {
-    updates[`features/${id}/reactionsByUser/${uid}`] = null;
+    updates[`reactionsByUser/${uid}`] = null;
   } else {
-    updates[`features/${id}/reactionsByUser/${uid}`] = { uid, name: userName, initials: userInitials, type: newType };
+    updates[`reactionsByUser/${uid}`] = { uid, name: userName, initials: userInitials, type: newType };
   }
-  update(ref(db), updates);
+  
+  // 2. Execute the update specifically on this post
+  update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
 
 window.openReactions = (id) => {
