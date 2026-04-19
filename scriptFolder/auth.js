@@ -61,6 +61,7 @@ document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
 });
 
 // --- SIGN IN LOGIC ---
+// --- SIGN IN LOGIC ---
 document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('signInEmail').value;
@@ -70,27 +71,39 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
         const userCredential = await signInWithEmailAndPassword(auth, email, pass);
         const user = userCredential.user;
 
-        // Gate 1: email verified?
-        if (!user.emailVerified) {
+        // Check if the user is an Exec Board member
+        const isExec = execEmails.includes(user.email.toLowerCase());
+
+        // Gate 1: email verified? (BYPASSED for Execs)
+        if (!isExec && !user.emailVerified) {
             await auth.signOut();
             alert("Please verify your email address first. Check your inbox for a verification link.");
             return;
-            
         }
 
-        // Gate 2: admin approved?
+        // Fetch user data from Database
         const snapshot = await get(ref(db, 'users/' + user.uid));
         const data = snapshot.val();
 
+        // Safety: Check if user actually exists in the database
+        if (!data) {
+            await auth.signOut();
+            alert("Account found in Auth, but missing from Database. Please contact an admin or sign up again.");
+            return;
+        }
+
+        // Gate 2: admin approved?
         if (data.status === "pending") {
             await auth.signOut();
             alert("Your email is verified! Your account is still pending approval by the Exec Board.");
             return;
         }
 
+        // Success!
         window.location.href = "index.html";
 
     } catch (error) {
+        console.error("Sign-in error:", error);
         alert("Invalid credentials.");
     }
 });
