@@ -14,6 +14,7 @@
   <script src="scriptFolder/footer.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/academy.js" defer></script>
+  <script type="module" src="scriptFolder/announcement.js"></script>
   
 </head>
 
@@ -23,20 +24,10 @@
   <tef-sidebar active-page="academy"></tef-sidebar>
 
   <main class="main">
-
+<tef-announcement></tef-announcement>
     <!-- ── LIST VIEW ── -->
     <div class="view active" id="viewList">
-      <div class="announce-bar">
-        <button class="announce-btn" onclick="window.openModal('announceModal')">
-          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Post Announcement
-        </button>
-        <span class="announce-text" id="announceText"></span>
-        <button class="announce-dismiss" onclick="document.getElementById('announceText').textContent=''">×</button>
-      </div>
+      
 
       <div class="page-header">
         <h1>The Academy</h1>
@@ -251,19 +242,7 @@ Consumer spending"></textarea>
     </div>
   </div>
 
-  <!-- ── ANNOUNCE MODAL ── -->
-  <div class="modal-overlay" id="announceModal">
-    <div class="modal" style="max-width:480px">
-      <button class="modal-close" onclick="window.closeModal('announceModal')">×</button>
-      <div class="modal-title">Post Announcement</div>
-      <div class="form-group">
-        <label class="form-label">Announcement Text</label>
-        <input class="form-input" id="announceInput" type="text"
-          placeholder="e.g. New beginner lesson on inflation published!">
-      </div>
-      <button class="btn-full" onclick="window.postAnnounce()">Post to Banner</button>
-    </div>
-  </div>
+
 
 
 </body>

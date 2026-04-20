@@ -510,12 +510,6 @@ function renderQuizBuilder() {
 function updateWC()  { document.getElementById("cWC").textContent = wdCt(document.getElementById("cContent").value)+" words"; }
 function updateEWC() { document.getElementById("eWC").textContent = wdCt(document.getElementById("eContent").value)+" words"; }
 
-function postAnnounce() {
-  const v=document.getElementById("announceInput").value.trim(); if(!v) return;
-  document.getElementById("announceText").textContent=v;
-  document.getElementById("announceInput").value="";
-  closeModal("announceModal");
-}
 
 // ─────────────────────────────────────────────
 //  EXPOSE TO HTML
@@ -527,7 +521,7 @@ Object.assign(window,{
   publishLesson, openEditModal, saveEdit, deleteLesson,
   reactLesson, postComment, likeComment, deleteComment,
   answerQuiz, nextQuiz, addQuizQuestion, renderQuizBuilder,
-  updateWC, updateEWC, postAnnounce,
+  updateWC, updateEWC,
 });
 
 window.setSortMode = (val) => { sortMode=val; renderList(); };

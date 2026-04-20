@@ -9,8 +9,10 @@ const style = `
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
-    :host { display: block; width: 100%; }
-
+:host {
+  display: block;
+  width: 100%;
+}
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     /* ── Bar ───────────────────────────────────────────────────────── */
@@ -160,6 +162,7 @@ const style = `
       border-bottom: 1px solid #1a2e52;
       font-family: 'Crimson Pro', Georgia, serif;
       display: none;
+      width: 100%;
     }
 
     .admin-bar.visible { display: block; }
@@ -268,7 +271,10 @@ class TEFAnnouncement extends HTMLElement {
     this._isAdmin = false;
   }
 
-  connectedCallback() {
+async connectedCallback() {
+  try {
+    const active = this.getAttribute('active-page') || 'nexus';
+    
     this.shadowRoot.innerHTML = style + `
       <!-- Admin post bar -->
       <div class="admin-bar" id="admin-bar">
@@ -302,10 +308,13 @@ class TEFAnnouncement extends HTMLElement {
         <div class="dots" id="dots"></div>
       </div>
     `;
-
+    
     this._bindAdminUI();
     this._listenToAnnouncements();
     this._checkAuth();
+  } catch(err) {
+    console.error("TEF Announcement error:", err);
+  }
   }
 
   _checkAuth() {

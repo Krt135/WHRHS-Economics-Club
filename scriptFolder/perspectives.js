@@ -36,7 +36,6 @@ let activeTag     = 'all';
 let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
-let announceMsg    = '';
 
 const COLOURS = ['#0f1f3d','#1a2e52','#7c3aed','#0369a1','#065f46','#92400e','#9f1239'];
 function avatarColour(name) { let h=0; for(let c of (name||'')) h=(h*31+c.charCodeAt(0))%COLOURS.length; return COLOURS[h]; }
@@ -425,15 +424,3 @@ window.deletePost = () => {
   }
 };
 
-window.postAnnounce = () => {
-  const v=document.getElementById('announceInput').value.trim(); if(!v) return;
-  announceMsg=v;
-  document.getElementById('announceText').textContent=v;
-  document.getElementById('announceInput').value='';
-  window.closeModal('announceModal');
-};
-
-window.dismissAnnounce = () => {
-  announceMsg='';
-  document.getElementById('announceText').textContent='';
-};
