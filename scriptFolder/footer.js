@@ -13,7 +13,7 @@ class SpecialFooter extends HTMLElement {
             <circle cx="12" cy="12" r="4" />
             <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
           </svg></a>
-        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+        <a href="https://www.youtube.com/@TheEconomicForum_TEF" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
             viewBox="0 0 24 24">
             <path
               d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z" />

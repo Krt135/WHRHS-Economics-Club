@@ -289,7 +289,6 @@ async function togglePin(discId, alreadyPinned) {
     
     await set(push(ref(db, "bulletin")), {
       discussionId:   discId,
-      title:          d.title,
       body:           d.body || "",
       author:         d.author,
       authorInitials: d.authorInitials || "?",
@@ -314,10 +313,9 @@ async function handleMainButtonClick() {
 
 async function publishDiscussion() {
   if (!currentUser) return alert("Please log in to post.");
-  const title   = document.getElementById("discTitle").value.trim();
   const body    = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
-  if (!title) return;
+  if (!body) return;
 
   // UPDATED: Use the new helper function
   const name = getDisplayName();
@@ -325,7 +323,7 @@ async function publishDiscussion() {
 
   const newRef = push(ref(db, "discussions"));
   await set(newRef, {
-    title, body, tags,
+    body, tags,
     author:         name,
     authorId:       currentUser.uid,
     authorRole:     userRole,
@@ -414,7 +412,6 @@ function openEditModal() {
   if (!d) return;
   isEditMode = true;
 
-  document.getElementById("discTitle").value   = d.title;
   document.getElementById("discContent").value = d.body;
   if (d.tags) document.getElementById("discTags").value = d.tags.join(", ");
 
@@ -428,21 +425,20 @@ function openEditModal() {
 }
 
 async function saveEditDiscussion() {
-  const title   = document.getElementById("discTitle").value.trim();
   const body    = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
-  if (!title || !body) return;
+  if (!body) return;
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   try {
     await update(ref(db, `discussions/${currentDiscId}`), {
-      title, body, tags, lastEdited: Date.now()
+      body, tags, lastEdited: Date.now()
     });
 
     const snap  = await get(ref(db, "bulletin"));
     const data  = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
-    if (entry) await update(ref(db, `bulletin/${entry[0]}`), { title, body, tags });
+    if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body, tags });
 
     closeModal("discussModal");
     alert("Changes saved successfully!");
@@ -538,18 +534,33 @@ function renderPolls() {
   const isAdmin = userRole === "admin";
 
   list.innerHTML = items.map(p => {
-    const options    = Array.isArray(p.options) ? p.options : [];
-    const totalVotes = options.reduce((a, o) => a + (o.votes || 0), 0);
-    const hasVoted   = localStorage.getItem(`voted_${p._key}`) !== null;
+    const options = Array.isArray(p.options) ? p.options : [];
+    
+    // 1. Get the map of votes (UID -> optionIndex)
+    const userVotes = p.userVotes || {}; 
+    const voteEntries = Object.values(userVotes);
+    const totalVotes = voteEntries.length;
+
+    // 2. Check if the CURRENT user has voted and which index they picked
+    const myVoteIndex = currentUser ? userVotes[currentUser.uid] : null;
+    const hasVoted = myVoteIndex !== undefined && myVoteIndex !== null;
 
     const optionsHtml = options.map((o, i) => {
-      const pct = totalVotes ? Math.round((o.votes || 0) / totalVotes * 100) : 0;
+      // 3. Calculate votes for THIS specific option by counting UIDs that picked it
+      const optionVotes = voteEntries.filter(v => v === i).length;
+      const pct = totalVotes ? Math.round(optionVotes / totalVotes * 100) : 0;
+      
+      // 4. Highlight the option the user currently has selected
+      const isMyChoice = myVoteIndex === i;
+
       return `
-        <div class="poll-option" onclick="window.votePoll('${p._key}',${i})">
+        <div class="poll-option ${isMyChoice ? 'voted' : ''}" onclick="window.votePoll('${p._key}',${i})">
           <div class="poll-bar" style="width:${hasVoted ? pct : 0}%"></div>
           <div class="poll-option-content">
-            <div class="poll-option-label">${esc(o.label)}</div>
-            ${hasVoted ? `<span class="poll-pct">${pct}%</span>` : ""}
+            <div class="poll-option-label">
+              ${isMyChoice ? '<strong>✓ </strong>' : ''}${esc(o.label)}
+            </div>
+            ${hasVoted ? `<span class="poll-pct">${pct}% (${optionVotes})</span>` : ""}
           </div>
         </div>`;
     }).join("");
@@ -563,19 +574,40 @@ function renderPolls() {
       <div class="poll-card" style="position:relative;">
         ${deleteBtnHtml}
         <div class="poll-title" style="padding-right:24px;">${esc(p.question)}</div>
-        ${optionsHtml}
+        <div class="poll-options-container">
+          ${optionsHtml}
+        </div>
+        <div class="poll-footer" style="font-size:12px; color:#6b7280; margin-top:8px;">
+          ${totalVotes} vote${totalVotes !== 1 ? 's' : ''} ${hasVoted ? '· You can click to change your vote' : ''}
+        </div>
       </div>`;
   }).join("");
 }
 
 async function votePoll(pollKey, optIndex) {
-  if (localStorage.getItem(`voted_${pollKey}`)) return;
-  const p = polls[pollKey];
-  const options = [...p.options];
-  options[optIndex].votes = (options[optIndex].votes || 0) + 1;
-  localStorage.setItem(`voted_${pollKey}`, optIndex);
-  await update(ref(db, `polls/${pollKey}`), { options });
-  renderPolls();
+  if (!currentUser) {
+    alert("Please log in to vote.");
+    return;
+  }
+
+  const uid = currentUser.uid;
+  
+  // 1. Path to this specific user's vote for this specific poll
+  const userVoteRef = ref(db, `polls/${pollKey}/userVotes/${uid}`);
+
+  try {
+    // 2. Set the vote to the new index. 
+    // Because Firebase keys are unique, this automatically overwrites the old vote.
+    await set(userVoteRef, optIndex);
+    
+    // 3. Remove the localStorage restriction
+    // localStorage.setItem(`voted_${pollKey}`, optIndex); // No longer needed!
+    
+    console.log("Vote updated successfully!");
+    renderPolls();
+  } catch (error) {
+    console.error("Error voting:", error);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -615,7 +647,6 @@ function closeModal(id) {
     if (modalTitle) modalTitle.innerText = "Start Discussion";
     const btn = document.getElementById("mainSubmitBtn");
     if (btn) btn.innerText = "Publish Discussion";
-    document.getElementById("discTitle").value   = "";
     document.getElementById("discContent").value = "";
     document.getElementById("discTags").value    = "";
     document.getElementById("attachPreview").textContent = "";

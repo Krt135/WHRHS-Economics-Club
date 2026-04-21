@@ -40,20 +40,27 @@ class SpecialSidebar extends HTMLElement {
 
     <a class="nav-item ${active === 'trading' ? 'active' : ''}" href="trading-floor.html">
     <span class="nav-icon">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-            <path d="M11.5 5.5H12.5" /> <path d="M6 8V6.5C6 4.567 7.567 3 9.5 3H14.5C16.433 3 18 4.567 18 6.5V8C20.2091 8 22 9.79086 22 12V17C22 19.2091 20.2091 21 18 21H16C13.7909 21 12 19.2091 12 17V15H12V17C12 19.2091 10.2091 21 8 21H6C3.79086 21 2 19.2091 2 17V12C2 9.79086 3.79086 8 6 8Z" />
-            <path d="M7 11.5V14.5" />
-            <path d="M5.5 13H8.5" />
-            <path d="M16.5 11V11" stroke-width="2.5" /> <path d="M16.5 15V15" stroke-width="2.5" /> <path d="M18.5 13V13" stroke-width="2.5" /> <path d="M14.5 13V13" stroke-width="2.5" /> </svg>
-    </span>
+  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+    <path d="M6 9V15" />
+    <path d="M3 12H9" />
+    
+    <path d="M18.5 9V9" stroke-width="3" /> <path d="M16 11.5V11.5" stroke-width="3" /> <path d="M21 11.5V11.5" stroke-width="3" /> <path d="M18.5 14V14" stroke-width="3" /> <path d="M12 21C14 21 16 20 18 20C20 20 22 18 22 16V10C22 8 20 6 18 6H6C4 6 2 8 2 10V16C2 18 4 20 6 20C8 20 10 21 12 21Z" />
+    
+    <path d="M16 6V4C16 3 17 2 18 2H20V6" />
+    <path d="M8 6V4C8 3 7 2 6 2H4V6" />
+  </svg>
+</span>
     Game Hub
 </a>
 
     <a class="nav-item ${active === 'about' ? 'active' : ''}" href="about-us.html">
         <span class="nav-icon">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+</svg>
         </span>
         About Us
     </a>

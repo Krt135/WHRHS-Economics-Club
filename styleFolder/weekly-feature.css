@@ -136,3 +136,10 @@
     padding: 10px 0;
     border-bottom: 1px dashed rgba(255, 255, 255, 0.1); /* Optional separator */
 }
+
+/*FILTER BAR*/
+.filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; align-items:center; }
+.filter-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.1em; color:var(--text-muted); margin-right:4px; }
+.filter-tag { padding:5px 12px; border:1px solid var(--border); border-radius:20px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.06em; cursor:pointer; background:#fff; color:var(--text-muted); transition:all 0.15s; }
+.filter-tag:hover { border-color:var(--gold); color:var(--gold); }
+.filter-tag.active { background:var(--gold); border-color:var(--gold); color:#fff; }

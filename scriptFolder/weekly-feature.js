@@ -13,6 +13,7 @@ let currentUser  = null;
 let userRole     = "public";
 let userProfile  = null;
 
+
 onAuthStateChanged(auth, async (user) => {
   // Grab the container, not just the button
   const adminControls = document.getElementById('admin-only-controls');
@@ -42,6 +43,7 @@ onAuthStateChanged(auth, async (user) => {
 // 3. ── GLOBAL STATE ──
 let features         = [];
 let currentFeatureId = null;
+let activeTag        = 'all'; // <--- ADD THIS LINE
 
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
@@ -103,31 +105,63 @@ onValue(ref(db, 'features'), (snapshot) => {
 
 // 7. ── RENDER FUNCTIONS ──
 function renderList() {
-  const el = document.getElementById('featuresList'); if (!el) return;
-  if (!features.length) { el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet. Be the first to contribute!</p></div>`; return; }
-  el.innerHTML = features.map(f => {
+  const el = document.getElementById('featuresList'); 
+  if (!el) return;
+
+  // 1. Handle the "Global" empty state (no posts at all)
+  if (!features || features.length === 0) { 
+    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet. Be the first to contribute!</p></div>`; 
+    return; 
+  }
+
+  // 2. Apply filtering
+  let displayFeatures = features;
+  if (activeTag && activeTag !== 'all') {
+    displayFeatures = features.filter(f => f.tag === activeTag);
+  }
+
+  // 3. Handle the "Filter" empty state (posts exist, but not for this tag)
+  if (displayFeatures.length === 0) { 
+    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet for the tag "${escHtml(activeTag)}".</p></div>`; 
+    return; 
+  }
+
+  // 4. Render the filtered list (mapping over displayFeatures, NOT features)
+  el.innerHTML = displayFeatures.map(f => {
     const iLiked    = myLiked(f);
     const iDisliked = myDisliked(f);
-    const excerpt   = f.content.split('\n\n')[0].slice(0,200) + (f.content.length>200?'…':'');
+    
+    // Create excerpt: first paragraph or first 200 chars
+    const excerpt = f.content.split('\n\n')[0].slice(0, 200) + (f.content.length > 200 ? '…' : '');
+    
     return `
     <div class="feature-card" onclick="showArticle('${f.id}')">
       <div class="fc-title">${escHtml(f.title)}</div>
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
-        <span class="author-chip"><span class="author-av">${escHtml(f.authorInitials||'?')}</span>${escHtml(f.author)}</span>
+        <span class="author-chip">
+          <span class="author-av">${escHtml(f.authorInitials || '?')}</span>
+          ${escHtml(f.author)}
+        </span>
         <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${f.comments.length}
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        ${f.comments ? f.comments.length : 0}
       </div>
-      ${f.tag?`<div class="fc-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>`:''}
+      ${f.tag ? `<div class="fc-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>` : ''}
       <div class="fc-actions" onclick="event.stopPropagation()">
-        <button class="react-btn ${iLiked?'liked':''}" onclick="reactFeature('${f.id}','like')">
-          <svg width="14" height="14" fill="${iLiked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-          ${f.likes||0}
+        <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="reactFeature('${f.id}','like')">
+          <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+          </svg>
+          ${f.likes || 0}
         </button>
-        <button class="react-btn ${iDisliked?'disliked':''}" onclick="reactFeature('${f.id}','dislike')">
-          <svg width="14" height="14" fill="${iDisliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-          ${f.dislikes||0}
+        <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="reactFeature('${f.id}','dislike')">
+          <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
+          </svg>
+          ${f.dislikes || 0}
         </button>
         <span class="see-reactions" onclick="openReactions('${f.id}')">See reactions</span>
       </div>
@@ -391,3 +425,12 @@ window.deleteFeature = () => {
     remove(ref(db,`features/${currentFeatureId}`)).then(()=>{window.closeModal('confirmModal');window.showList();});
   }
 };
+
+window.filterByTag = (btn, tag) => {
+  activeTag = tag; // This works now because we declared it above!
+  document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  
+  renderList(); // <--- Changed this from renderArticle() to renderList()
+};
+

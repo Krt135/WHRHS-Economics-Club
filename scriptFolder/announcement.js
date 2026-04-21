@@ -19,7 +19,7 @@ const style = `
     .announcement-bar {
       position: relative;
       width: 100%;
-      min-height: 40px;
+      min-height: 70px;
       display: flex;
       align-items: center;
       justify-content: center;
