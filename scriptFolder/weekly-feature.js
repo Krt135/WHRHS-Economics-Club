@@ -42,8 +42,8 @@ onAuthStateChanged(auth, async (user) => {
 
 // 3. ── GLOBAL STATE ──
 let features         = [];
-let currentFeatureId = null;
-let activeTag        = 'all'; // <--- ADD THIS LINE
+let currentFeatureId = sessionStorage.getItem("openFeature") || null; // Immediately check storage
+let activeTag        = 'all';
 
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
@@ -88,6 +88,38 @@ window.showArticle = (id) => {
 };
 window.openConfirmDelete = () => { window.openModal('confirmModal'); };
 
+window.togglePin = async (id, alreadyPinned) => {
+  if (alreadyPinned) {
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    // Look for the specific bulletin entry matching this feature ID
+    const entry = Object.entries(data).find(([, v]) => v.originalId === id && v.type === 'weekly');
+    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
+  } else {
+    const f = features.find(x => x.id === id);
+    if (!f) return;
+    
+    const commentCount = f.comments ? f.comments.length : 0;
+    const name = getDisplayName(currentUser);
+
+    await set(push(ref(db, "bulletin")), {
+      originalId: id,
+      type: 'weekly', // Tagging it so the bulletin router knows where to send them
+      title: f.title,
+      body: f.content || "",
+      author: f.author,
+      authorInitials: f.authorInitials || "?",
+      tags: f.tag ? [f.tag] : [], // Weekly features use a single string tag, converting to array
+      postedAt: f.postedAt,
+      commentCount,
+      pinnedAt: Date.now(),
+      pinnedBy: name
+    });
+  }
+  // Re-render UI to update the button status
+  renderArticle();
+};
+
 // 6. ── FIREBASE LISTENER ──
 onValue(ref(db, 'features'), (snapshot) => {
   const data = snapshot.val();
@@ -99,8 +131,28 @@ onValue(ref(db, 'features'), (snapshot) => {
       return { id: key, ...f, comments: commentsArray, reactions: reactionsArray };
     });
     features.sort((a,b) => b.postedAt - a.postedAt);
-  } else { features = []; }
-  if (currentFeatureId) renderArticle(); else renderList();
+
+    // If redirected from bulletin, verify the feature actually exists
+    if (currentFeatureId) {
+      const postExists = features.find(f => f.id === currentFeatureId);
+      if (postExists) {
+        sessionStorage.removeItem("openFeature"); // Clear storage to prevent loops
+      } else {
+        currentFeatureId = null; // Failsafe
+      }
+    }
+  } else { 
+    features = []; 
+  }
+
+  // Force the correct view to show based on the ID state
+  if (currentFeatureId) {
+    document.getElementById('viewList').classList.remove('active');
+    document.getElementById('viewArticle').classList.add('active');
+    renderArticle(); 
+  } else { 
+    renderList(); 
+  }
 });
 
 // 7. ── RENDER FUNCTIONS ──
@@ -177,17 +229,30 @@ function renderArticle() {
   const iLiked     = myLiked(f);
   const iDisliked  = myDisliked(f);
 
-  // Only author or admin sees Edit/Delete
+  // Only author or admin sees Edit/Delete, Admin sees Pin
   const canModify  = currentUser && (f.authorId === currentUser.uid || userRole === 'admin');
+  const isAdmin    = userRole === 'admin';
+  
   const topActions = document.getElementById('articleTopActions');
   if (topActions) {
-    topActions.innerHTML = canModify ? `
-      <button class="topbar-btn btn-edit" onclick="openEditModal()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
-      </button>
-      <button class="topbar-btn btn-delete" onclick="openConfirmDelete()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Delete
-      </button>` : '';
+    get(ref(db, "bulletin")).then(snap => {
+      const bulletinData = snap.val() || {};
+      const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === f.id && b.type === 'weekly');
+      
+      topActions.innerHTML = `
+        ${canModify ? `
+          <button class="topbar-btn btn-edit" onclick="openEditModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
+          </button>
+          <button class="topbar-btn btn-delete" onclick="openConfirmDelete()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
+          </button>` : ''}
+        ${isAdmin ? `
+          <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${f.id}', ${alreadyPinned})">
+            <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+          </button>` : ''}`;
+    });
   }
 
   const commentsHtml = f.comments.length

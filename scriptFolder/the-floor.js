@@ -24,10 +24,12 @@ let userRole          = "public";
 let userProfile       = null;
 let discussions       = {};
 let polls             = {};
-let currentDiscId     = null;
 let activeTag         = "all";
 let attachedImageData = null;
 let isEditMode        = false;
+
+// Check for deep links from Bulletin (Check both potential keys to be safe)
+let currentDiscId = sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -48,8 +50,12 @@ onAuthStateChanged(auth, async (user) => {
     pollBtn.style.display = (userRole === "admin") ? "block" : "none";
   }
 
-  if (currentDiscId) renderDiscussionView();
-  renderDiscussions();
+  // Initial render based on state
+  if (currentDiscId) {
+    showDiscussion(currentDiscId);
+  } else {
+    renderDiscussions();
+  }
   renderPolls();
 });
 
@@ -57,7 +63,6 @@ onAuthStateChanged(auth, async (user) => {
 //  UTILITIES
 // ─────────────────────────────────────────────
 
-// NEW HELPER: Automatically gets the best name to display
 function getDisplayName() {
   if (userProfile && userProfile.displayName) {
     return userProfile.displayName;
@@ -92,9 +97,19 @@ function rel(ts) {
 
 onValue(ref(db, "discussions"), snapshot => {
   discussions = snapshot.val() || {};
+
+  // CHECK FOR REDIRECT FROM BULLETIN
   if (currentDiscId) {
-    if (discussions[currentDiscId]) renderDiscussionView();
-    else showList();
+    if (discussions[currentDiscId]) {
+      // Clear session storage so it doesn't trap the user on refresh
+      sessionStorage.removeItem("openFloorPost");
+      sessionStorage.removeItem("openDiscussion");
+      showDiscussion(currentDiscId);
+    } else {
+      console.warn("Discussion not found, defaulting to list.");
+      currentDiscId = null;
+      showList();
+    }
   } else {
     renderDiscussions();
   }
@@ -103,24 +118,6 @@ onValue(ref(db, "discussions"), snapshot => {
 onValue(ref(db, "polls"), snapshot => {
   polls = snapshot.val() || {};
   renderPolls();
-});
-
-// ─────────────────────────────────────────────
-//  DEEP-LINK FROM BULLETIN
-// ─────────────────────────────────────────────
-
-window.addEventListener("DOMContentLoaded", () => {
-  const targetId = sessionStorage.getItem("openDiscussion");
-  if (targetId) {
-    sessionStorage.removeItem("openDiscussion");
-    const unsubscribe = onValue(ref(db, `discussions/${targetId}`), snapshot => {
-      if (snapshot.exists()) {
-        console.log("Tesintg!");
-        showDiscussion(targetId);
-        unsubscribe();
-      }
-    });
-  }
 });
 
 // ─────────────────────────────────────────────
@@ -150,9 +147,9 @@ function renderDiscussions() {
 
     let cardTheme = "theme-member";
     if (currentUser && d.authorId === currentUser.uid) {
-      cardTheme = "theme-me"; // Your post: Blue
+      cardTheme = "theme-me"; 
     } else if (d.authorRole === "admin") {
-      cardTheme = "theme-exec"; // Exec post: Gold
+      cardTheme = "theme-exec"; 
     }
 
     return `
@@ -182,7 +179,12 @@ function renderDiscussions() {
 
 function renderDiscussionView() {
   const d = discussions[currentDiscId];
-  if (!d) return showList();
+  
+  // Failsafe: if data is not ready or ID is wrong, go back to list
+  if (!d) {
+    showList();
+    return;
+  }
 
   const commentEntries = d.comments
     ? Object.entries(d.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
@@ -193,7 +195,8 @@ function renderDiscussionView() {
 
   get(ref(db, "bulletin")).then(snap => {
     const bulletinData  = snap.val() || {};
-    const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId);
+    // Check if originalId or discussionId matches
+    const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId || b.originalId === currentDiscId);
 
     const topActions = document.getElementById("discTopActions");
     if (topActions) {
@@ -277,18 +280,19 @@ async function togglePin(discId, alreadyPinned) {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
-    const entry = Object.entries(data).find(([, v]) => v.discussionId === discId);
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === discId || v.originalId === discId);
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
   } else {
     const d = discussions[discId];
     if (!d) return;
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
     
-    // UPDATED: Use the new helper function
     const name = getDisplayName();
     
     await set(push(ref(db, "bulletin")), {
-      discussionId:   discId,
+      discussionId:   discId, // Included for backwards compatibility 
+      originalId:     discId, // The new standard
+      type:           "floor", // Tells bulletin.js it's a floor post
       body:           d.body || "",
       author:         d.author,
       authorInitials: d.authorInitials || "?",
@@ -317,7 +321,6 @@ async function publishDiscussion() {
   const tagsRaw = document.getElementById("discTags").value.trim();
   if (!body) return;
 
-  // UPDATED: Use the new helper function
   const name = getDisplayName();
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
@@ -357,7 +360,6 @@ async function publishPoll() {
   if (!question) return alert("Please enter a question.");
   if (options.length < 2) return alert("Please provide at least two valid options.");
 
-  // UPDATED: Use the new helper function for polls too!
   const name = getDisplayName();
 
   try {
@@ -437,7 +439,7 @@ async function saveEditDiscussion() {
 
     const snap  = await get(ref(db, "bulletin"));
     const data  = snap.val() || {};
-    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body, tags });
 
     closeModal("discussModal");
@@ -452,7 +454,7 @@ async function deleteDiscussion() {
   if (confirm("Delete this discussion permanently?")) {
     const snap  = await get(ref(db, "bulletin"));
     const data  = snap.val() || {};
-    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId);
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
 
     await remove(ref(db, `discussions/${currentDiscId}`));
@@ -485,7 +487,6 @@ async function postComment() {
   const inp = document.getElementById("cmtInput");
   if (!inp.value.trim()) return;
 
-  // UPDATED: Use the new helper function
   const name = getDisplayName();
 
   await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
@@ -500,7 +501,7 @@ async function postComment() {
 
   const snap        = await get(ref(db, "bulletin"));
   const bulletinData = snap.val() || {};
-  const entry       = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId);
+  const entry       = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
   if (entry) {
     const d        = discussions[currentDiscId];
     const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
@@ -536,21 +537,16 @@ function renderPolls() {
   list.innerHTML = items.map(p => {
     const options = Array.isArray(p.options) ? p.options : [];
     
-    // 1. Get the map of votes (UID -> optionIndex)
     const userVotes = p.userVotes || {}; 
     const voteEntries = Object.values(userVotes);
     const totalVotes = voteEntries.length;
 
-    // 2. Check if the CURRENT user has voted and which index they picked
     const myVoteIndex = currentUser ? userVotes[currentUser.uid] : null;
     const hasVoted = myVoteIndex !== undefined && myVoteIndex !== null;
 
     const optionsHtml = options.map((o, i) => {
-      // 3. Calculate votes for THIS specific option by counting UIDs that picked it
       const optionVotes = voteEntries.filter(v => v === i).length;
       const pct = totalVotes ? Math.round(optionVotes / totalVotes * 100) : 0;
-      
-      // 4. Highlight the option the user currently has selected
       const isMyChoice = myVoteIndex === i;
 
       return `
@@ -591,18 +587,10 @@ async function votePoll(pollKey, optIndex) {
   }
 
   const uid = currentUser.uid;
-  
-  // 1. Path to this specific user's vote for this specific poll
   const userVoteRef = ref(db, `polls/${pollKey}/userVotes/${uid}`);
 
   try {
-    // 2. Set the vote to the new index. 
-    // Because Firebase keys are unique, this automatically overwrites the old vote.
     await set(userVoteRef, optIndex);
-    
-    // 3. Remove the localStorage restriction
-    // localStorage.setItem(`voted_${pollKey}`, optIndex); // No longer needed!
-    
     console.log("Vote updated successfully!");
     renderPolls();
   } catch (error) {
@@ -616,15 +604,22 @@ async function votePoll(pollKey, optIndex) {
 
 function showList() {
   currentDiscId = null;
-  document.getElementById("viewList").classList.add("active");
-  document.getElementById("viewDiscussion").classList.remove("active");
+  // Make sure these IDs match what is in your HTML (e.g. id="viewList" and id="viewDiscussion")
+  const vList = document.getElementById("viewList");
+  const vDisc = document.getElementById("viewDiscussion");
+  
+  if (vList) vList.classList.add("active");
+  if (vDisc) vDisc.classList.remove("active");
   renderDiscussions();
 }
 
 function showDiscussion(key) {
   currentDiscId = key;
-  document.getElementById("viewList").classList.remove("active");
-  document.getElementById("viewDiscussion").classList.add("active");
+  const vList = document.getElementById("viewList");
+  const vDisc = document.getElementById("viewDiscussion");
+  
+  if (vList) vList.classList.remove("active");
+  if (vDisc) vDisc.classList.add("active");
   renderDiscussionView();
 }
 

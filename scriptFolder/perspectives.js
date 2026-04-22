@@ -31,8 +31,8 @@ onAuthStateChanged(auth, async (user) => {
 
 // 3. ── GLOBAL STATE ──
 let posts         = [];
-let currentPostId = null;
-let activeTag     = 'all';
+let currentPostId = sessionStorage.getItem("openPerspective") || null; 
+let activeTag = 'all';
 let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
@@ -100,17 +100,75 @@ window.filterTag = (btn, tag) => {
 };
 window.sortPosts = (mode) => { sortMode = mode; renderList(); };
 
+window.togglePin = async (id, alreadyPinned) => {
+  if (alreadyPinned) {
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    // Find the specific bulletin entry matching this perspective ID
+    const entry = Object.entries(data).find(([, v]) => v.originalId === id && v.type === 'perspective');
+    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
+  } else {
+    const p = posts.find(x => x.id === id);
+    if (!p) return;
+    
+    const commentCount = p.comments ? p.comments.length : 0;
+    const name = getDisplayName();
+
+    await set(push(ref(db, "bulletin")), {
+      originalId: id,
+      type: 'perspective', // We tag it so the bulletin knows where it came from
+      title: p.title,
+      body: p.content || "",
+      author: p.author,
+      authorInitials: p.authorInitials || "?",
+      tags: p.tags || [],
+      postedAt: p.postedAt,
+      commentCount,
+      pinnedAt: Date.now(),
+      pinnedBy: name
+    });
+  }
+  // Re-render to update the button UI
+  renderArticle();
+};
+
 // 5. ── FIREBASE LISTENER ──
-onValue(ref(db,'perspectives'), (snapshot) => {
+onValue(ref(db, 'perspectives'), (snapshot) => {
   const data = snapshot.val();
+  console.log("Firebase Data Received:", data ? "Success" : "Empty"); // Debugging log
+
   if (data) {
     posts = Object.keys(data).map(key => {
       const post = data[key];
-      const commentsArray = post.comments ? Object.keys(post.comments).map(cId=>({id:cId,...post.comments[cId]})) : [];
-      return { id:key, ...post, comments:commentsArray, tags:post.tags||[], postedAt:post.postedAt };
+      const commentsArray = post.comments ? Object.keys(post.comments).map(cId => ({ id: cId, ...post.comments[cId] })) : [];
+      return { id: key, ...post, comments: commentsArray, tags: post.tags || [], postedAt: post.postedAt };
     });
-  } else { posts = []; }
-  if (currentPostId) renderArticle(); else renderList();
+
+    // Check if our currentPostId actually exists in the data we just got
+    if (currentPostId) {
+      const postExists = posts.find(p => p.id === currentPostId);
+      if (postExists) {
+        console.log("Post found, rendering article:", currentPostId);
+        // We found it! Now we can safely clear the session storage
+        sessionStorage.removeItem("openPerspective");
+      } else {
+        console.warn("Target ID not found in posts, defaulting to list.");
+        currentPostId = null;
+      }
+    }
+  } else {
+    posts = [];
+  }
+
+  // Final render decision
+  if (currentPostId) {
+    // Force the view switch before rendering
+    document.getElementById('viewList').classList.remove('active');
+    document.getElementById('viewArticle').classList.add('active');
+    renderArticle();
+  } else {
+    renderList();
+  }
 });
 
 // 6. ── RENDER FUNCTIONS ──
@@ -211,13 +269,32 @@ function renderArticle() {
 
   // Only author or admin sees Edit/Delete
   const canModify = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
-  document.getElementById('articleTopActions').innerHTML = canModify ? `
-    <button class="topbar-btn btn-edit" onclick="openEditModal()">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
-    </button>
-    <button class="topbar-btn btn-delete" onclick="openModal('confirmModal')">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
-    </button>` : '';
+  const isAdmin = userRole === 'admin';
+
+  if (!p) {
+    window.showList();
+    return;
+  }
+
+  // Check the bulletin database to see if this is currently pinned
+  get(ref(db, "bulletin")).then(snap => {
+    const bulletinData = snap.val() || {};
+    const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === p.id && b.type === 'perspective');
+
+    document.getElementById('articleTopActions').innerHTML = `
+      ${canModify ? `
+        <button class="topbar-btn btn-edit" onclick="openEditModal()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
+        </button>
+        <button class="topbar-btn btn-delete" onclick="openModal('confirmModal')">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
+        </button>` : ''}
+      ${isAdmin ? `
+        <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${p.id}', ${alreadyPinned})">
+          <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+        </button>` : ''}`;
+  });
 
   const commentsHtml = p.comments.length
     ? p.comments.map(c=>{

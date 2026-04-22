@@ -98,7 +98,7 @@ function renderBulletin() {
     const tags = Array.isArray(item.tags) ? item.tags : [];
     const commentCount = item.commentCount || 0;
     return `
-    <div class="bulletin-card" onclick="goToDiscussion('${esc(item.discussionId)}')">
+    <div class="bulletin-card" onclick="goToPost('${esc(item.originalId || item.discussionId)}', '${item.type}')">
       <div class="bc-pin-label">
         <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         PINNED BY EXEC BOARD · ${rel(item.pinnedAt)}
@@ -135,9 +135,24 @@ function renderBulletin() {
 //  so the-floor.js can open it directly on load.
 // ─────────────────────────────────────────────
 
-function goToDiscussion(discussionId) {
-  sessionStorage.setItem("openDiscussion", discussionId);
-  window.location.href = "the-floor.html";
+// ─────────────────────────────────────────────
+//  NAVIGATION — Route to the correct page
+// ─────────────────────────────────────────────
+
+function goToPost(originalId, type) {
+  // If it's an old database entry without a type, assume it's from the floor
+  const targetType = type || 'floor'; 
+
+  if (targetType === 'perspective') {
+    sessionStorage.setItem("openPerspective", originalId);
+    window.location.href = "perspectives.html";
+  } else if (targetType === 'weekly') {
+    sessionStorage.setItem("openFeature", originalId);
+    window.location.href = "weekly-feature.html";
+  } else if (type === 'floor') {
+    sessionStorage.setItem("openFloorPost", originalId);
+    window.location.href = "the-floor.html";
+}
 }
 
 // ─────────────────────────────────────────────
@@ -153,4 +168,4 @@ async function unpinPost(bulletinKey) {
 //  EXPOSE
 // ─────────────────────────────────────────────
 
-Object.assign(window, { goToDiscussion, unpinPost });
+Object.assign(window, { goToPost, unpinPost });

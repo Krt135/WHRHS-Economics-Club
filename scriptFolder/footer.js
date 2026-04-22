@@ -7,7 +7,7 @@ class SpecialFooter extends HTMLElement {
         <div class="sub">Watchung Hills Regional High School</div>
       </div>
       <div class="footer-social">
-        <a href="#" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+        <a href="https://www.instagram.com/theeconomicforum_whrhs?igsh=Z2Y5Z2c4cmlvazhv&utm_source=qr" class="social-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
             viewBox="0 0 24 24">
             <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
             <circle cx="12" cy="12" r="4" />
