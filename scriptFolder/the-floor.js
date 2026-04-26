@@ -11,22 +11,22 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 
-const app  = initializeApp(firebaseConfig);
-const db   = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 const auth = getAuth(app);
 
 // ─────────────────────────────────────────────
 //  STATE & AUTH TRACKING
 // ─────────────────────────────────────────────
 
-let currentUser       = null;
-let userRole          = "public";
-let userProfile       = null;
-let discussions       = {};
-let polls             = {};
-let activeTag         = "all";
+let currentUser = null;
+let userRole = "public";
+let userProfile = null;
+let discussions = {};
+let polls = {};
+let activeTag = "all";
 let attachedImageData = null;
-let isEditMode        = false;
+let isEditMode = false;
 
 // Check for deep links from Bulletin (Check both potential keys to be safe)
 let currentDiscId = sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
@@ -37,11 +37,11 @@ onAuthStateChanged(auth, async (user) => {
     const snapshot = await get(ref(db, `users/${user.uid}`));
     if (snapshot.exists()) {
       userProfile = snapshot.val();
-      userRole    = userProfile.role || "member";
+      userRole = userProfile.role || "member";
     }
   } else {
     currentUser = null;
-    userRole    = "public";
+    userRole = "public";
     userProfile = null;
   }
 
@@ -73,20 +73,20 @@ function getDisplayName() {
   return "Member";
 }
 
-const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
+const COLOURS = ["#0f1f3d", "#1a2e52", "#7c3aed", "#0369a1", "#065f46", "#92400e"];
 function avColour(name) {
   let h = 0;
   for (let c of (name || "")) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
   return COLOURS[h];
 }
 function esc(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60)    return "just now";
-  if (s < 3600)  return Math.floor(s / 60)   + " min ago";
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
   if (s < 86400) return Math.floor(s / 3600) + " hours ago";
   return Math.floor(s / 86400) + " days ago";
 }
@@ -147,9 +147,9 @@ function renderDiscussions() {
 
     let cardTheme = "theme-member";
     if (currentUser && d.authorId === currentUser.uid) {
-      cardTheme = "theme-me"; 
+      cardTheme = "theme-me";
     } else if (d.authorRole === "admin") {
-      cardTheme = "theme-exec"; 
+      cardTheme = "theme-exec";
     }
 
     return `
@@ -177,10 +177,13 @@ function renderDiscussions() {
 //  RENDER — SINGLE DISCUSSION VIEW
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+//  RENDER — SINGLE DISCUSSION VIEW
+// ─────────────────────────────────────────────
+
 function renderDiscussionView() {
   const d = discussions[currentDiscId];
-  
-  // Failsafe: if data is not ready or ID is wrong, go back to list
+
   if (!d) {
     showList();
     return;
@@ -191,49 +194,60 @@ function renderDiscussionView() {
     : [];
 
   const canModify = currentUser && (d.authorId === currentUser.uid || userRole === "admin");
-  const isAdmin   = userRole === "admin";
+  const isAdmin = userRole === "admin";
 
   get(ref(db, "bulletin")).then(snap => {
-    const bulletinData  = snap.val() || {};
-    // Check if originalId or discussionId matches
+    const bulletinData = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId || b.originalId === currentDiscId);
 
     const topActions = document.getElementById("discTopActions");
     if (topActions) {
       topActions.innerHTML = `
         ${canModify ? `
-          <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Edit
-          </button>
-          <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-            Delete
-          </button>` : ""}
+          <button class="topbar-btn btn-edit-tb" onclick="window.openEditModal()">Edit</button>
+          <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">Delete</button>` : ""}
         ${isAdmin ? `
           <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
-            <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
             ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
           </button>` : ""}`;
     }
   });
 
   let postTheme = "theme-member";
-  if (currentUser && d.authorId === currentUser.uid) {
-    postTheme = "theme-me";
-  } else if (d.authorRole === "admin") {
-    postTheme = "theme-exec";
-  }
+  if (currentUser && d.authorId === currentUser.uid) { postTheme = "theme-me"; }
+  else if (d.authorRole === "admin") { postTheme = "theme-exec"; }
 
   const commentsHtml = commentEntries.map(c => {
     const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === "admin");
-    
-    let cmtTheme = "theme-member";
-    if (currentUser && c.authorId === currentUser.uid) {
-      cmtTheme = "theme-me";
-    } else if (c.authorRole === "admin") {
-      cmtTheme = "theme-exec";
-    }
+    let cmtTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : (c.authorRole === "admin" ? "theme-exec" : "theme-member");
+
+    // --- NEW: Handle Nested Replies ---
+    const replies = c.replies ? Object.entries(c.replies).map(([rk, rv]) => ({ ...rv, _key: rk })).sort((a, b) => a.postedAt - b.postedAt) : [];
+
+    const repliesHtml = replies.map(r => {
+      const canDeleteReply = currentUser && (r.authorId === currentUser.uid || userRole === "admin");
+      return `
+        <div class="reply-item" style="display:flex; gap:8px; margin-top:12px;">
+          <div class="comment-av" style="background:${avColour(r.author)}; width:24px; height:24px; font-size:10px;">${esc(r.initials || "?")}</div>
+          <div class="comment-bubble" style="flex:1;">
+            <div class="comment-hdr">
+              <span class="comment-author">${esc(r.author)}</span>
+              <span class="comment-time">${rel(r.postedAt)}</span>
+            </div>
+            <div class="comment-text">${esc(r.text)}</div>
+            ${canDeleteReply ? `
+              <div class="comment-acts">
+                <button class="cmt-act cmt-del" onclick="deleteReply('${currentDiscId}','${c._key}','${r._key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="3 6 5 6 21 6"></polyline>
+  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+  <line x1="10" y1="11" x2="10" y2="17"></line>
+  <line x1="14" y1="11" x2="14" y2="17"></line>
+</svg>Delete</button>
+              </div>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
 
     return `
     <div class="comment-item ${cmtTheme}">
@@ -244,10 +258,30 @@ function renderDiscussionView() {
           <span class="comment-time">${rel(c.postedAt)}</span>
         </div>
         <div class="comment-text">${esc(c.text)}</div>
-        ${canDeleteComment ? `
-          <div class="comment-acts">
-            <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">Delete</button>
-          </div>` : ""}
+        
+        <div class="comment-acts">
+          <button class="cmt-act" onclick="window.toggleReplyBox('${c._key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="9 17 4 12 9 7"></polyline>
+  <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+</svg>Reply</button>
+          ${canDeleteComment ? `<button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="3 6 5 6 21 6"></polyline>
+  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+  <line x1="10" y1="11" x2="10" y2="17"></line>
+  <line x1="14" y1="11" x2="14" y2="17"></line>
+</svg>
+Delete</button>` : ""}
+        </div>
+
+        ${replies.length > 0 ? `<div style="margin-left:8px; padding-left:12px; border-left:2px solid #e5e7eb;">${repliesHtml}</div>` : ""}
+
+        <div id="reply-box-${c._key}" style="display:none; margin-top:12px; margin-left:8px; padding-left:12px; border-left:2px solid #e5e7eb;">
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="reply-input-${c._key}" class="new-comment-input" placeholder="Write a reply..." style="min-height:36px; height:36px;">
+            <button class="btn-post-cmt" onclick="window.postReply('${c._key}')">Post</button>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join("");
@@ -286,21 +320,21 @@ async function togglePin(discId, alreadyPinned) {
     const d = discussions[discId];
     if (!d) return;
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
-    
+
     const name = getDisplayName();
-    
+
     await set(push(ref(db, "bulletin")), {
-      discussionId:   discId, // Included for backwards compatibility 
-      originalId:     discId, // The new standard
-      type:           "floor", // Tells bulletin.js it's a floor post
-      body:           d.body || "",
-      author:         d.author,
+      discussionId: discId, // Included for backwards compatibility 
+      originalId: discId, // The new standard
+      type: "floor", // Tells bulletin.js it's a floor post
+      body: d.body || "",
+      author: d.author,
       authorInitials: d.authorInitials || "?",
-      tags:           d.tags || [],
-      postedAt:       d.postedAt,
+      tags: d.tags || [],
+      postedAt: d.postedAt,
       commentCount,
-      pinnedAt:       Date.now(),
-      pinnedBy:       name
+      pinnedAt: Date.now(),
+      pinnedBy: name
     });
   }
   renderDiscussionView();
@@ -317,7 +351,7 @@ async function handleMainButtonClick() {
 
 async function publishDiscussion() {
   if (!currentUser) return alert("Please log in to post.");
-  const body    = document.getElementById("discContent").value.trim();
+  const body = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
   if (!body) return;
 
@@ -327,12 +361,12 @@ async function publishDiscussion() {
   const newRef = push(ref(db, "discussions"));
   await set(newRef, {
     body, tags,
-    author:         name,
-    authorId:       currentUser.uid,
-    authorRole:     userRole,
+    author: name,
+    authorId: currentUser.uid,
+    authorRole: userRole,
     authorInitials: name.substring(0, 2).toUpperCase(),
-    image:          attachedImageData || null,
-    postedAt:       Date.now()
+    image: attachedImageData || null,
+    postedAt: Date.now()
   });
 
   closeModal("discussModal");
@@ -371,7 +405,7 @@ async function publishPoll() {
       authorId: currentUser.uid,
       postedAt: Date.now()
     });
-    
+
     document.getElementById("pollQuestion").value = "";
     optionInputs.forEach(input => input.value = "");
     closeModal("pollModal");
@@ -388,7 +422,7 @@ async function publishPoll() {
 
 function addPollOption() {
   const container = document.getElementById("pollOptionInputs");
-  const newRow    = document.createElement("div");
+  const newRow = document.createElement("div");
   newRow.className = "poll-opt-row";
   newRow.innerHTML = `
     <input class="form-input" type="text" placeholder="New Option">
@@ -427,7 +461,7 @@ function openEditModal() {
 }
 
 async function saveEditDiscussion() {
-  const body    = document.getElementById("discContent").value.trim();
+  const body = document.getElementById("discContent").value.trim();
   const tagsRaw = document.getElementById("discTags").value.trim();
   if (!body) return;
   const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
@@ -437,8 +471,8 @@ async function saveEditDiscussion() {
       body, tags, lastEdited: Date.now()
     });
 
-    const snap  = await get(ref(db, "bulletin"));
-    const data  = snap.val() || {};
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body, tags });
 
@@ -452,8 +486,8 @@ async function saveEditDiscussion() {
 
 async function deleteDiscussion() {
   if (confirm("Delete this discussion permanently?")) {
-    const snap  = await get(ref(db, "bulletin"));
-    const data  = snap.val() || {};
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
 
@@ -490,20 +524,20 @@ async function postComment() {
   const name = getDisplayName();
 
   await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
-    author:   name,
+    author: name,
     authorId: currentUser.uid,
     authorRole: userRole,
     initials: name.substring(0, 2).toUpperCase(),
-    text:     inp.value.trim(),
+    text: inp.value.trim(),
     postedAt: Date.now()
   });
   inp.value = "";
 
-  const snap        = await get(ref(db, "bulletin"));
+  const snap = await get(ref(db, "bulletin"));
   const bulletinData = snap.val() || {};
-  const entry       = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
+  const entry = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
   if (entry) {
-    const d        = discussions[currentDiscId];
+    const d = discussions[currentDiscId];
     const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
     await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
   }
@@ -512,6 +546,43 @@ async function postComment() {
 async function deleteComment(discKey, cmtKey) {
   if (confirm("Delete this comment?")) {
     await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  NESTED REPLIES
+// ─────────────────────────────────────────────
+
+function toggleReplyBox(cmtId) {
+  const box = document.getElementById(`reply-box-${cmtId}`);
+  if (box) {
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+}
+
+async function postReply(cmtId) {
+  if (!currentUser) return alert("Please log in to reply.");
+  const inp = document.getElementById(`reply-input-${cmtId}`);
+  if (!inp.value.trim()) return;
+
+  const name = getDisplayName();
+
+  // Push the reply into a sub-folder of the specific comment
+  await set(push(ref(db, `discussions/${currentDiscId}/comments/${cmtId}/replies`)), {
+    author: name,
+    authorId: currentUser.uid,
+    authorRole: userRole,
+    initials: name.substring(0, 2).toUpperCase(),
+    text: inp.value.trim(),
+    postedAt: Date.now()
+  });
+
+  inp.value = "";
+}
+
+async function deleteReply(discId, cmtId, replyId) {
+  if (confirm("Delete this reply?")) {
+    await remove(ref(db, `discussions/${discId}/comments/${cmtId}/replies/${replyId}`));
   }
 }
 
@@ -536,8 +607,8 @@ function renderPolls() {
 
   list.innerHTML = items.map(p => {
     const options = Array.isArray(p.options) ? p.options : [];
-    
-    const userVotes = p.userVotes || {}; 
+
+    const userVotes = p.userVotes || {};
     const voteEntries = Object.values(userVotes);
     const totalVotes = voteEntries.length;
 
@@ -607,7 +678,7 @@ function showList() {
   // Make sure these IDs match what is in your HTML (e.g. id="viewList" and id="viewDiscussion")
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
-  
+
   if (vList) vList.classList.add("active");
   if (vDisc) vDisc.classList.remove("active");
   renderDiscussions();
@@ -617,7 +688,7 @@ function showDiscussion(key) {
   currentDiscId = key;
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
-  
+
   if (vList) vList.classList.remove("active");
   if (vDisc) vDisc.classList.add("active");
   renderDiscussionView();
@@ -627,12 +698,12 @@ function switchTab(tab) {
   document.getElementById("tabDiscussions").classList.toggle("active", tab === "discussions");
   document.getElementById("tabPolls").classList.toggle("active", tab === "polls");
   document.getElementById("panelDiscussions").style.display = tab === "discussions" ? "" : "none";
-  document.getElementById("panelPolls").style.display       = tab === "polls"       ? "" : "none";
+  document.getElementById("panelPolls").style.display = tab === "polls" ? "" : "none";
   const filterBar = document.getElementById("filterBar");
   if (filterBar) filterBar.style.display = tab === "discussions" ? "" : "none";
 }
 
-function openModal(id)  { document.getElementById(id).classList.add("open"); }
+function openModal(id) { document.getElementById(id).classList.add("open"); }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove("open");
@@ -643,7 +714,7 @@ function closeModal(id) {
     const btn = document.getElementById("mainSubmitBtn");
     if (btn) btn.innerText = "Publish Discussion";
     document.getElementById("discContent").value = "";
-    document.getElementById("discTags").value    = "";
+    document.getElementById("discTags").value = "";
     document.getElementById("attachPreview").textContent = "";
     attachedImageData = null;
   }
@@ -667,6 +738,7 @@ Object.assign(window, {
   showList, showDiscussion, switchTab,
   openModal, closeModal, previewFile,
   postComment, deleteComment,
+  toggleReplyBox, postReply, deleteReply,
   publishDiscussion, deleteDiscussion,
   publishPoll, addPollOption, removeOpt, deletePoll,
   votePoll, openEditModal, handleMainButtonClick,

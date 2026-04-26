@@ -229,3 +229,56 @@
   }
   .tier-card.exec .tier-perks li::before { background: var(--gold); }
 
+  /* ── THE EXECUTIVE BOARD ── */
+  .exec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .exec-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 28px 24px;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+
+  .exec-card:hover {
+    border-color: var(--gold);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(15, 31, 61, 0.05);
+  }
+
+  .exec-role {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .exec-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 12px;
+  }
+
+  .exec-desc {
+    font-size: 14.5px;
+    color: #4b5563;
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* Responsive adjustment if you ever view on smaller screens */
+  @media (max-width: 900px) {
+    .exec-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+

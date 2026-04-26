@@ -35,7 +35,6 @@ onValue(latestRef, (snapshot) => {
     return `
     <div class="home-post-card" onclick="window.location.href='the-floor.html?post=${d._key}'">
       <div class="hp-content">
-        <h4 class="hp-title">${esc(d.title)}</h4>
         <p class="hp-body">${esc(d.body.substring(0, 120))}...</p>
         
         <div class="hp-meta">
