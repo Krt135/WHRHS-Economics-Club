@@ -177,7 +177,7 @@ function renderList() {
 function renderLesson() {
   const l = lessons[currentId]; if(!l) return showList();
   const readMin = Math.max(1,Math.round(wdCt(l.content||"")/130));
-  const iLiked    = myLiked(l);
+  const iLiked     = myLiked(l);
   const iDisliked = myDisliked(l);
 
   function parseContent(raw) {
@@ -189,7 +189,7 @@ function renderLesson() {
     }).join("");
   }
 
-  // Quiz HTML
+  // Quiz HTML logic remains the same...
   const qs = Array.isArray(l.quiz)?l.quiz:[];
   let quizHtml="";
   if(qs.length){
@@ -231,11 +231,15 @@ function renderLesson() {
     ? Object.entries(l.comments).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.postedAt-b.postedAt)
     : [];
 
-  // Only author or admin sees Edit/Delete
   const canModify = currentUser && (l.authorId === currentUser.uid || userRole === 'admin');
 
   const commentsHtml = commentEntries.length
     ? commentEntries.map(c=>{
+        // --- NEW LIKE CALCULATION ---
+        const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
+        const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+        // ----------------------------
+
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         return `
         <div class="comment-item">
@@ -247,9 +251,9 @@ function renderLesson() {
             </div>
             <div class="comment-text">${esc(c.text)}</div>
             <div class="comment-acts">
-              <button class="cmt-act ${c.liked?"liked":""}" onclick="likeComment('${currentId}','${c._key}',${!!c.liked},${c.likes||0})">
-                <svg width="12" height="12" fill="${c.liked?"currentColor":"none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
-                ${c.likes||0}
+              <button class="cmt-act ${amILiked ? "liked" : ""}" onclick="likeComment('${currentId}','${c._key}')">
+                <svg width="12" height="12" fill="${amILiked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
+                ${totalCommentLikes}
               </button>
               ${canDeleteComment?`
               <button class="cmt-act cmt-del" onclick="deleteComment('${currentId}','${c._key}')">
@@ -447,11 +451,29 @@ async function postComment() {
   inp.value="";
 }
 
-async function likeComment(lessonKey, commentKey, currentlyLiked, currentLikes) {
-  const newLiked=!currentlyLiked;
-  await update(ref(db,`lessons/${lessonKey}/comments/${commentKey}`),{
-    liked: newLiked, likes: newLiked?currentLikes+1:currentLikes-1
-  });
+async function likeComment(lessonKey, commentKey) {
+  if (!currentUser) {
+    alert("Please log in to like comments.");
+    return;
+  }
+
+  const uid = currentUser.uid;
+  // Get the specific lesson and comment from your local state
+  const l = lessons[lessonKey];
+  const c = l && l.comments ? l.comments[commentKey] : null;
+  if (!c) return;
+
+  // Check if this specific user has already liked it
+  const hasLiked = c.userLikes && c.userLikes[uid];
+  const likeRef = ref(db, `lessons/${lessonKey}/comments/${commentKey}/userLikes/${uid}`);
+
+  if (hasLiked) {
+    // If already liked, remove my specific ID
+    await remove(likeRef);
+  } else {
+    // If not liked, add my ID
+    await set(likeRef, true);
+  }
 }
 
 async function deleteComment(lessonKey, commentKey) {

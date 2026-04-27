@@ -257,26 +257,19 @@ function renderList() {
 }
 
 function renderArticle() {
-  const p = posts.find(x=>x.id===currentPostId); if(!p) return window.showList();
+  const p = posts.find(x => x.id === currentPostId); if (!p) return window.showList();
   const wds     = p.content.trim().split(/\s+/).length;
-  const readMin = Math.max(1,Math.round(wds/200));
-  const paragraphs = p.content.split(/\n\n+/).map(s=>`<p>${esc(s.trim())}</p>`).join('');
+  const readMin = Math.max(1, Math.round(wds / 200));
+  const paragraphs = p.content.split(/\n\n+/).map(s => `<p>${esc(s.trim())}</p>`).join('');
   const iLiked     = myLiked(p);
   const iDisliked  = myDisliked(p);
   const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
                   : (p.authorRole === "admin") ? "theme-exec" 
                   : "theme-member";
 
-  // Only author or admin sees Edit/Delete
   const canModify = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
   const isAdmin = userRole === 'admin';
 
-  if (!p) {
-    window.showList();
-    return;
-  }
-
-  // Check the bulletin database to see if this is currently pinned
   get(ref(db, "bulletin")).then(snap => {
     const bulletinData = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === p.id && b.type === 'perspective');
@@ -297,9 +290,15 @@ function renderArticle() {
   });
 
   const commentsHtml = p.comments.length
-    ? p.comments.map(c=>{
+    ? p.comments.map(c => {
+        // --- NEW INDIVIDUAL LIKE LOGIC ---
+        const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
+        const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+        // ---------------------------------
+
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         const commentTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
+        
         return `
         <div class="comment-item ${commentTheme}">
           <div class="comment-av" style="background:${avatarColour(c.author)}">${esc(c.initials||'?')}</div>
@@ -310,13 +309,13 @@ function renderArticle() {
             </div>
             <div class="comment-bubble-text">${esc(c.text)}</div>
             <div class="comment-bubble-actions">
-              <button class="comment-action ${c.liked?'liked':''}" onclick="likeComment('${p.id}','${c.id}')">
-                <svg width="12" height="12" fill="${c.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
-                ${c.likes||0}
+              <button class="comment-action ${amILiked ? 'liked' : ''}" onclick="likeComment('${p.id}','${c.id}')">
+                <svg width="12" height="12" fill="${amILiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
+                ${totalCommentLikes}
               </button>
               ${canDeleteComment?`
               <button class="comment-action delete-comment" onclick="deleteComment('${p.id}','${c.id}')">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Delete
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Delete
               </button>`:''}
             </div>
           </div>
@@ -324,9 +323,9 @@ function renderArticle() {
       }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
 
-document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
+  document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
   document.getElementById('articleBody').innerHTML = `
-    <div class="article-eyebrow">PERSPECTIVES${p.tags.length?' · '+p.tags[0].toUpperCase():''}</div>
+    <div class="article-eyebrow">PERSPECTIVES${p.tags.length ? ' · ' + p.tags[0].toUpperCase() : ''}</div>
     <div class="article-title">${esc(p.title)}</div>
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
@@ -336,24 +335,24 @@ document.getElementById('articleBody').className = `article-body article-contain
       <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
       <span>${wds} words · ${readMin} min read</span>
     </div>
-    ${p.tags.length?`<div class="article-tags">${p.tags.map(t=>`<span class="tag-pill">${esc(t)}</span>`).join('')}</div>`:''}
+    ${p.tags.length ? `<div class="article-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="article-divider"></div>
-    ${p.image?`<img src="${p.image}" class="article-img" alt="">`:''}
+    ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
     <div class="article-content">${paragraphs}</div>
     <div class="reaction-bar">
-      <button class="react-btn ${iLiked?'liked':''}" onclick="react('${p.id}','like')">
-        <svg width="15" height="15" fill="${iLiked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-        ${p.likes||0} likes
+      <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')">
+        <svg width="15" height="15" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+        ${p.likes || 0} likes
       </button>
-      <button class="react-btn ${iDisliked?'disliked':''}" onclick="react('${p.id}','dislike')">
-        <svg width="15" height="15" fill="${iDisliked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-        ${p.dislikes||0} dislikes
+      <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')">
+        <svg width="15" height="15" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+        ${p.dislikes || 0} dislikes
       </button>
     </div>
     <div class="comments-area">
       <div class="comments-title">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${p.comments.length} Comment${p.comments.length!==1?'s':''}
+        ${p.comments.length} Comment${p.comments.length !== 1 ? 's' : ''}
       </div>
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:20px">
@@ -361,8 +360,6 @@ document.getElementById('articleBody').className = `article-body article-contain
         <button class="btn-post-comment" onclick="postComment('${p.id}')">Post</button>
       </div>
     </div>`;
-
-    
 }
 
 // 7. ── DATABASE MUTATIONS ──
@@ -462,11 +459,25 @@ window.postComment = (postId) => {
   inp.value='';
 };
 
-window.likeComment = (postId, cmtId) => {
-  const p = posts.find(x=>x.id===postId); if(!p) return;
-  const c = p.comments.find(x=>x.id===cmtId); if(!c) return;
-  const newLiked = !c.liked;
-  update(ref(db,`perspectives/${postId}/comments/${cmtId}`),{liked:newLiked,likes:(c.likes||0)+(newLiked?1:-1)});
+window.likeComment = async (postId, cmtId) => {
+  if (!auth.currentUser) {
+    alert("Please log in to like comments.");
+    return;
+  }
+
+  const uid = auth.currentUser.uid;
+  const p = posts.find(x => x.id === postId); if (!p) return;
+  const c = p.comments.find(x => x.id === cmtId); if (!c) return;
+
+  // Check if this specific user is in the userLikes object
+  const hasLiked = c.userLikes && c.userLikes[uid];
+  const likeRef = ref(db, `perspectives/${postId}/comments/${cmtId}/userLikes/${uid}`);
+
+  if (hasLiked) {
+    await remove(likeRef);
+  } else {
+    await set(likeRef, true);
+  }
 };
 
 window.deleteComment = (postId, cmtId) => {

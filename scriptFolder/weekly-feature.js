@@ -257,7 +257,15 @@ function renderArticle() {
 
   const commentsHtml = f.comments.length
     ? f.comments.map(c => {
+        // --- NEW LIKE LOGIC STARTS HERE ---
+        // Count how many keys are in the userLikes object
+        const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
+        // Check if the current user's ID exists in that object
+        const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+        // ----------------------------------
+
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+        
         return `
         <div class="comment-item" id="comment-${c.id}">
           <div class="comment-av">${escHtml(c.initials||'?')}</div>
@@ -268,9 +276,9 @@ function renderArticle() {
             </div>
             <div class="comment-bubble-text">${escHtml(c.text)}</div>
             <div class="comment-bubble-actions">
-              <button class="comment-action ${c.liked?'liked':''}" onclick="likeComment('${f.id}','${c.id}')">
-                <svg width="12" height="12" fill="${c.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
-                ${c.likes||0}
+              <button class="comment-action ${amILiked ? 'liked' : ''}" onclick="likeComment('${f.id}','${c.id}')">
+                <svg width="12" height="12" fill="${amILiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
+                ${totalCommentLikes}
               </button>
               ${canDeleteComment?`
               <button class="comment-action delete-comment" onclick="deleteComment('${f.id}','${c.id}')">
@@ -456,11 +464,34 @@ window.postComment = (featureId) => {
   input.value = '';
 };
 
-window.likeComment = (featureId, commentId) => {
-  const f = features.find(x=>x.id===featureId); if(!f) return;
-  const c = f.comments.find(x=>x.id===commentId); if(!c) return;
-  const newLiked = !c.liked;
-  update(ref(db,`features/${featureId}/comments/${commentId}`),{liked:newLiked,likes:(c.likes||0)+(newLiked?1:-1)});
+window.likeComment = async (featureId, commentId) => {
+  // 1. Ensure user is logged in
+  if (!auth.currentUser) {
+    alert("Please log in to like comments.");
+    return;
+  }
+
+  const uid = auth.currentUser.uid;
+  const f = features.find(x => x.id === featureId);
+  if (!f) return;
+
+  const c = f.comments.find(x => x.id === commentId);
+  if (!c) return;
+
+  // 2. Check if THIS specific user has already liked it
+  // We check the 'userLikes' object for the user's UID
+  const hasLiked = c.userLikes && c.userLikes[uid];
+  
+  // 3. Reference to the user's specific like slot
+  const likeRef = ref(db, `features/${featureId}/comments/${commentId}/userLikes/${uid}`);
+
+  if (hasLiked) {
+    // If already liked, remove the UID entry
+    await remove(likeRef);
+  } else {
+    // If not liked, save 'true' under the user's UID
+    await set(likeRef, true);
+  }
 };
 
 window.deleteComment = (featureId, commentId) => {
