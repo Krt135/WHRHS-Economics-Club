@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import { getDatabase, ref, push, set, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -108,6 +109,7 @@ window.togglePin = async (id, alreadyPinned) => {
       title: f.title,
       body: f.content || "",
       author: f.author,
+      authorId: f.authorId || null,
       authorInitials: f.authorInitials || "?",
       tags: f.tag ? [f.tag] : [], // Weekly features use a single string tag, converting to array
       postedAt: f.postedAt,
@@ -192,7 +194,7 @@ function renderList() {
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">
-          <span class="author-av">${escHtml(f.authorInitials || '?')}</span>
+          ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { stopPropagation: true })}
           ${escHtml(f.author)}
         </span>
         <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
@@ -268,7 +270,7 @@ function renderArticle() {
         
         return `
         <div class="comment-item" id="comment-${c.id}">
-          <div class="comment-av">${escHtml(c.initials||'?')}</div>
+          ${profileAvatarHtml(c.authorId, "div", "comment-av", "", escHtml(c.initials || "?"))}
           <div class="comment-bubble">
             <div class="comment-bubble-header">
               <span class="comment-author-name">${escHtml(c.author)}</span>
@@ -295,7 +297,7 @@ function renderArticle() {
     <div class="article-title">${escHtml(f.title)}</div>
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
-        <span class="author-av">${escHtml(f.authorInitials||'?')}</span>
+        ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"))}
         <strong>${escHtml(f.author)}</strong>
       </span>
       <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
@@ -445,7 +447,7 @@ window.openReactions = (id) => {
   const reactionMap = f.reactionsByUser || {};
   const list = Object.values(reactionMap);
   const html = list.length
-    ? list.map(r=>`<div class="reaction-row"><div class="avatar-sm">${escHtml(r.initials)}</div>${escHtml(r.name)}<span class="reaction-type">${r.type}</span></div>`).join('')
+    ? list.map(r => `<div class="reaction-row">${profileAvatarHtml(r.uid, "div", "avatar-sm", "", escHtml(r.initials))}${escHtml(r.name)}<span class="reaction-type">${r.type}</span></div>`).join("")
     : '<p style="color:#9ca3af;font-size:14px;padding:12px 0">No reactions yet.</p>';
   document.getElementById('reactionsList').innerHTML = html;
   window.openModal('reactionsModal');

@@ -10,6 +10,7 @@ import {
   getAuth, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -160,7 +161,7 @@ function renderDiscussions() {
       ${tags.length ? `<div class="disc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="disc-meta">
         <span class="author">
-          <span class="author-av" style="background:${avColour(d.author)}">${esc(d.authorInitials || "?")}</span>
+          ${profileAvatarHtml(d.authorId, "span", "author-av", `background:${avColour(d.author)}`, esc(d.authorInitials || "?"), { stopPropagation: true })}
           ${esc(d.author)}
         </span>
         <span>·</span>
@@ -228,7 +229,7 @@ function renderDiscussionView() {
       const canDeleteReply = currentUser && (r.authorId === currentUser.uid || userRole === "admin");
       return `
         <div class="reply-item" style="display:flex; gap:8px; margin-top:12px;">
-          <div class="comment-av" style="background:${avColour(r.author)}; width:24px; height:24px; font-size:10px;">${esc(r.initials || "?")}</div>
+          ${profileAvatarHtml(r.authorId, "div", "comment-av", `background:${avColour(r.author)}; width:24px; height:24px; font-size:10px;`, esc(r.initials || "?"))}
           <div class="comment-bubble" style="flex:1;">
             <div class="comment-hdr">
               <span class="comment-author">${esc(r.author)}</span>
@@ -251,7 +252,7 @@ function renderDiscussionView() {
 
     return `
     <div class="comment-item ${cmtTheme}">
-      <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials || "?")}</div>
+      ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avColour(c.author)}`, esc(c.initials || "?"))}
       <div class="comment-bubble">
         <div class="comment-hdr">
           <span class="comment-author">${esc(c.author)}</span>
@@ -329,6 +330,7 @@ async function togglePin(discId, alreadyPinned) {
       type: "floor", // Tells bulletin.js it's a floor post
       body: d.body || "",
       author: d.author,
+      authorId: d.authorId || null,
       authorInitials: d.authorInitials || "?",
       tags: d.tags || [],
       postedAt: d.postedAt,

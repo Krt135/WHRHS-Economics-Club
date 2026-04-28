@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import { getDatabase, ref, query, orderByChild, limitToLast, onValue } 
   from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 // 1. You MUST do this first on every page
 const app = initializeApp(firebaseConfig);
@@ -39,7 +40,7 @@ onValue(latestRef, (snapshot) => {
         
         <div class="hp-meta">
           <span class="hp-author">
-            <span class="hp-av" style="background:#c9a84c">${esc(d.authorInitials || "??")}</span>
+            ${profileAvatarHtml(d.authorId, "span", "hp-av", "background:#c9a84c", esc(d.authorInitials || "??"), { stopPropagation: true })}
             ${esc(d.author)}
           </span>
           <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${rel(d.postedAt)}</span>
