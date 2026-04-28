@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import { getDatabase, ref, push, set, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -243,7 +244,7 @@ function renderLesson() {
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         return `
         <div class="comment-item">
-          <div class="comment-av" style="background:${avColour(c.author)}">${esc(c.initials||'?')}</div>
+          ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avColour(c.author)}`, esc(c.initials || "?"))}
           <div class="comment-bubble">
             <div class="comment-hdr">
               <span class="comment-author">${esc(c.author)}</span>

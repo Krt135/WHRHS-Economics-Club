@@ -36,6 +36,65 @@
       color: var(--text-muted);
       font-style: italic;
     }
+
+    .page-header p a {
+      color: var(--navy);
+      font-style: normal;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .page-header p a:hover {
+      color: var(--gold);
+    }
+
+    /* ── View another member (read-only) — same boxed look as disabled primary email ── */
+    .profile-main--viewing-member input[readonly]:not([type="checkbox"]),
+    .profile-main--viewing-member textarea[readonly] {
+      background: var(--cream-dark);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      cursor: default;
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .profile-main--viewing-member input[readonly]:not([type="checkbox"]):focus,
+    .profile-main--viewing-member textarea[readonly]:focus {
+      border-color: var(--border);
+      box-shadow: none;
+      outline: none;
+      background: var(--cream-dark);
+    }
+
+    .profile-main--viewing-member textarea[readonly] {
+      resize: none;
+      min-height: 4.5rem;
+    }
+
+    .profile-main--viewing-member #profile-actions {
+      display: none !important;
+    }
+
+    /* ── Profile error / not found ─────────────────────────────────── */
+    .profile-error-card {
+      max-width: 520px;
+    }
+
+    .profile-error-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 0 0 12px;
+    }
+
+    .profile-error-text {
+      margin: 0 0 22px;
+      color: var(--text-muted);
+      font-size: 1.02rem;
+      line-height: 1.45;
+    }
  
     /* ── Cards ───────────────────────────────────────────────────────── */
     .card {

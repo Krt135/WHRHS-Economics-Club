@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your Profile – The Economic Forum</title>
+  <title>Profile – The Economic Forum</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -24,21 +24,29 @@
   <tef-sidebar></tef-sidebar>
 
   <div class="page-wrapper">
-    <main class="profile-main">
+    <main class="profile-main" id="profile-main">
+
+      <div id="profile-error-state" class="card profile-error-card" hidden>
+        <h2 class="profile-error-title">Profile unavailable</h2>
+        <p class="profile-error-text">This member could not be found, or the link is invalid.</p>
+        <a class="btn btn-primary" href="profile.html">Go to your profile</a>
+      </div>
+
+      <div id="profile-app-body">
 
       <div class="page-header">
-        <h1>Your Profile</h1>
-        <p>Manage your account settings and notification preferences.</p>
+        <h1 id="profile-page-title">Your Profile</h1>
+        <p id="profile-page-subtitle">Manage your account settings and notification preferences.</p>
       </div>
 
       <!-- Account Information -->
-      <div class="card">
-        <div class="card-title">
+      <div class="card" id="profile-card-account">
+        <div class="card-title" id="profile-account-card-heading">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
           </svg>
-          Account Information
+          <span id="profile-account-card-title-text">Account Information</span>
         </div>
 
         <div class="field-group">
@@ -46,15 +54,15 @@
           <input type="text" id="field-display-name" placeholder="Your name" />
         </div>
 
-        <div class="field-group">
-          <label class="field-label" for="field-primary-email">
+        <div class="field-group" id="field-group-primary-email">
+          <label class="field-label" for="field-primary-email" id="label-primary-email">
             Primary Email (Login)
           </label>
-          <input type="email" id="field-primary-email" disabled />
-          <p class="field-hint">This is your login email and cannot be changed.</p>
+          <input type="email" id="field-primary-email" readonly />
+          <p class="field-hint" id="hint-primary-email">This is your login email and cannot be changed.</p>
         </div>
 
-        <div class="field-group">
+        <div class="field-group" id="field-group-secondary-email">
           <label class="field-label" for="field-secondary-email">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -63,12 +71,21 @@
             Secondary Email (School Email)
           </label>
           <input type="email" id="field-secondary-email" placeholder="your.name@whrhs.org" />
-          <p class="field-hint">Add your school email here to receive notifications at both addresses.</p>
         </div>
 
         <div class="field-group">
           <label class="field-label" for="field-bio">Bio</label>
           <textarea id="field-bio" placeholder="Tell us about yourself…"></textarea>
+        </div>
+
+        <div class="field-group" id="field-group-member-phone" hidden>
+          <label class="field-label" for="field-member-phone">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z"/>
+            </svg>
+            Phone Number
+          </label>
+          <input type="tel" id="field-member-phone" readonly />
         </div>
 
         <div class="field-group">
@@ -80,7 +97,7 @@
       </div>
 
       <!-- Notifications -->
-      <div class="card">
+      <div class="card" id="profile-card-notifications">
         <div class="card-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -123,7 +140,7 @@
       </div>
 
       <!-- Actions -->
-      <div class="actions">
+      <div class="actions" id="profile-actions">
         <button class="btn btn-primary" id="btn-save">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -141,6 +158,8 @@
           Sign Out
         </button>
       </div>
+
+      </div><!-- #profile-app-body -->
 
     </main>
 

@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import { getDatabase, ref, push, set, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -120,6 +121,7 @@ window.togglePin = async (id, alreadyPinned) => {
       title: p.title,
       body: p.content || "",
       author: p.author,
+      authorId: p.authorId || null,
       authorInitials: p.authorInitials || "?",
       tags: p.tags || [],
       postedAt: p.postedAt,
@@ -232,7 +234,7 @@ function renderList() {
       
       <div class="pc-meta">
         <span class="author-chip">
-          <span class="author-av" style="background:${avatarColour(p.author)}">${esc(p.authorInitials || '?')}</span>
+          ${profileAvatarHtml(p.authorId, "span", "author-av", `background:${avatarColour(p.author)}`, esc(p.authorInitials || '?'), { stopPropagation: true })}
           ${esc(p.author)}
         </span>
         <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
@@ -301,7 +303,7 @@ function renderArticle() {
         
         return `
         <div class="comment-item ${commentTheme}">
-          <div class="comment-av" style="background:${avatarColour(c.author)}">${esc(c.initials||'?')}</div>
+          ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avatarColour(c.author)}`, esc(c.initials || "?"))}
           <div class="comment-bubble">
             <div class="comment-header">
               <span class="comment-author-name">${esc(c.author)}</span>
@@ -329,7 +331,7 @@ function renderArticle() {
     <div class="article-title">${esc(p.title)}</div>
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
-        <span class="author-av" style="background:${avatarColour(p.author)};width:24px;height:24px;font-size:9px">${esc(p.authorInitials||'?')}</span>
+        ${profileAvatarHtml(p.authorId, "span", "author-av", `background:${avatarColour(p.author)};width:24px;height:24px;font-size:9px`, esc(p.authorInitials || "?"))}
         <strong>${esc(p.author)}</strong>
       </span>
       <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>

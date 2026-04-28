@@ -6,6 +6,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import { getDatabase, ref, onValue, remove, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
+import { profileAvatarHtml } from "./profile-link.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -108,7 +109,7 @@ function renderBulletin() {
       ${tags.length ? `<div class="bc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="bc-meta">
         <span class="author-chip">
-          <span class="author-av" style="background:${avColour(item.author)}">${esc(item.authorInitials || "?")}</span>
+          ${profileAvatarHtml(item.authorId, "span", "author-av", `background:${avColour(item.author)}`, esc(item.authorInitials || "?"), { stopPropagation: true })}
           ${esc(item.author)}
         </span>
         <span>·</span>
