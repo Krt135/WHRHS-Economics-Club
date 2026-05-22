@@ -11,6 +11,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
+import { softDelete } from './deletePost.js';
+
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -486,16 +488,16 @@ async function saveEditDiscussion() {
   }
 }
 
-async function deleteDiscussion() {
-  if (confirm("Delete this discussion permanently?")) {
-    const snap = await get(ref(db, "bulletin"));
-    const data = snap.val() || {};
-    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
-    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
 
-    await remove(ref(db, `discussions/${currentDiscId}`));
-    showList();
-  }
+async function deleteDiscussion() {
+    if (confirm("Delete this discussion?")) {
+        const snap = await get(ref(db, "bulletin"));
+        const data = snap.val() || {};
+        const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
+        if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
+        await softDelete('discussions', currentDiscId);
+        showList();
+    }
 }
 
 // ─────────────────────────────────────────────

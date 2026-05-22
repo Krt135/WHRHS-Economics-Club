@@ -4,6 +4,8 @@ import { getDatabase, ref, push, set, onValue, remove, update, get } from "https
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
+import { softDelete } from './deletePost.js';
+
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -518,10 +520,12 @@ window.saveEdit = () => {
   }).then(()=>window.closeModal('editModal'));
 };
 
-window.deleteFeature = () => {
-  if (currentFeatureId) {
-    remove(ref(db,`features/${currentFeatureId}`)).then(()=>{window.closeModal('confirmModal');window.showList();});
-  }
+
+window.deleteFeature = async () => {
+    if (currentFeatureId) {
+        await softDelete('features', currentFeatureId);
+        window.closeModal('confirmModal'); window.showList();
+    }
 };
 
 window.filterByTag = (btn, tag) => {

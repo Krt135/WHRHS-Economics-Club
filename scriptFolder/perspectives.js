@@ -4,6 +4,8 @@ import { getDatabase, ref, push, set, onValue, remove, update, get } from "https
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
+import { softDelete } from './deletePost.js';
+
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -508,9 +510,11 @@ window.saveEdit = () => {
   update(ref(db,`perspectives/${currentPostId}`),updatedData).then(()=>window.closeModal('editModal'));
 };
 
-window.deletePost = () => {
-  if(currentPostId){
-    remove(ref(db,`perspectives/${currentPostId}`)).then(()=>{window.closeModal('confirmModal');window.showList();});
-  }
+
+window.deletePost = async () => {
+    if (currentPostId) {
+        await softDelete('perspectives', currentPostId);
+        window.closeModal('confirmModal'); window.showList();
+    }
 };
 

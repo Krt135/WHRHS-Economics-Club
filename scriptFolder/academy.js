@@ -3,6 +3,8 @@ import { getDatabase, ref, push, set, onValue, remove, update, get } from "https
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
+import { softDelete } from './deletePost.js';
+
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -367,8 +369,8 @@ async function saveEdit() {
 }
 
 async function deleteLesson() {
-  await remove(ref(db,`lessons/${currentId}`));
-  closeModal("confirmModal"); showList();
+    await softDelete('lessons', currentId);
+    closeModal("confirmModal"); showList();
 }
 
 // ─────────────────────────────────────────────
