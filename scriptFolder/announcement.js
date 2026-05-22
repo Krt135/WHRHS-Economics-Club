@@ -30,7 +30,6 @@ const style = `
 
     .announcement-bar.empty { display: none; }
 
-    /* Info = navy, Urgent = gold */
     .announcement-bar.type-info {
       background: #0f1f3d;
       color: #fff;
@@ -95,7 +94,7 @@ const style = `
     }
 
     .slide-text {
-      font-size: 0.88rem;
+      font-size: 1.5rem;
       font-weight: 400;
       line-height: 1.3;
     }
@@ -115,6 +114,24 @@ const style = `
 
     .type-info .slide-link { color: #c9a84c; }
     .type-urgent .slide-link { color: #0f1f3d; }
+
+    /* ── Read more button ──────────────────────────────────────────── */
+    .read-more-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      padding: 0 0 0 4px;
+      color: inherit;
+      opacity: 0.75;
+      transition: opacity 0.15s;
+    }
+
+    .read-more-btn:hover { opacity: 1; }
 
     /* ── Dots ──────────────────────────────────────────────────────── */
     .dots {
@@ -167,7 +184,6 @@ const style = `
 
     .admin-bar.visible { display: block; }
 
-    /* Collapsed trigger */
     .admin-trigger {
       display: flex;
       align-items: center;
@@ -185,10 +201,8 @@ const style = `
     }
 
     .admin-trigger:hover { color: #c9a84c; }
-
     .admin-trigger svg { flex-shrink: 0; }
 
-    /* Expanded compose form */
     .admin-compose {
       display: none;
       align-items: center;
@@ -215,7 +229,6 @@ const style = `
 
     .compose-input::placeholder { color: rgba(255,255,255,0.35); }
     .compose-input:focus { border-color: rgba(201,168,76,0.6); }
-
     .compose-input.short { flex: 0 0 180px; min-width: 0; }
 
     .compose-select {
@@ -248,16 +261,61 @@ const style = `
 
     .compose-btn:hover { opacity: 0.88; transform: translateY(-1px); }
     .compose-btn:active { transform: translateY(0); }
+    .compose-btn.post { background: #c9a84c; color: #0f1f3d; }
+    .compose-btn.cancel { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
 
-    .compose-btn.post {
-      background: #c9a84c;
+    /* ── Read more popup ───────────────────────────────────────────── */
+    .ann-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ann-overlay.open { display: flex; }
+
+    .ann-popup {
+      background: #fff;
+      border-radius: 10px;
+      padding: 32px 36px;
+      max-width: 480px;
+      width: 90%;
+      position: relative;
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-size: 1.05rem;
       color: #0f1f3d;
+      line-height: 1.6;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
 
-    .compose-btn.cancel {
-      background: rgba(255,255,255,0.08);
-      color: rgba(255,255,255,0.6);
+    .ann-popup-close {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #6b7280;
+      transition: color 0.15s;
+      line-height: 1;
     }
+
+    .ann-popup-close:hover { color: #0f1f3d; }
+
+    .ann-popup-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #c9a84c;
+      margin-bottom: 10px;
+    }
+
+    .ann-popup-text { margin: 0; }
   </style>
 `;
 
@@ -271,50 +329,57 @@ class TEFAnnouncement extends HTMLElement {
     this._isAdmin = false;
   }
 
-async connectedCallback() {
-  try {
-    const active = this.getAttribute('active-page') || 'nexus';
-    
-    this.shadowRoot.innerHTML = style + `
-      <!-- Admin post bar -->
-      <div class="admin-bar" id="admin-bar">
-        <div class="admin-trigger" id="admin-trigger">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Post Announcement
+  async connectedCallback() {
+    try {
+      this.shadowRoot.innerHTML = style + `
+        <!-- Admin post bar -->
+        <div class="admin-bar" id="admin-bar">
+          <div class="admin-trigger" id="admin-trigger">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Post Announcement
+          </div>
+          <div class="admin-compose" id="admin-compose">
+            <input class="compose-input" id="compose-msg" type="text" placeholder="Announcement message…" />
+            <input class="compose-input short" id="compose-link-text" type="text" placeholder="Link text (optional)" />
+            <input class="compose-input short" id="compose-url" type="text" placeholder="URL (optional)" />
+            <select class="compose-select" id="compose-type">
+              <option value="info">Info</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <button class="compose-btn post" id="compose-post">Post</button>
+            <button class="compose-btn cancel" id="compose-cancel">✕</button>
+          </div>
         </div>
-        <div class="admin-compose" id="admin-compose">
-          <input class="compose-input" id="compose-msg" type="text" placeholder="Announcement message…" />
-          <input class="compose-input short" id="compose-link-text" type="text" placeholder="Link text (optional)" />
-          <input class="compose-input short" id="compose-url" type="text" placeholder="URL (optional)" />
-          <select class="compose-select" id="compose-type">
-            <option value="info">Info</option>
-            <option value="urgent">Urgent</option>
-          </select>
-          <button class="compose-btn post" id="compose-post">Post</button>
-          <button class="compose-btn cancel" id="compose-cancel">✕</button>
-        </div>
-      </div>
 
-      <!-- Announcement display bar -->
-      <div class="announcement-bar empty type-info" id="ann-bar">
-        <div class="slides-wrap" id="slides-wrap"></div>
-        <button class="delete-btn" id="delete-btn" style="display:none" title="Delete announcement">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-          </svg>
-        </button>
-        <div class="dots" id="dots"></div>
-      </div>
-    `;
-    
-    this._bindAdminUI();
-    this._listenToAnnouncements();
-    this._checkAuth();
-  } catch(err) {
-    console.error("TEF Announcement error:", err);
-  }
+        <!-- Announcement display bar -->
+        <div class="announcement-bar empty type-info" id="ann-bar">
+          <div class="slides-wrap" id="slides-wrap"></div>
+          <button class="delete-btn" id="delete-btn" style="display:none" title="Delete announcement">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+          <div class="dots" id="dots"></div>
+        </div>
+
+        <!-- Read more popup -->
+        <div class="ann-overlay" id="ann-overlay">
+          <div class="ann-popup">
+            <button class="ann-popup-close" id="ann-popup-close">✕</button>
+            <div class="ann-popup-label" id="ann-popup-label">Announcement</div>
+            <p class="ann-popup-text" id="ann-popup-text"></p>
+          </div>
+        </div>
+      `;
+
+      this._bindAdminUI();
+      this._listenToAnnouncements();
+      this._checkAuth();
+    } catch(err) {
+      console.error("TEF Announcement error:", err);
+    }
   }
 
   _checkAuth() {
@@ -357,18 +422,24 @@ async connectedCallback() {
     }
 
     bar.classList.remove('empty');
-
-    // Set bar color based on first/current announcement type
     this._updateBarType();
 
-    // Build slides
     this._announcements.forEach((ann, i) => {
       const slide = document.createElement('div');
       slide.className = 'slide' + (i === 0 ? ' active' : '');
       slide.dataset.index = i;
 
       const badge = `<span class="slide-badge">${ann.type === 'urgent' ? '⚠ Urgent' : 'Info'}</span>`;
-      const text = `<span class="slide-text">${ann.message}</span>`;
+
+      // Truncate if over 80 chars
+      const fullText = ann.message;
+      const isTruncated = fullText.length > 80;
+      const displayText = isTruncated ? fullText.substring(0, 80) + '…' : fullText;
+      const text = `<span class="slide-text">
+        ${displayText}
+        ${isTruncated ? `<button class="read-more-btn" data-full="${fullText.replace(/"/g, '&quot;')}" data-type="${ann.type}">Read more</button>` : ''}
+      </span>`;
+
       const link = ann.url
         ? `<a class="slide-link" href="${ann.url}" target="_blank" rel="noopener">${ann.linkText || 'Learn more'} →</a>`
         : '';
@@ -376,16 +447,13 @@ async connectedCallback() {
       slide.innerHTML = badge + text + link;
       wrap.appendChild(slide);
 
-      // Dot
       const dot = document.createElement('div');
       dot.className = 'dot' + (i === 0 ? ' active' : '');
       dots.appendChild(dot);
     });
 
-    // Hide dots if only one
     dots.style.display = this._announcements.length > 1 ? 'flex' : 'none';
 
-    // Cycle if multiple
     if (this._announcements.length > 1) {
       this._cycleTimer = setInterval(() => this._nextSlide(), 4500);
     }
@@ -457,6 +525,19 @@ async connectedCallback() {
       if (!ann) return;
       if (!confirm('Delete this announcement?')) return;
       await remove(ref(db, `announcements/${ann.id}`));
+    });
+
+    // Read more popup handlers
+    this.shadowRoot.addEventListener('click', (e) => {
+      if (e.target.classList.contains('read-more-btn')) {
+        this.shadowRoot.getElementById('ann-popup-text').textContent = e.target.dataset.full;
+        this.shadowRoot.getElementById('ann-popup-label').textContent =
+          e.target.dataset.type === 'urgent' ? '⚠ Urgent Announcement' : 'Announcement';
+        this.shadowRoot.getElementById('ann-overlay').classList.add('open');
+      }
+      if (e.target.id === 'ann-popup-close' || e.target.id === 'ann-overlay') {
+        this.shadowRoot.getElementById('ann-overlay').classList.remove('open');
+      }
     });
   }
 
