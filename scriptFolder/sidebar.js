@@ -40,15 +40,25 @@ class SpecialSidebar extends HTMLElement {
 
     <a class="nav-item ${active === 'trading' ? 'active' : ''}" href="trading-floor.html">
     <span class="nav-icon">
-  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-    <path d="M6 9V15" />
-    <path d="M3 12H9" />
-    
-    <path d="M18.5 9V9" stroke-width="3" /> <path d="M16 11.5V11.5" stroke-width="3" /> <path d="M21 11.5V11.5" stroke-width="3" /> <path d="M18.5 14V14" stroke-width="3" /> <path d="M12 21C14 21 16 20 18 20C20 20 22 18 22 16V10C22 8 20 6 18 6H6C4 6 2 8 2 10V16C2 18 4 20 6 20C8 20 10 21 12 21Z" />
-    
-    <path d="M16 6V4C16 3 17 2 18 2H20V6" />
-    <path d="M8 6V4C8 3 7 2 6 2H4V6" />
-  </svg>
+  <svg 
+  xmlns="http://www.w3.org/2000/svg" 
+  width="18" 
+  height="18" 
+  viewBox="0 0 24 24" 
+  fill="none" 
+  stroke="currentColor" 
+  stroke-width="2" 
+  stroke-linecap="round" 
+  stroke-linejoin="round"
+>
+  <rect x="2" y="6" width="20" height="12" rx="4" />
+  
+  <line x1="6" y1="12" x2="10" y2="12" />
+  <line x1="8" y1="10" x2="8" y2="14" />
+  
+  <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
+  <circle cx="18" cy="10" r="1" fill="currentColor" stroke="none" />
+</svg>
 </span>
     Game Hub
 </a>
