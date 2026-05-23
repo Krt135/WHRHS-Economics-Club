@@ -40,7 +40,7 @@ onValue(latestRef, (snapshot) => {
         
         <div class="hp-meta">
           <span class="hp-author">
-            ${profileAvatarHtml(d.authorId, "span", "hp-av", "background:#c9a84c", esc(d.authorInitials || "??"), { stopPropagation: true })}
+            ${profileAvatarHtml(d.authorId, "span", "hp-av", "", esc(d.authorInitials || "??"), { stopPropagation: true, role: d.authorRole || "member" })}
             ${esc(d.author)}
           </span>
           <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${rel(d.postedAt)}</span>

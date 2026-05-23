@@ -76,23 +76,6 @@ function getDisplayName() {
   return "Member";
 }
 
-const COLOURS = ["#0f1f3d", "#1a2e52", "#7c3aed", "#0369a1", "#065f46", "#92400e"];
-function avColour(name) {
-  let h = 0;
-  for (let c of (name || "")) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
-  return COLOURS[h];
-}
-function esc(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function rel(ts) {
-  if (!ts) return "just now";
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + " min ago";
-  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
-  return Math.floor(s / 86400) + " days ago";
-}
 
 // ─────────────────────────────────────────────
 //  FIREBASE LISTENERS
@@ -163,7 +146,7 @@ function renderDiscussions() {
       ${tags.length ? `<div class="disc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="disc-meta">
         <span class="author">
-          ${profileAvatarHtml(d.authorId, "span", "author-av", `background:${avColour(d.author)}`, esc(d.authorInitials || "?"), { stopPropagation: true })}
+          ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
           ${esc(d.author)}
         </span>
         <span>·</span>
@@ -231,7 +214,7 @@ function renderDiscussionView() {
       const canDeleteReply = currentUser && (r.authorId === currentUser.uid || userRole === "admin");
       return `
         <div class="reply-item" style="display:flex; gap:8px; margin-top:12px;">
-          ${profileAvatarHtml(r.authorId, "div", "comment-av", `background:${avColour(r.author)}; width:24px; height:24px; font-size:10px;`, esc(r.initials || "?"))}
+          ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
           <div class="comment-bubble" style="flex:1;">
             <div class="comment-hdr">
               <span class="comment-author">${esc(r.author)}</span>
@@ -254,7 +237,7 @@ function renderDiscussionView() {
 
     return `
     <div class="comment-item ${cmtTheme}">
-      ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avColour(c.author)}`, esc(c.initials || "?"))}
+      ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
       <div class="comment-bubble">
         <div class="comment-hdr">
           <span class="comment-author">${esc(c.author)}</span>
@@ -676,6 +659,19 @@ async function votePoll(pollKey, optIndex) {
 // ─────────────────────────────────────────────
 //  UI HELPERS
 // ─────────────────────────────────────────────
+
+function esc(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function rel(ts) {
+  if (!ts) return "just now";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
+  return Math.floor(s / 86400) + " days ago";
+}
 
 function showList() {
   currentDiscId = null;

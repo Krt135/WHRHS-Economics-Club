@@ -40,15 +40,6 @@ let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
 
-const COLOURS = ['#0f1f3d','#1a2e52','#7c3aed','#0369a1','#065f46','#92400e','#9f1239'];
-function avatarColour(name) { let h=0; for(let c of (name||'')) h=(h*31+c.charCodeAt(0))%COLOURS.length; return COLOURS[h]; }
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function rel(date) {
-  const s=Math.floor((Date.now()-date)/1000);
-  if(s<60)return'just now'; if(s<3600)return Math.floor(s/60)+' min ago';
-  if(s<86400)return Math.floor(s/3600)+' hours ago'; return Math.floor(s/86400)+' days ago';
-}
-
 // NEW HELPER: Automatically gets the best name to display
 function getDisplayName() {
   if (userProfile && userProfile.displayName) {
@@ -60,9 +51,21 @@ function getDisplayName() {
   return "Member";
 }
 
+function rel(ts) {
+  if (!ts) return "just now";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
+  return Math.floor(s / 86400) + " days ago";
+}
+
 // Per-user like helpers
 function myLiked(p)    { return !!(currentUser && p.userLikes    && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
+function esc(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 // 4. ── WINDOW BINDINGS ──
 window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
@@ -236,7 +239,7 @@ function renderList() {
       
       <div class="pc-meta">
         <span class="author-chip">
-          ${profileAvatarHtml(p.authorId, "span", "author-av", `background:${avatarColour(p.author)}`, esc(p.authorInitials || '?'), { stopPropagation: true })}
+          ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
           ${esc(p.author)}
         </span>
         <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
@@ -305,7 +308,7 @@ function renderArticle() {
         
         return `
         <div class="comment-item ${commentTheme}">
-          ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avatarColour(c.author)}`, esc(c.initials || "?"))}
+          ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
           <div class="comment-bubble">
             <div class="comment-header">
               <span class="comment-author-name">${esc(c.author)}</span>
@@ -333,7 +336,7 @@ function renderArticle() {
     <div class="article-title">${esc(p.title)}</div>
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
-        ${profileAvatarHtml(p.authorId, "span", "author-av", `background:${avatarColour(p.author)};width:24px;height:24px;font-size:9px`, esc(p.authorInitials || "?"))}
+        ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
         <strong>${esc(p.author)}</strong>
       </span>
       <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>

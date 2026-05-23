@@ -196,7 +196,7 @@ function renderList() {
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">
-          ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { stopPropagation: true })}
+          ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { role: f.authorRole || "member" })}
           ${escHtml(f.author)}
         </span>
         <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
@@ -272,7 +272,8 @@ function renderArticle() {
         
         return `
         <div class="comment-item" id="comment-${c.id}">
-          ${profileAvatarHtml(c.authorId, "div", "comment-av", "", escHtml(c.initials || "?"))}
+          ${profileAvatarHtml(c.authorId, "span", "author-av", "", escHtml(c.initials || "?"), { role: c.authorRole || "member" })}
+
           <div class="comment-bubble">
             <div class="comment-bubble-header">
               <span class="comment-author-name">${escHtml(c.author)}</span>
@@ -299,7 +300,7 @@ function renderArticle() {
     <div class="article-title">${escHtml(f.title)}</div>
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
-        ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"))}
+        ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { role: f.authorRole || "member" })}
         <strong>${escHtml(f.author)}</strong>
       </span>
       <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
@@ -449,7 +450,7 @@ window.openReactions = (id) => {
   const reactionMap = f.reactionsByUser || {};
   const list = Object.values(reactionMap);
   const html = list.length
-    ? list.map(r => `<div class="reaction-row">${profileAvatarHtml(r.uid, "div", "avatar-sm", "", escHtml(r.initials))}${escHtml(r.name)}<span class="reaction-type">${r.type}</span></div>`).join("")
+    ? list.map(r => `<div class="reaction-row">${profileAvatarHtml(r.uid, "div", "avatar-sm", "", escHtml(r.initials), { role: r.role || "member" })}${escHtml(r.name)}<span class="reaction-type">${r.type}</span></div>`).join("")
     : '<p style="color:#9ca3af;font-size:14px;padding:12px 0">No reactions yet.</p>';
   document.getElementById('reactionsList').innerHTML = html;
   window.openModal('reactionsModal');
@@ -460,11 +461,16 @@ window.postComment = (featureId) => {
   const input = document.getElementById('newCommentInput');
   if (!input || !input.value.trim()) return;
   const name = getDisplayName(currentUser);
-  set(push(ref(db, `features/${featureId}/comments`)), {
-    author: name, initials: name.substring(0,2).toUpperCase(),
-    authorId: currentUser.uid, text: input.value.trim(),
-    postedAt: Date.now(), likes: 0, liked: false
-  });
+  set(push(ref(db, 'features')), {
+    title, content, tag,
+    author: name,
+    authorInitials: name.substring(0,2).toUpperCase(),
+    authorId: currentUser.uid,
+    authorRole: userRole,   // ← add this line
+    postedAt: Date.now(),
+    likes: 0,
+    dislikes: 0
+})
   input.value = '';
 };
 
