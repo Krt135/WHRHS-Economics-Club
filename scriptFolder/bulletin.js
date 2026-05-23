@@ -53,17 +53,8 @@ function rel(ts) {
   return Math.floor(s / 86400) + " days ago";
 }
 
-const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
-function avColour(name) {
-  let h = 0;
-  for (let c of (name || "")) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length;
-  return COLOURS[h];
-}
-
 // ─────────────────────────────────────────────
 //  FIREBASE LISTENER
-//  bulletin/{id} stores: { discussionId, title, author,
-//    authorInitials, body, tags, pinnedAt, pinnedBy }
 // ─────────────────────────────────────────────
 
 let bulletinItems = [];
@@ -109,7 +100,7 @@ function renderBulletin() {
       ${tags.length ? `<div class="bc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="bc-meta">
         <span class="author-chip">
-          ${profileAvatarHtml(item.authorId, "span", "author-av", `background:${avColour(item.author)}`, esc(item.authorInitials || "?"), { stopPropagation: true })}
+          ${profileAvatarHtml(item.authorId, "span", "author-av", "", esc(item.authorInitials || "?"), { stopPropagation: true, role: item.authorRole || "member" })}
           ${esc(item.author)}
         </span>
         <span>·</span>
@@ -131,18 +122,11 @@ function renderBulletin() {
 }
 
 // ─────────────────────────────────────────────
-//  NAVIGATION — click a card → go to the-floor
-//  We store the target discussion ID in sessionStorage
-//  so the-floor.js can open it directly on load.
-// ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
-//  NAVIGATION — Route to the correct page
+//  NAVIGATION
 // ─────────────────────────────────────────────
 
 function goToPost(originalId, type) {
-  // If it's an old database entry without a type, assume it's from the floor
-  const targetType = type || 'floor'; 
+  const targetType = type || 'floor';
 
   if (targetType === 'perspective') {
     sessionStorage.setItem("openPerspective", originalId);
@@ -150,10 +134,10 @@ function goToPost(originalId, type) {
   } else if (targetType === 'weekly') {
     sessionStorage.setItem("openFeature", originalId);
     window.location.href = "weekly-feature.html";
-  } else if (type === 'floor') {
+  } else if (targetType === 'floor') {
     sessionStorage.setItem("openFloorPost", originalId);
     window.location.href = "the-floor.html";
-}
+  }
 }
 
 // ─────────────────────────────────────────────

@@ -370,6 +370,7 @@ window.publishFeature = async () => {
     author: name, 
     authorInitials: name.substring(0,2).toUpperCase(), 
     authorId: currentUser.uid,
+    authorRole: userRole,
     postedAt: Date.now(), 
     likes: 0, 
     dislikes: 0
@@ -461,16 +462,11 @@ window.postComment = (featureId) => {
   const input = document.getElementById('newCommentInput');
   if (!input || !input.value.trim()) return;
   const name = getDisplayName(currentUser);
-  set(push(ref(db, 'features')), {
-    title, content, tag,
-    author: name,
-    authorInitials: name.substring(0,2).toUpperCase(),
-    authorId: currentUser.uid,
-    authorRole: userRole,   // ← add this line
-    postedAt: Date.now(),
-    likes: 0,
-    dislikes: 0
-})
+  set(push(ref(db, `features/${featureId}/comments`)), {
+    author: name, initials: name.substring(0,2).toUpperCase(),
+    authorId: currentUser.uid, authorRole: userRole, text: input.value.trim(),
+    postedAt: Date.now(), likes: 0, liked: false
+  });
   input.value = '';
 };
 

@@ -155,13 +155,14 @@ class SpecialSidebar extends HTMLElement {
                     }
 
                     // Render Profile View
-                    const initials = data.email.substring(0, 2).toUpperCase();
+                    const initials = (data.displayName || data.email).substring(0, 2).toUpperCase();
+                    const bgColor = data.role === 'admin' ? '#c9a84c' : '#0f1f3d';
                     const displayName = data.displayName || data.email.split('@')[0];
                     const displayRole = data.role.toUpperCase();
 
                     footerContent.innerHTML = `
                     <div class="user-profile-block" style="display: flex; align-items: center; gap: 12px;">
-                        <div class="avatar-circle" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 12px;">
+                        <div class="avatar-circle" style="width:36px;height:36px;border-radius:50%;background:${bgColor};color:${data.role === 'admin' ? '#0f1f3d' : '#fff'};border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:12px;">
                             ${initials}
                         </div>
                         <div class="user-info" onclick="window.location.href='profile.html'" style="cursor:pointer">
