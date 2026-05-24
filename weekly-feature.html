@@ -43,11 +43,12 @@
         <div class="filter-bar" id="filterBar">
           <span class="filter-label">FILTER:</span>
           <button class="filter-tag active" onclick="window.filterByTag(this,'all')">All</button>
-          <button class="filter-tag" onclick="window.filterByTag(this,'macroeconomics')">macroeconomics</button>
-          <button class="filter-tag" onclick="window.filterByTag(this,'fed-policy')">fed-policy</button>
-          <button class="filter-tag" onclick="window.filterByTag(this,'trade')">trade</button>
-          <button class="filter-tag" onclick="window.filterByTag(this,'inflation')">inflation</button>
-          <button class="filter-tag" onclick="window.filterByTag(this,'debate')">debate</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Macro')">Macro</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Micro')">Micro</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Money')">Money</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Trade')">Trade</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Markets')">Markets</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
         </div>
         
         <div id="featuresList"></div>
@@ -82,10 +83,17 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Topic Tag</label>
-        <input class="form-input" id="pubTag" type="text" placeholder="e.g. fed-policy, inflation, trade...">
-        <div class="form-hint">One primary tag for categorization.</div>
-      </div>
+  <label class="form-label">Topic</label>
+  <select class="form-input" id="pubTag">
+    <option value="">All</option>
+    <option value="Macro">Macro</option>
+    <option value="Micro">Micro</option>
+    <option value="Money">Money</option>
+    <option value="Trade">Trade</option>
+    <option value="Markets">Markets</option>
+    <option value="Policy">Policy</option>
+  </select>
+</div>
 
       <div class="form-group">
         <label class="form-label">Essay Content</label>
@@ -108,9 +116,17 @@
         <input class="form-input" id="editTitle" type="text">
       </div>
       <div class="form-group">
-        <label class="form-label">Topic Tag</label>
-        <input class="form-input" id="editTag" type="text">
-      </div>
+  <label class="form-label">Topic</label>
+  <select class="form-input" id="pubTag">
+    <option value="">All</option>
+    <option value="Macro">Macro</option>
+    <option value="Micro">Micro</option>
+    <option value="Money">Money</option>
+    <option value="Trade">Trade</option>
+    <option value="Markets">Markets</option>
+    <option value="Policy">Policy</option>
+  </select>
+</div>
       <div class="form-group">
         <label class="form-label">Essay Content</label>
         <textarea class="form-textarea" id="editContent" oninput="window.updateEditWordCount()"></textarea>

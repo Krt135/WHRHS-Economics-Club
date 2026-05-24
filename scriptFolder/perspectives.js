@@ -40,7 +40,6 @@ let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
 
-// NEW HELPER: Automatically gets the best name to display
 function getDisplayName() {
   if (userProfile && userProfile.displayName) {
     return userProfile.displayName;
@@ -60,7 +59,6 @@ function rel(ts) {
   return Math.floor(s / 86400) + " days ago";
 }
 
-// Per-user like helpers
 function myLiked(p)    { return !!(currentUser && p.userLikes    && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
 function esc(s) {
@@ -110,7 +108,6 @@ window.togglePin = async (id, alreadyPinned) => {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
-    // Find the specific bulletin entry matching this perspective ID
     const entry = Object.entries(data).find(([, v]) => v.originalId === id && v.type === 'perspective');
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
   } else {
@@ -122,12 +119,13 @@ window.togglePin = async (id, alreadyPinned) => {
 
     await set(push(ref(db, "bulletin")), {
       originalId: id,
-      type: 'perspective', // We tag it so the bulletin knows where it came from
+      type: 'perspective',
       title: p.title,
       body: p.content || "",
       author: p.author,
       authorId: p.authorId || null,
       authorInitials: p.authorInitials || "?",
+      authorRole: p.authorRole || userRole,
       tags: p.tags || [],
       postedAt: p.postedAt,
       commentCount,
@@ -135,14 +133,12 @@ window.togglePin = async (id, alreadyPinned) => {
       pinnedBy: name
     });
   }
-  // Re-render to update the button UI
   renderArticle();
 };
 
 // 5. ── FIREBASE LISTENER ──
 onValue(ref(db, 'perspectives'), (snapshot) => {
   const data = snapshot.val();
-  console.log("Firebase Data Received:", data ? "Success" : "Empty"); // Debugging log
 
   if (data) {
     posts = Object.keys(data).map(key => {
@@ -151,15 +147,11 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
       return { id: key, ...post, comments: commentsArray, tags: post.tags || [], postedAt: post.postedAt };
     });
 
-    // Check if our currentPostId actually exists in the data we just got
     if (currentPostId) {
       const postExists = posts.find(p => p.id === currentPostId);
       if (postExists) {
-        console.log("Post found, rendering article:", currentPostId);
-        // We found it! Now we can safely clear the session storage
         sessionStorage.removeItem("openPerspective");
       } else {
-        console.warn("Target ID not found in posts, defaulting to list.");
         currentPostId = null;
       }
     }
@@ -167,9 +159,7 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
     posts = [];
   }
 
-  // Final render decision
   if (currentPostId) {
-    // Force the view switch before rendering
     document.getElementById('viewList').classList.remove('active');
     document.getElementById('viewArticle').classList.add('active');
     renderArticle();
@@ -181,10 +171,10 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
 // 6. ── RENDER FUNCTIONS ──
 function rebuildFilterBar() {
   const bar = document.getElementById('filterBar'); if(!bar) return;
-  const allTags = [...new Set(posts.flatMap(p=>p.tags))].sort();
+  const topics = ['Macro', 'Micro', 'Money', 'Trade', 'Markets', 'Policy'];
   bar.innerHTML = `<span class="filter-label">FILTER:</span>
     <button class="filter-tag ${activeTag==='all'?'active':''}" onclick="filterTag(this,'all')">All</button>
-    ${allTags.map(t=>`<button class="filter-tag ${activeTag===t?'active':''}" onclick="filterTag(this,'${t}')">${esc(t)}</button>`).join('')}`;
+    ${topics.map(t=>`<button class="filter-tag ${activeTag===t?'active':''}" onclick="filterTag(this,'${t}')">${t}</button>`).join('')}`;
 }
 
 function renderList() {
@@ -194,7 +184,6 @@ function renderList() {
 
   let filtered = posts.filter(p => {
     const matchTag = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
-    // Added safety check for p.tags.some
     const matchSearch = !q || 
                         p.title.toLowerCase().includes(q) || 
                         p.author.toLowerCase().includes(q) || 
@@ -202,7 +191,6 @@ function renderList() {
     return matchTag && matchSearch;
   });
 
-  // Sorting
   if (sortMode === 'oldest') filtered.sort((a, b) => a.postedAt - b.postedAt);
   else if (sortMode === 'popular') filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
   else filtered.sort((a, b) => b.postedAt - a.postedAt);
@@ -218,10 +206,8 @@ function renderList() {
   el.innerHTML = filtered.map(p => {
     const iLiked = myLiked(p);
     const iDisliked = myDisliked(p);
-    // Safer excerpt generation
     const excerpt = p.content ? (p.content.split('\n\n')[0].slice(0, 240) + (p.content.length > 240 ? '…' : '')) : '';
 
-    // THEME LOGIC
     const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
                     : (p.authorRole === "admin") ? "theme-exec" 
                     : "theme-member";
@@ -274,7 +260,8 @@ function renderArticle() {
                   : (p.authorRole === "admin") ? "theme-exec" 
                   : "theme-member";
 
-  const canModify = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
+  const canEdit   = currentUser && p.authorId === currentUser.uid;
+  const canDelete = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
   const isAdmin = userRole === 'admin';
 
   get(ref(db, "bulletin")).then(snap => {
@@ -282,10 +269,11 @@ function renderArticle() {
     const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === p.id && b.type === 'perspective');
 
     document.getElementById('articleTopActions').innerHTML = `
-      ${canModify ? `
+      ${canEdit ? `
         <button class="topbar-btn btn-edit" onclick="openEditModal()">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
-        </button>
+        </button>` : ''}
+      ${canDelete ? `
         <button class="topbar-btn btn-delete" onclick="openModal('confirmModal')">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
         </button>` : ''}
@@ -298,17 +286,14 @@ function renderArticle() {
 
   const commentsHtml = p.comments.length
     ? p.comments.map(c => {
-        // --- NEW INDIVIDUAL LIKE LOGIC ---
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
         const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        // ---------------------------------
-
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         const commentTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
         
         return `
         <div class="comment-item ${commentTheme}">
-          ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
+          ${profileAvatarHtml(c.authorId, "span", "author-av", "", esc(c.initials || "?"), { role: c.authorRole || "member" })}
           <div class="comment-bubble">
             <div class="comment-header">
               <span class="comment-author-name">${esc(c.author)}</span>
@@ -374,12 +359,12 @@ window.publishPost = () => {
   if (!currentUser) return alert("Please log in to post.");
   const title   = document.getElementById('wTitle').value.trim();
   const content = document.getElementById('wContent').value.trim();
-  const tagsRaw = document.getElementById('wTags').value.trim();
+  const tag     = document.getElementById('wTags').value;
   if(!title){document.getElementById('wTitle').focus();return;}
   if(!content){document.getElementById('wContent').focus();return;}
   
   const name = getDisplayName();
-  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+  const tags = tag ? [tag] : [];
 
   set(push(ref(db,'perspectives')),{
     title, 
@@ -388,7 +373,7 @@ window.publishPost = () => {
     author: name, 
     authorInitials: name.substring(0,2).toUpperCase(), 
     authorId: currentUser.uid,
-    authorRole: userRole, // <--- ADD THIS LINE
+    authorRole: userRole,
     image: pendingImgData||null, 
     postedAt: Date.now(),
     likes: 0, 
@@ -415,9 +400,8 @@ window.react = (id, type) => {
   let likes    = p.likes    || 0;
   let dislikes = p.dislikes || 0;
 
-  // 1. Target the specific post, NOT the root db
   const postRef = ref(db, `perspectives/${id}`);
-  const updates = {}; // Keys will now be relative to the post
+  const updates = {};
 
   if (type === 'like') {
     if (wasLiked) { 
@@ -445,11 +429,9 @@ window.react = (id, type) => {
     }
   }
 
-  // Update the counters
   updates[`likes`] = likes;
   updates[`dislikes`] = dislikes;
   
-  // 2. Execute the update specifically on this post
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
 
@@ -476,7 +458,6 @@ window.likeComment = async (postId, cmtId) => {
   const p = posts.find(x => x.id === postId); if (!p) return;
   const c = p.comments.find(x => x.id === cmtId); if (!c) return;
 
-  // Check if this specific user is in the userLikes object
   const hasLiked = c.userLikes && c.userLikes[uid];
   const likeRef = ref(db, `perspectives/${postId}/comments/${cmtId}/userLikes/${uid}`);
 
@@ -495,7 +476,7 @@ window.openEditModal = () => {
   const p=posts.find(x=>x.id===currentPostId); if(!p) return;
   document.getElementById('eTitle').value   = p.title;
   document.getElementById('eContent').value = p.content;
-  document.getElementById('eTags').value    = p.tags.join(', ');
+  document.getElementById('eTags').value    = p.tags[0] || '';
   document.getElementById('eWC').textContent = p.content.trim().split(/\s+/).length+' words';
   document.getElementById('eImgPreview').textContent='';
   editImgData=null;
@@ -507,17 +488,15 @@ window.saveEdit = () => {
   const updatedData={
     title:   document.getElementById('eTitle').value.trim()||p.title,
     content: document.getElementById('eContent').value.trim()||p.content,
-    tags:    document.getElementById('eTags').value.split(',').map(t=>t.trim()).filter(Boolean)
+    tags:    document.getElementById('eTags').value ? [document.getElementById('eTags').value] : []
   };
   if(editImgData) updatedData.image=editImgData;
   update(ref(db,`perspectives/${currentPostId}`),updatedData).then(()=>window.closeModal('editModal'));
 };
 
-
 window.deletePost = async () => {
-    if (currentPostId) {
-        await softDelete('perspectives', currentPostId);
-        window.closeModal('confirmModal'); window.showList();
-    }
+  if (currentPostId) {
+    await softDelete('perspectives', currentPostId);
+    window.closeModal('confirmModal'); window.showList();
+  }
 };
-

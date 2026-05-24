@@ -55,7 +55,13 @@
 
       <div class="filter-bar" id="filterBar">
         <span class="filter-label">FILTER:</span>
-        <button class="filter-tag active" onclick="window.filterTag(this,'all')">All</button>
+        <button class="filter-tag active" onclick="window.filterByTag(this,'all')">All</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Macro')">Macro</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Micro')">Micro</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Money')">Money</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Trade')">Trade</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Markets')">Markets</button>
+<button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
       </div>
 
       <div id="postsList"></div>
@@ -95,10 +101,19 @@
       <textarea class="form-textarea" id="wContent" placeholder="Write your post... Use @username to mention someone" oninput="wc('wContent','wWC')"></textarea>
       <div class="word-count" id="wWC">0 words</div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Tags (comma separated)</label>
-      <input class="form-input" id="wTags" type="text" placeholder="macroeconomics, fed-policy, debate...">
-    </div>
+    <!-- AFTER -->
+<div class="form-group">
+  <label class="form-label">Topic</label>
+  <select class="form-input" id="eTags">
+    <option value="">All</option>
+    <option value="Macro">Macro</option>
+    <option value="Micro">Micro</option>
+    <option value="Money">Money</option>
+    <option value="Trade">Trade</option>
+    <option value="Markets">Markets</option>
+    <option value="Policy">Policy</option>
+  </select>
+</div>
     <div class="form-group">
       <label class="form-label">Attachments</label>
       <div class="attach-area" onclick="document.getElementById('fileInput').click()">
@@ -126,10 +141,18 @@
       <textarea class="form-textarea" id="eContent" oninput="window.wc('eContent','eWC')"></textarea>
       <div class="word-count" id="eWC">0 words</div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Tags (comma separated)</label>
-      <input class="form-input" id="eTags" type="text">
-    </div>
+<div class="form-group">
+  <label class="form-label">Topic</label>
+  <select class="form-input" id="wTags">
+    <option value="">All</option>
+    <option value="Macro">Macro</option>
+    <option value="Micro">Micro</option>
+    <option value="Money">Money</option>
+    <option value="Trade">Trade</option>
+    <option value="Markets">Markets</option>
+    <option value="Policy">Policy</option>
+  </select>
+</div>
     <div class="form-group">
       <label class="form-label">Replace Image</label>
       <div class="attach-area" onclick="document.getElementById('editFileInput').click()">
