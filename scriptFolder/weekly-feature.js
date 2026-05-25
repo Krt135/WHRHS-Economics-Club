@@ -17,6 +17,7 @@ let userRole     = "public";
 let userProfile  = null;
 
 
+
 onAuthStateChanged(auth, async (user) => {
   // Grab the container, not just the button
   const adminControls = document.getElementById('admin-only-controls');
@@ -47,6 +48,7 @@ onAuthStateChanged(auth, async (user) => {
 let features         = [];
 let currentFeatureId = sessionStorage.getItem("openFeature") || null; // Immediately check storage
 let activeTag        = 'all';
+let pinnedIds = new Set();
 
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
@@ -155,7 +157,11 @@ onValue(ref(db, 'features'), (snapshot) => {
     document.getElementById('viewArticle').classList.add('active');
     renderArticle(); 
   } else { 
-    renderList(); 
+    get(ref(db, 'bulletin')).then(snap => {
+    const data = snap.val() || {};
+    pinnedIds = new Set(Object.values(data).map(v => v.originalId).filter(Boolean));
+    renderList();
+  });
   }
 });
 
@@ -190,9 +196,16 @@ function renderList() {
     // Create excerpt: first paragraph or first 200 chars
     const excerpt = f.content.split('\n\n')[0].slice(0, 200) + (f.content.length > 200 ? '…' : '');
     
-    return `
-    <div class="feature-card" onclick="showArticle('${f.id}')">
-      <div class="fc-title">${escHtml(f.title)}</div>
+    const isPinned = pinnedIds.has(f.id);
+
+return `
+<div class="feature-card" onclick="showArticle('${f.id}')">
+  ${isPinned ? `
+  <div class="pinned-badge">
+    <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+    Pinned to Bulletin
+  </div>` : ''}
+  <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">

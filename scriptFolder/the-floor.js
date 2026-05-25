@@ -30,6 +30,7 @@ let polls = {};
 let activeTag = "all";
 let attachedImageData = null;
 let isEditMode = false;
+let pinnedIds = new Set();
 
 // Check for deep links from Bulletin (Check both potential keys to be safe)
 let currentDiscId = sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
@@ -97,7 +98,11 @@ onValue(ref(db, "discussions"), snapshot => {
       showList();
     }
   } else {
+    get(ref(db, 'bulletin')).then(snap => {
+    const data = snap.val() || {};
+    pinnedIds = new Set(Object.values(data).map(v => v.originalId || v.discussionId).filter(Boolean));
     renderDiscussions();
+});
   }
 });
 
@@ -138,10 +143,17 @@ function renderDiscussions() {
       cardTheme = "theme-exec";
     }
 
-    return `
-    <div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
-      ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
-      <div class="disc-title">${esc(d.title)}</div>
+    const isPinned = pinnedIds.has(d._key);
+
+return `
+<div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
+  ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
+  <div class="disc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(d.title)}</div>
+  ${isPinned ? `
+  <div class="pinned-badge">
+    <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+    Pinned to Bulletin
+  </div>` : ''}
       <div class="disc-body">${esc(d.body)}</div>
       ${tags.length ? `<div class="disc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="disc-meta">

@@ -39,6 +39,7 @@ let activeTag = 'all';
 let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
+let pinnedIds = new Set();
 
 function getDisplayName() {
   if (userProfile && userProfile.displayName) {
@@ -164,7 +165,11 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
     document.getElementById('viewArticle').classList.add('active');
     renderArticle();
   } else {
+    get(ref(db, 'bulletin')).then(snap => {
+    const data = snap.val() || {};
+    pinnedIds = new Set(Object.values(data).map(v => v.originalId).filter(Boolean));
     renderList();
+});
   }
 });
 
@@ -212,12 +217,19 @@ function renderList() {
                     : (p.authorRole === "admin") ? "theme-exec" 
                     : "theme-member";
 
-    return `
-    <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
-      <div class="pc-header">
-        <div class="pc-title">${esc(p.title)}</div>
-        ${p.featured ? `<span class="featured-badge">FEATURED</span>` : ''}
-      </div>
+    const isPinned = pinnedIds.has(p.id);
+
+return `
+<div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
+  <div class="pc-header">
+    <div class="pc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(p.title)}</div>
+    ${p.featured ? `<span class="featured-badge">FEATURED</span>` : ''}
+    ${isPinned ? `
+    <div class="pinned-badge">
+      <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      Pinned to Bulletin
+    </div>` : ''}
+  </div>
       
       ${p.image ? `<img src="${p.image}" class="pc-image" alt="Post Image" loading="lazy">` : ''}
       
