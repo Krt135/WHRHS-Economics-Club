@@ -77,6 +77,7 @@ window.updateWordCount     = () => { document.getElementById('wordCount').textCo
 window.updateEditWordCount = () => { document.getElementById('editWordCount').textContent = wordCount(document.getElementById('editContent').value) + ' words'; };
 window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+window.renderList = renderList;
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
 
 window.showList = () => {
@@ -176,19 +177,31 @@ function renderList() {
     return; 
   }
 
-  // 2. Apply filtering
-  let displayFeatures = features;
-  if (activeTag && activeTag !== 'all') {
-    displayFeatures = features.filter(f => f.tag === activeTag);
-  }
+  const searchInput = document.getElementById('searchInput');
+  const q = searchInput ? searchInput.value.toLowerCase() : '';
 
-  // 3. Handle the "Filter" empty state (posts exist, but not for this tag)
+  // 2. Apply filtering (Search + Tags combined)
+  let displayFeatures = features.filter(f => {
+    // Check if the post matches the active tag
+    const matchTag = !activeTag || activeTag === 'all' || f.tag === activeTag;
+    
+    // Check if the post matches the search query (title, author, or tag)
+    const matchSearch = !q || 
+                        (f.title && f.title.toLowerCase().includes(q)) || 
+                        (f.author && f.author.toLowerCase().includes(q)) || 
+                        (f.tag && f.tag.toLowerCase().includes(q));
+                        
+    return matchTag && matchSearch;
+  });
+
+  // 3. Handle the "Filter" empty state (posts exist, but not for this tag/search)
   if (displayFeatures.length === 0) { 
-    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet for the tag "${escHtml(activeTag)}".</p></div>`; 
+    // Updated this string so it makes sense for both tag and search misses
+    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features found matching your search or tag criteria.</p></div>`; 
     return; 
   }
 
-  // 4. Render the filtered list (mapping over displayFeatures, NOT features)
+  // 4. Render the filtered list 
   el.innerHTML = displayFeatures.map(f => {
     const iLiked    = myLiked(f);
     const iDisliked = myDisliked(f);
@@ -196,45 +209,45 @@ function renderList() {
     // Create excerpt: first paragraph or first 200 chars
     const excerpt = f.content.split('\n\n')[0].slice(0, 200) + (f.content.length > 200 ? '…' : '');
     
-    const isPinned = pinnedIds.has(f.id);
+    const isPinned = typeof pinnedIds !== 'undefined' && pinnedIds.has(f.id);
 
-return `
-<div class="feature-card" onclick="showArticle('${f.id}')">
-  ${isPinned ? `
-  <div class="pinned-badge">
-    <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-    Pinned to Bulletin
-  </div>` : ''}
-  <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
-      <div class="fc-excerpt">${escHtml(excerpt)}</div>
-      <div class="fc-meta">
-        <span class="author-chip">
-          ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { role: f.authorRole || "member" })}
-          ${escHtml(f.author)}
-        </span>
-        <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-        </svg>
-        ${f.comments ? f.comments.length : 0}
-      </div>
-      ${f.tag ? `<div class="fc-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>` : ''}
-      <div class="fc-actions" onclick="event.stopPropagation()">
-        <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="reactFeature('${f.id}','like')">
-          <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
-          </svg>
-          ${f.likes || 0}
-        </button>
-        <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="reactFeature('${f.id}','dislike')">
-          <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
-          </svg>
-          ${f.dislikes || 0}
-        </button>
-        <span class="see-reactions" onclick="openReactions('${f.id}')">See reactions</span>
-      </div>
-    </div>`;
+    return `
+    <div class="feature-card" onclick="showArticle('${f.id}')">
+      ${isPinned ? `
+      <div class="pinned-badge">
+        <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Pinned to Bulletin
+      </div>` : ''}
+      <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
+          <div class="fc-excerpt">${escHtml(excerpt)}</div>
+          <div class="fc-meta">
+            <span class="author-chip">
+              ${profileAvatarHtml(f.authorId, "span", "author-av", "", escHtml(f.authorInitials || "?"), { role: f.authorRole || "member" })}
+              ${escHtml(f.author)}
+            </span>
+            <span>·</span><span>${relativeTime(f.postedAt)}</span><span>·</span>
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+            ${f.comments ? f.comments.length : 0}
+          </div>
+          ${f.tag ? `<div class="fc-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>` : ''}
+          <div class="fc-actions" onclick="event.stopPropagation()">
+            <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="reactFeature('${f.id}','like')">
+              <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+              </svg>
+              ${f.likes || 0}
+            </button>
+            <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="reactFeature('${f.id}','dislike')">
+              <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
+              </svg>
+              ${f.dislikes || 0}
+            </button>
+            <span class="see-reactions" onclick="openReactions('${f.id}')">See reactions</span>
+          </div>
+        </div>`;
   }).join('');
 }
 
