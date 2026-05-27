@@ -9,7 +9,7 @@
   --red: #dc2626; --red-bg: #fff1f2; --red-border: #fecdd3;
   --beginner: #16a34a; --beginner-bg: #dcfce7;
   --intermediate: #d97706; --intermediate-bg: #fef3c7;
-  --advanced: #dc2626; --advanced-bg: #fee2e2;
+  --advanced: #dc2626; --advanced-bg: #fee2e2; --blue: #3b84f7;
 }
   body { font-family: 'Crimson Pro', Georgia, serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; display: flex; overflow-x: hidden; position: relative;}
 
@@ -85,6 +85,6 @@ tef-announcement {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--blue);
   margin-top: 4px;
 }

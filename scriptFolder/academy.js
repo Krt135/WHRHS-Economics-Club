@@ -39,6 +39,13 @@ function getDisplayName(user) {
   return user.email.split('@')[0];
 }
 
+///WINDOW BINDINGS
+
+window.renderList = renderList;
+window.showList = showList;
+window.showLesson = showLesson;
+
+
 // ─────────────────────────────────────────────
 //  CONSTANTS / HELPERS
 // ─────────────────────────────────────────────

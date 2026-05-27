@@ -69,6 +69,7 @@ function esc(s) {
 // 4. ── WINDOW BINDINGS ──
 window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+window.renderList = renderList;
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
 
 window.wc = (textareaId, countId) => {
@@ -377,6 +378,9 @@ window.publishPost = () => {
   
   const name = getDisplayName();
   const tags = tag ? [tag] : [];
+
+  console.log("tag value:", document.getElementById('wTags').value);
+  console.log("tags array:", tags);
 
   set(push(ref(db,'perspectives')),{
     title, 

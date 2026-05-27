@@ -123,9 +123,7 @@ function renderDiscussions() {
     .map(([key, val]) => ({ ...val, _key: key }))
     .sort((a, b) => b.postedAt - a.postedAt);
 
-  if (activeTag !== "all") {
-    items = items.filter(d => Array.isArray(d.tags) && d.tags.includes(activeTag));
-  }
+
 
   if (!items.length) {
     list.innerHTML = `<div class="empty-state"><p class="empty-text">No discussions yet.</p></div>`;
@@ -134,7 +132,6 @@ function renderDiscussions() {
 
   list.innerHTML = items.map(d => {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
-    const tags = Array.isArray(d.tags) ? d.tags : [];
 
     let cardTheme = "theme-member";
     if (currentUser && d.authorId === currentUser.uid) {
@@ -155,7 +152,6 @@ return `
     Pinned to Bulletin
   </div>` : ''}
       <div class="disc-body">${esc(d.body)}</div>
-      ${tags.length ? `<div class="disc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="disc-meta">
         <span class="author">
           ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
@@ -336,7 +332,6 @@ async function togglePin(discId, alreadyPinned) {
       author: d.author,
       authorId: d.authorId || null,
       authorInitials: d.authorInitials || "?",
-      tags: d.tags || [],
       postedAt: d.postedAt,
       commentCount,
       pinnedAt: Date.now(),
@@ -358,15 +353,13 @@ async function handleMainButtonClick() {
 async function publishDiscussion() {
   if (!currentUser) return alert("Please log in to post.");
   const body = document.getElementById("discContent").value.trim();
-  const tagsRaw = document.getElementById("discTags").value.trim();
   if (!body) return;
 
   const name = getDisplayName();
-  const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   const newRef = push(ref(db, "discussions"));
   await set(newRef, {
-    body, tags,
+    body,
     author: name,
     authorId: currentUser.uid,
     authorRole: userRole,
@@ -455,7 +448,6 @@ function openEditModal() {
   isEditMode = true;
 
   document.getElementById("discContent").value = d.body;
-  if (d.tags) document.getElementById("discTags").value = d.tags.join(", ");
 
   const modalTitle = document.querySelector("#discussModal .modal-title");
   if (modalTitle) modalTitle.innerText = "Edit Discussion";
@@ -468,19 +460,17 @@ function openEditModal() {
 
 async function saveEditDiscussion() {
   const body = document.getElementById("discContent").value.trim();
-  const tagsRaw = document.getElementById("discTags").value.trim();
   if (!body) return;
-  const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
   try {
     await update(ref(db, `discussions/${currentDiscId}`), {
-      body, tags, lastEdited: Date.now()
+      body, lastEdited: Date.now()
     });
 
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
-    if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body, tags });
+    if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body });
 
     closeModal("discussModal");
     alert("Changes saved successfully!");
@@ -733,7 +723,6 @@ function closeModal(id) {
     const btn = document.getElementById("mainSubmitBtn");
     if (btn) btn.innerText = "Publish Discussion";
     document.getElementById("discContent").value = "";
-    document.getElementById("discTags").value = "";
     document.getElementById("attachPreview").textContent = "";
     attachedImageData = null;
   }
