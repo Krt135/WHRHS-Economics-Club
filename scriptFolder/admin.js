@@ -194,12 +194,17 @@ const NODE_LABELS = {
 
 function renderModeration(posts, container) {
     container.innerHTML = `
-        <div class="mod-info-bar">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-            </svg>
-            ${posts.length} deleted post${posts.length !== 1 ? 's' : ''} — restore or permanently delete below.
+        <div class="mod-info-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                ${posts.length} deleted post${posts.length !== 1 ? 's' : ''} — restore or permanently delete below.
+            </div>
+            <button class="btn-deny" onclick="deleteAllPosts()" style="white-space:nowrap;">
+                🗑 Delete All
+            </button>
         </div>
         ${posts.map(post => `
             <div class="admin-list-item mod-item">
@@ -246,6 +251,12 @@ window.restorePost = async (id) => {
 window.permanentDelete = async (id) => {
     if (confirm("Permanently delete this post? This cannot be undone.")) {
         await remove(ref(db, `deleted_posts/${id}`));
+    }
+};
+
+window.deleteAllPosts = async () => {
+    if (confirm("Permanently delete ALL posts in the recycling bin? This cannot be undone.")) {
+        await remove(ref(db, 'deleted_posts'));
     }
 };
 

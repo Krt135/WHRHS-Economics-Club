@@ -48,6 +48,7 @@ const style = `
       position: relative;
       overflow: hidden;
       height: 40px;
+      cursor: pointer;
     }
 
     .slide {
@@ -457,6 +458,7 @@ class TEFAnnouncement extends HTMLElement {
     if (this._announcements.length > 1) {
       this._cycleTimer = setInterval(() => this._nextSlide(), 4500);
     }
+    this._bindClickCycle();
   }
 
   _nextSlide() {
@@ -480,6 +482,19 @@ class TEFAnnouncement extends HTMLElement {
     if (!ann) return;
     bar.classList.remove('type-info', 'type-urgent');
     bar.classList.add(ann.type === 'urgent' ? 'type-urgent' : 'type-info');
+  }
+
+  _bindClickCycle() {
+    const wrap = this.shadowRoot.getElementById('slides-wrap');
+    wrap.addEventListener('click', (e) => {
+      // Don't cycle if they clicked a button or link
+      if (e.target.closest('button, a')) return;
+      if (this._announcements.length <= 1) return;
+      clearInterval(this._cycleTimer);
+      this._nextSlide();
+      // Restart auto-cycle after manual click
+      this._cycleTimer = setInterval(() => this._nextSlide(), 4500);
+    });
   }
 
   _bindAdminUI() {
