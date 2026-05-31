@@ -48,7 +48,7 @@
 .disc-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
 .tag-pill { padding:3px 10px; background:rgba(201,168,76,0.15); border:1px solid rgba(201,168,76,0.4); border-radius:20px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.05em; color:var(--gold); }
 .disc-meta { display:flex; align-items:center; gap:14px; font-size:13px; color:var(--text-muted); margin-bottom:12px; }
-.disc-meta .author { display:flex; align-items:center; gap:6px; }
+.disc-meta .author { display:flex; align-items:center; gap:6px; font-size:18px; }
 .author-av { 
   width: 28px; 
   height: 28px; 
