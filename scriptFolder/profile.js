@@ -81,7 +81,8 @@ function wireOwnProfile(user, data) {
   bioEl.value = data.bio || "";
   phoneEl.value = data.phone || "";
   document.getElementById("toggle-email-notif").checked = data.emailNotifications !== false;
-  document.getElementById("toggle-phone-notif").checked = data.phoneNotifications === true;
+  const phoneToggle = document.getElementById("toggle-phone-notif");
+  if (phoneToggle) phoneToggle.checked = data.phoneNotifications === true;
 
   setRoleBadge(roleBadge, data);
 
@@ -100,7 +101,7 @@ function wireOwnProfile(user, data) {
       bio: document.getElementById("field-bio").value.trim(),
       phone: document.getElementById("field-phone").value.trim(),
       emailNotifications: document.getElementById("toggle-email-notif").checked,
-      phoneNotifications: document.getElementById("toggle-phone-notif").checked,
+      phoneNotifications: document.getElementById("toggle-phone-notif")?.checked ?? false,
     };
 
     try {
