@@ -19,7 +19,7 @@ const execEmails = [
 ];
 
 const passwordResetActionCodeSettings = {
-    url: `${window.location.origin}/auth-action.html`,
+    url: `https://theeconomicforum.net/auth.html`,
     handleCodeInApp: false
 };
 function setAuthFeedback(elementId, message, type) {
