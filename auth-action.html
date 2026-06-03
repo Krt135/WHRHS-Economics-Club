@@ -1,40 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Verifying – The Economic Forum</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account action – The Economic Forum</title>
+  <link rel="stylesheet" href="styleFolder/auth.css">
+</head>
+
+<body class="auth-body">
+  <div class="auth-container">
+    <div class="auth-card auth-action-card">
+      <h2>The Economic Forum</h2>
+      <p id="actionSubtitle" class="auth-subtitle">Processing your request...</p>
+      <div id="actionFeedback" class="auth-feedback" hidden></div>
+      <form id="resetPasswordForm" class="hidden">
+        <p id="resetEmailHint" class="auth-subtitle"></p>
+        <div class="input-group">
+          <label for="resetNewPassword">New password</label>
+          <input type="password" id="resetNewPassword" placeholder="Min. 8 characters" required minlength="8">
+        </div>
+        <div class="input-group">
+          <label for="resetConfirmPassword">Confirm password</label>
+          <input type="password" id="resetConfirmPassword" placeholder="Re-enter password" required>
+        </div>
+        <button type="submit" class="auth-submit-btn">Update password</button>
+      </form>
+      <a href="auth.html" class="auth-link bold" style="display: inline-block; margin-top: 24px;">Go to Sign In →</a>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-    import { getAuth, applyActionCode } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-    import { firebaseConfig } from '/scriptFolder/config.js';
+    import {
+      getAuth,
+      applyActionCode,
+      verifyPasswordResetCode,
+      confirmPasswordReset
+    } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+    import { firebaseConfig } from "./scriptFolder/config.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-
     const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const oobCode = params.get('oobCode');
 
-    const msg = document.getElementById('message');
+    const mode = params.get("mode");
+    const oobCode = params.get("oobCode");
 
-    if (mode === 'verifyEmail' && oobCode) {
+    const subtitle = document.getElementById("actionSubtitle");
+    const feedbackEl = document.getElementById("actionFeedback");
+    const resetForm = document.getElementById("resetPasswordForm");
+
+    if (mode === "verifyEmail" && oobCode) {
+      subtitle.textContent = "Verifying your email...";
       applyActionCode(auth, oobCode)
         .then(() => {
-          msg.textContent = "✅ Email verified! You can now close this tab and sign in once the Exec Board approves your account.";
+          subtitle.textContent = "Email verified";
+          setFeedback(
+            "You can close this tab and sign in once the Exec Board approves your account.",
+            "success"
+          );
         })
         .catch((err) => {
-          msg.textContent = "❌ Verification failed: " + err.message;
+          subtitle.textContent = "Verification failed";
+          setFeedback(err.message, "error");
+        });
+    } else if (mode === "resetPassword" && oobCode) {
+      subtitle.textContent = "Choose a new password";
+      verifyPasswordResetCode(auth, oobCode)
+        .then((email) => {
+          document.getElementById("resetEmailHint").textContent =
+            `Resetting password for ${email}`;
+          resetForm.classList.remove("hidden");
+          resetForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const pass = document.getElementById("resetNewPassword").value;
+            const confirm = document.getElementById("resetConfirmPassword").value;
+            const submitBtn = resetForm.querySelector('button[type="submit"]');
+            if (pass.length < 8) {
+              setFeedback("Password must be at least 8 characters.", "error");
+              return;
+            }
+            if (pass !== confirm) {
+              setFeedback("Passwords do not match.", "error");
+              return;
+            }
+            submitBtn.disabled = true;
+            setFeedback("", "");
+            try {
+              await confirmPasswordReset(auth, oobCode, pass);
+              resetForm.classList.add("hidden");
+              subtitle.textContent = "Password updated";
+              setFeedback(
+                "Your password has been reset. You can sign in with your new password.",
+                "success"
+              );
+            } catch (err) {
+              setFeedback(err.message, "error");
+              submitBtn.disabled = false;
+            }
+          });
+        })
+        .catch(() => {
+          subtitle.textContent = "Reset link invalid";
+          setFeedback(
+            "This reset link is invalid or has expired. Request a new one from the sign-in page.",
+            "error"
+          );
         });
     } else {
-      msg.textContent = "Invalid or missing action code.";
+      subtitle.textContent = "Invalid link";
+      setFeedback("Invalid or missing action code.", "error");
     }
   </script>
-</head>
-<body style="font-family: Georgia, serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f5f0e8; color: #0f1f3d;">
-  <div style="text-align: center; max-width: 480px; padding: 40px;">
-    <h2 style="margin-bottom: 16px;">The Economic Forum</h2>
-    <p id="message">Verifying your email...</p>
-    <a href="auth.html" style="display: inline-block; margin-top: 24px; color: #c9a84c;">Go to Sign In →</a>
-  </div>
-</body>
+
 </html>
