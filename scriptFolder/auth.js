@@ -20,7 +20,7 @@ const execEmails = [
 
 const passwordResetActionCodeSettings = {
     url: `${window.location.origin}/auth-action.html`,
-    handleCodeInApp: false;
+    handleCodeInApp: false
 };
 function setAuthFeedback(elementId, message, type) {
     const el = document.getElementById(elementId);
