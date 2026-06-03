@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-         onAuthStateChanged, sendEmailVerification }
-    from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    sendEmailVerification, sendPasswordResetEmail }
+from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get }
     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
@@ -17,6 +17,20 @@ const execEmails = [
     "placeholder3@gmail.com",
     "placeholder4@gmail.com"
 ];
+
+const passwordResetActionCodeSettings = {
+    url: `${window.location.origin}/auth-action.html`,
+    handleCodeInApp: true
+};
+function setAuthFeedback(elementId, message, type) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.hidden = !message;
+    el.textContent = message;
+    el.className = "auth-feedback" + (type ? ` auth-feedback--${type}` : "");
+}
+const RESET_EMAIL_SENT_MESSAGE =
+    "If an account exists for that email, we sent a password reset link. Check your inbox and spam folder.";
 
 // --- SIGN UP LOGIC ---
 document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
@@ -60,12 +74,45 @@ document.getElementById('signUpForm')?.addEventListener('submit', async (e) => {
     }
 });
 
-// --- SIGN IN LOGIC ---
+document.getElementById('forgotPasswordForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotPasswordEmail').value.trim();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (!email) {
+        setAuthFeedback('forgotPasswordFeedback', 'Please enter your email address.', 'error');
+        return;
+    }
+    submitBtn.disabled = true;
+    setAuthFeedback('forgotPasswordFeedback', '', '');
+    try {
+        await sendPasswordResetEmail(auth, email, passwordResetActionCodeSettings);
+    } catch (error) {
+        if (error.code === 'auth/invalid-email') {
+            setAuthFeedback('forgotPasswordFeedback', 'Please enter a valid email address.', 'error');
+            submitBtn.disabled = false;
+            return;
+        }
+        if (error.code === 'auth/too-many-requests') {
+            setAuthFeedback('forgotPasswordFeedback', 'Too many attempts. Please try again later.', 'error');
+            submitBtn.disabled = false;
+            return;
+        }
+        // auth/user-not-found and other errors: show generic success (no enumeration)
+    }
+
+    setAuthFeedback('forgotPasswordFeedback', RESET_EMAIL_SENT_MESSAGE, 'success');
+    submitBtn.disabled = false;
+});
+
 // --- SIGN IN LOGIC ---
 document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('signInEmail').value;
     const pass = document.getElementById('signInPassword').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    setAuthFeedback('signInFeedback', '', '');
+    submitBtn.disabled = true;
 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, pass);
@@ -77,7 +124,7 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
         // Gate 1: email verified? (BYPASSED for Execs)
         if (!isExec && !user.emailVerified) {
             await auth.signOut();
-            alert("Please verify your email address first. Check your inbox for a verification link.");
+            setAuthFeedback('signInFeedback', 'Please verify your email address first. Check your inbox for a verification link.', 'error');
             return;
         }
 
@@ -88,14 +135,14 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
         // Safety: Check if user actually exists in the database
         if (!data) {
             await auth.signOut();
-            alert("Account found in Auth, but missing from Database. Please contact an admin or sign up again.");
+            setAuthFeedback('signInFeedback', 'Account found in Auth, but missing from Database. Please contact an admin or sign up again.', 'error');
             return;
         }
 
         // Gate 2: admin approved?
         if (data.status === "pending") {
             await auth.signOut();
-            alert("Your email is verified! Your account is still pending approval by the Exec Board.");
+            setAuthFeedback('signInFeedback', 'Your email is verified! Your account is still pending approval by the Exec Board.', 'error');
             return;
         }
 
@@ -104,6 +151,6 @@ document.getElementById('signInForm')?.addEventListener('submit', async (e) => {
 
     } catch (error) {
         console.error("Sign-in error:", error);
-        alert("Invalid credentials.");
+        setAuthFeedback('signInFeedback', 'Invalid credentials.', 'error');
     }
 });

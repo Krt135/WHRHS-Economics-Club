@@ -170,3 +170,27 @@
 .hidden {
     display: none;
 }
+
+.auth-feedback {
+    text-align: left;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+.auth-feedback--success {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+.auth-feedback--error {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+.auth-action-card {
+    text-align: center;
+}
+.auth-action-card .auth-subtitle {
+    margin-bottom: 16px;
+}
