@@ -21,17 +21,30 @@
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
     text-align: center;
+    
+    /* ADD THIS LINE: It forces the card to sit in the center of its container */
+    margin: 0 auto; 
 }
-
 .auth-logo {
-    width: 48px;
-    height: 48px;
-    background-color: #0f1f3d;
-    border-radius: 50%;
+    width: 110px;           /* Replaced 48px to give the logo room to expand */
+    height: 110px;          /* Replaced 48px to maintain a perfect circle */
+    background-color: #0f1f3d; /* Changed from navy to white so the logo blends seamlessly */
+    border-radius: 50%;     /* Keeps it a perfect circle */
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 20px auto;
+    overflow: hidden;       /* CRITICAL: Masks and clips off the image's square edges */
+    box-shadow: 0 4px 12px rgba(15, 31, 61, 0.06); /* Adds a premium soft shadow around the bubble */
+    border: 1px solid #e5e7eb; /* Adds a clean, subtle border line */
+}
+
+/* Add this right below .auth-logo to target the img element safely */
+.auth-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;    /* Preserves your original logo's proportions without stretching it */
+    padding: 6px;           /* Gives the golden arrow edge subtle breathing room from the border */
 }
 
 .auth-card h2 {
@@ -194,3 +207,8 @@
 .auth-action-card .auth-subtitle {
     margin-bottom: 16px;
 }
+
+.hidden {
+    display: none !important;
+}
+

@@ -15,10 +15,7 @@
         
         <div id="signInView" class="auth-card">
             <div class="auth-logo">
-                <svg width="24" height="24" viewBox="0 0 200 200" fill="none">
-                    <circle cx="100" cy="100" r="90" stroke="#c9a84c" stroke-width="4"/>
-                    <path d="M100 30 L100 170 M40 100 L160 100" stroke="#c9a84c" stroke-width="4"/>
-                </svg>
+                <img src = "images/TEF-image.jpeg">
             </div>
             <h2>Welcome to The Economic Forum</h2>
             <p class="auth-subtitle">Sign in to continue</p>
@@ -75,21 +72,23 @@
             </form>
         </div>
 
+        <div id="forgotPasswordView" class="auth-card hidden">
+            <a href="#" class="back-link" onclick="showAuthView('signInView'); return false;">← Back to sign in</a>
+            <h2>Reset your password</h2>
+            <p class="auth-subtitle">We will email you a link to choose a new password.</p>
+            <form id="forgotPasswordForm">
+                <div id="forgotPasswordFeedback" class="auth-feedback" hidden></div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="forgotPasswordEmail" placeholder="you@example.com" required>
+                </div>
+                <button type="submit" class="auth-submit-btn">Send reset link</button>
+            </form>
+        </div>
+
     </div>
 
-    <div id="forgotPasswordView" class="auth-card hidden">
-        <a href="#" class="back-link" onclick="showAuthView('signInView'); return false;">← Back to sign in</a>
-        <h2>Reset your password</h2>
-        <p class="auth-subtitle">We will email you a link to choose a new password.</p>
-        <form id="forgotPasswordForm">
-            <div id="forgotPasswordFeedback" class="auth-feedback" hidden></div>
-            <div class="input-group">
-                <label>Email</label>
-                <input type="email" id="forgotPasswordEmail" placeholder="you@example.com" required>
-            </div>
-            <button type="submit" class="auth-submit-btn">Send reset link</button>
-        </form>
-    </div>
+    
 
     <script>
         const AUTH_VIEWS = ['signInView', 'signUpView', 'forgotPasswordView'];
