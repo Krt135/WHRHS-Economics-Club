@@ -294,3 +294,22 @@
     border-radius: 0 4px 4px 0;
     font-style: italic;
 }
+
+/* Forces the profile link elements inside member names to look like standard text */
+div.member-name .profile-link-name,
+.admin-list-item .member-name a,
+.member-info .member-name a,
+.member-name a:link, 
+.member-name a:visited {
+    color: var(--text-dark) !important; /* Forces it to use your dark text color instead of global link blue */
+    text-decoration: none !important;
+    cursor: pointer !important;
+}
+
+/* Adds an underline only on hover so admins know it's interactive */
+div.member-name .profile-link-name:hover,
+.admin-list-item .member-name a:hover,
+.member-info .member-name a:hover {
+    text-decoration: underline !important;
+    color: var(--navy) !important; /* Optional: transitions to your elegant navy theme color on hover */
+}

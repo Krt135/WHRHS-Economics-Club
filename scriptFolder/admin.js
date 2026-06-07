@@ -1,6 +1,8 @@
 import { app } from './app.js';
 import { getDatabase, ref, onValue, update, remove, get, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { profileAvatarHtml } from "./profile-link.js";
+
 
 const db = getDatabase(app);
 const auth = getAuth(app);
@@ -121,12 +123,24 @@ function renderMembers(list, container) {
             ${group.map(user => `
                 <div class="admin-list-item">
                     <div class="member-info">
-                        <div class="member-avatar ${user.role === 'admin' ? 'avatar--admin' : ''}">
-                            ${(user.displayName || user.email).substring(0,2).toUpperCase()}
-                        </div>
+                        ${profileAvatarHtml(
+                            user.id, 
+                            "div", 
+                            `member-avatar ${user.role === 'admin' ? 'avatar--admin' : ''}`, 
+                            "", 
+                            (user.displayName || user.email).substring(0,2).toUpperCase(), 
+                            { stopPropagation: true, role: user.role || 'member' }
+                        )}
                         <div>
                             <div class="member-name">
-                                ${user.displayName || '—'}
+                                ${profileAvatarHtml(
+                                    user.id,
+                                    "span",
+                                    "profile-link-name",
+                                    "cursor: pointer;",
+                                    user.displayName || '—',
+                                    { stopPropagation: true, role: user.role || 'member' }
+                                )}
                                 <span class="role-pill role-pill--${user.role}">${user.role.toUpperCase()}</span>
                             </div>
                             <div class="member-email">${user.email}</div>
