@@ -88,6 +88,19 @@ window.showList = () => {
 };
 window.showArticle = (id) => {
   currentFeatureId = id;
+
+  // Update URL with article title
+  const feature = features.find(f => f.id === id);
+
+  if (feature) {
+    const slug = feature.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    window.history.pushState({}, '', `?article=${slug}`);
+  }
+
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
