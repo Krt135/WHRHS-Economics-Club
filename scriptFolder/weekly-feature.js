@@ -88,6 +88,19 @@ window.showList = () => {
 };
 window.showArticle = (id) => {
   currentFeatureId = id;
+
+  // Update URL with article title
+  const feature = features.find(f => f.id === id);
+
+  if (feature) {
+    const slug = feature.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    window.history.pushState({}, '', `?article=${slug}`);
+  }
+
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
@@ -139,18 +152,35 @@ onValue(ref(db, 'features'), (snapshot) => {
     });
     features.sort((a,b) => b.postedAt - a.postedAt);
 
-    // If redirected from bulletin, verify the feature actually exists
-    if (currentFeatureId) {
-      const postExists = features.find(f => f.id === currentFeatureId);
-      if (postExists) {
-        sessionStorage.removeItem("openFeature"); // Clear storage to prevent loops
-      } else {
-        currentFeatureId = null; // Failsafe
-      }
-    }
-  } else { 
-    features = []; 
+    // Check if URL contains an article title
+const params = new URLSearchParams(window.location.search);
+const articleSlug = params.get("article");
+
+if (articleSlug && !currentFeatureId) {
+  const post = features.find(f => {
+    const slug = f.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    return slug === articleSlug;
+  });
+
+  if (post) {
+    currentFeatureId = post.id;
   }
+}
+
+// If redirected from bulletin, verify the feature actually exists
+if (currentFeatureId) {
+  const postExists = features.find(f => f.id === currentFeatureId);
+
+  if (postExists) {
+    sessionStorage.removeItem("openFeature");
+  } else {
+    currentFeatureId = null;
+  }
+}
 
   // Force the correct view to show based on the ID state
   if (currentFeatureId) {
