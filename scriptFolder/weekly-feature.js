@@ -46,7 +46,10 @@ onAuthStateChanged(auth, async (user) => {
 
 // 3. ── GLOBAL STATE ──
 let features         = [];
-let currentFeatureId = sessionStorage.getItem("openFeature") || null; // Immediately check storage
+let currentFeatureId = sessionStorage.getItem("openFeature") || null;
+
+const urlParams = new URLSearchParams(window.location.search);
+const articleSlug = urlParams.get("article");
 let activeTag        = 'all';
 let pinnedIds = new Set();
 
@@ -88,6 +91,22 @@ window.showList = () => {
 };
 window.showArticle = (id) => {
   currentFeatureId = id;
+
+  const feature = features.find(f => f.id === id);
+
+  if (feature) {
+    const slug = feature.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    history.pushState(
+      { article: id },
+      '',
+      `weekly-feature.html?article=${slug}`
+    );
+  }
+
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
@@ -139,6 +158,21 @@ onValue(ref(db, 'features'), (snapshot) => {
     });
     features.sort((a,b) => b.postedAt - a.postedAt);
 
+    // Open article from URL if one exists
+if (articleSlug && !currentFeatureId) {
+  const matchingArticle = features.find(f => {
+    const slug = f.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    return slug === articleSlug;
+  });
+
+  if (matchingArticle) {
+    currentFeatureId = matchingArticle.id;
+  }
+}
     // If redirected from bulletin, verify the feature actually exists
     if (currentFeatureId) {
       const postExists = features.find(f => f.id === currentFeatureId);
