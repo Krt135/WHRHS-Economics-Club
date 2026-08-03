@@ -14,8 +14,19 @@ class SpecialSidebar extends HTMLElement {
 
         this.innerHTML = `
 
-        
-        <aside class="sidebar">
+        <div class="mobile-topbar">
+            <div class="mt-logo" onclick="window.location.href='index.html'">THE ECONOMIC <span class="gold">FORUM</span></div>
+            <button class="hamburger-btn" id="tef-hamburger-btn" aria-label="Open menu" aria-expanded="false">
+                <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div class="sidebar-overlay" id="tef-sidebar-overlay"></div>
+
+        <aside class="sidebar" id="tef-sidebar-aside">
 
         <div class="sidebar-logo" onclick="window.location.href='index.html'" style="cursor:pointer">
                 <img class="logo-icon" src="images/TEF-image.jpeg" alt="Logo">
@@ -137,6 +148,38 @@ class SpecialSidebar extends HTMLElement {
 
         // Check Auth Status specifically for this sidebar instance
         this.checkAccess();
+
+        // Mobile menu toggle
+        this.initMobileMenu();
+    }
+
+    initMobileMenu() {
+        const btn = this.querySelector('#tef-hamburger-btn');
+        const aside = this.querySelector('#tef-sidebar-aside');
+        const overlay = this.querySelector('#tef-sidebar-overlay');
+
+        const closeMenu = () => {
+            aside.classList.remove('open');
+            overlay.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+        };
+
+        const openMenu = () => {
+            aside.classList.add('open');
+            overlay.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+        };
+
+        btn.addEventListener('click', () => {
+            aside.classList.contains('open') ? closeMenu() : openMenu();
+        });
+
+        overlay.addEventListener('click', closeMenu);
+
+        // Close the drawer when a nav link is tapped
+        this.querySelectorAll('.nav-item').forEach(link => {
+            link.addEventListener('click', closeMenu);
+        });
     }
 
     async checkAccess() {

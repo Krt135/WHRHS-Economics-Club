@@ -260,3 +260,52 @@
 /* The Floor Author Names */
 .theme-me .comment-author-name { color: #1d4ed8; }
 .theme-exec .comment-author-name { color: #9c7b3c; }
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main { margin-left: 0; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { padding: 28px 22px 24px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header .subtitle { font-size: 14px; }
+
+  /* ── CONTENT ── */
+  .content { padding: 24px 16px 40px; max-width: 100%; }
+
+  /* ── ACTION BAR / TABS ── */
+  .action-bar { flex-wrap: wrap; gap: 10px; }
+  .btn-primary, .btn-outline { padding: 10px 16px; font-size: 14px; }
+  .tabs { width: 100%; }
+  .tab { flex: 1; padding: 9px 10px; text-align: center; }
+
+  /* ── DISCUSSION CARD ── */
+  .disc-card, .poll-card { padding: 16px 16px; }
+  .disc-title { font-size: 16.5px; }
+  .disc-meta { flex-wrap: wrap; gap: 8px; }
+  .disc-actions { flex-wrap: wrap; gap: 10px; }
+
+  /* ── MODALS ── */
+  .modal { padding: 24px 20px 20px; max-height: 85vh; }
+  .modal-title { font-size: 19px; }
+  .confirm-modal { padding: 28px 22px; }
+
+  /* ── DISCUSSION VIEW TOPBAR ── */
+  .disc-topbar { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+  .topbar-actions { flex-wrap: wrap; gap: 8px; }
+  .topbar-btn { padding: 7px 12px; font-size: 12px; }
+
+  /* ── DISCUSSION BODY ── */
+  .discussion-body { padding: 28px 18px 40px; }
+  .disc-view-title { font-size: 24px; }
+  .disc-view-body { font-size: 16px; }
+  .disc-view-image { max-height: 220px; }
+  .disc-reaction-bar { flex-wrap: wrap; gap: 10px; padding: 16px 0; margin: 22px 0; }
+  .react-btn { padding: 8px 14px; font-size: 14px; }
+
+  /* ── COMMENTS ── */
+  .comment-item { gap: 8px; }
+  .new-comment-box { flex-direction: column; gap: 8px; }
+  .btn-post-cmt { align-self: stretch; text-align: center; }
+}
