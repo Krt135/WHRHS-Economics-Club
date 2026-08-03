@@ -313,3 +313,46 @@ div.member-name .profile-link-name:hover,
     text-decoration: underline !important;
     color: var(--navy) !important; /* Optional: transitions to your elegant navy theme color on hover */
 }
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main {
+    margin-left: 0;
+    padding: 20px 16px;
+  }
+
+  .admin-container { padding: 0; }
+
+  .admin-header h1 { font-size: 1.5rem; margin-bottom: 20px; }
+
+  #shield-icon { margin-left: 10px; }
+
+  /* ── TABS ── */
+  .admin-tabs { flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .tab-btn { padding: 7px 12px; font-size: 0.7rem; }
+
+  /* ── MEMBERS SEARCH ── */
+  .members-search { max-width: 100%; }
+
+  /* ── LIST ITEMS ── */
+  .admin-list-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .member-info { min-width: 0; flex-wrap: wrap; }
+
+  .member-bio { max-width: 100%; }
+
+  .admin-actions { width: 100%; justify-content: flex-start; }
+
+  .user-info { font-size: 1rem; }
+
+  /* ── MODERATION / RECYCLING BIN ── */
+  .mod-info-bar { font-size: 0.8rem; padding: 8px 12px; }
+
+  .mod-title { white-space: normal; overflow: visible; text-overflow: clip; }
+}

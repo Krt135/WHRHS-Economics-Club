@@ -212,3 +212,22 @@
     display: none !important;
 }
 
+
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .auth-container { padding: 14px; }
+
+  .auth-card { padding: 28px 22px; }
+
+  .auth-logo { width: 84px; height: 84px; margin-bottom: 14px; }
+
+  .auth-card h2 { font-size: 1.3rem; }
+
+  .auth-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
