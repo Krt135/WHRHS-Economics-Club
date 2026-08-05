@@ -149,6 +149,10 @@
 .search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none; }
 .search-input { width:100%; border:1px solid var(--border); background:#fff; padding:11px 14px 11px 38px; font-family:'Crimson Pro',serif; font-size:15px; color:var(--text-dark); outline:none; transition:border-color 0.15s; }
 .search-input:focus { border-color:var(--gold); }
+
+.example-box { background:#fff; border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:2px; padding:16px 20px; margin:1.4em 0; font-size:16px; }
+
+.example-box strong { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--gold); display:block; margin-bottom:6px; }
 /* ═══════════════════════════════════════════════
    MOBILE (added for mobile compatibility)
 ═══════════════════════════════════════════════ */

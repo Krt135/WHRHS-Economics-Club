@@ -203,6 +203,10 @@
     transform: translateY(-3px);
     transition: 0.2s ease-in-out;
 }
+
+.example-box { background:#fff; border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:2px; padding:16px 20px; margin:1.4em 0; font-size:16px; }
+
+.example-box strong { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--gold); display:block; margin-bottom:6px; }
 /* ═══════════════════════════════════════════════
    MOBILE (added for mobile compatibility)
 ═══════════════════════════════════════════════ */

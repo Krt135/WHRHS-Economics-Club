@@ -465,11 +465,11 @@
 
   .hero-actions { justify-content: center; flex-wrap: wrap; }
 
-  .hero-badge { margin-bottom: 8px; }
+  .hero-badge { margin-bottom: 0px; }
 
   .badge-circle { width: 110px; height: 110px; }
 
-  .badge-svg { width: 130px; height: 130px; }
+  .badge-svg { width: 300px; height: 300px; }
 
   /* ── TICKER ── */
   .ticker-item { font-size: 10px; padding: 0 14px; }

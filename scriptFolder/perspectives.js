@@ -63,7 +63,12 @@ function rel(ts) {
 function myLiked(p)    { return !!(currentUser && p.userLikes    && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
 function esc(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // 4. ── WINDOW BINDINGS ──
@@ -266,7 +271,10 @@ function renderArticle() {
   const p = posts.find(x => x.id === currentPostId); if (!p) return window.showList();
   const wds     = p.content.trim().split(/\s+/).length;
   const readMin = Math.max(1, Math.round(wds / 200));
-  const paragraphs = p.content.split(/\n\n+/).map(s => `<p>${esc(s.trim())}</p>`).join('');
+  
+  // Updated: parse === Headings === and [EXAMPLE] blocks
+  const paragraphs = parseContent(p.content);
+  
   const iLiked     = myLiked(p);
   const iDisliked  = myDisliked(p);
   const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
@@ -365,6 +373,22 @@ function renderArticle() {
         <button class="btn-post-comment" onclick="postComment('${p.id}')">Post</button>
       </div>
     </div>`;
+}
+
+// Custom Markdown/Syntax Parser
+function parseContent(raw) {
+  return (raw || "").split(/\n\n+/).map(para => {
+    para = para.trim();
+    if (para.startsWith("===")) {
+      const h = para.replace(/^===\s*/, "").replace(/\s*===$/, "");
+      return `<h3>${esc(h)}</h3>`;
+    }
+    if (para.startsWith("[EXAMPLE]")) {
+      const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim();
+      return `<div class="example-box"><strong>EXAMPLE</strong>${esc(inner)}</div>`;
+    }
+    return `<p>${esc(para)}</p>`;
+  }).join("");
 }
 
 // 7. ── DATABASE MUTATIONS ──

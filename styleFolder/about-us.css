@@ -300,7 +300,7 @@
     border-right: none;
     border-bottom: 1px solid #ddd;
   }
-  .mission-badge-svg { width: 140px; height: 140px; }
+  .mission-badge-svg { width: 300px; height: 300px; }
   .mission-text-col { padding: 28px 24px; }
   .mission-text-col h2 { font-size: 22px; }
   .mission-text-col p { font-size: 15.5px; }

@@ -62,6 +62,22 @@ function getDisplayName(user) {
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function parseContent(raw) {
+  return (raw || "").split(/\n\n+/).map(para => {
+    para = para.trim();
+    if (para.startsWith("===")) {
+      const h = para.replace(/^===\s*/, "").replace(/\s*===$/, "");
+      return `<h3>${escHtml(h)}</h3>`;
+    }
+    if (para.startsWith("[EXAMPLE]")) {
+      const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim();
+      return `<div class="example-box"><strong>EXAMPLE</strong>${escHtml(inner)}</div>`;
+    }
+    return `<p>${escHtml(para)}</p>`;
+  }).join("");
+}
+
 function relativeTime(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60)    return 'just now';
@@ -287,7 +303,10 @@ function renderList() {
 
 function renderArticle() {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return window.showList();
-  const paragraphs = f.content.split(/\n\n+/).map(p=>`<p>${escHtml(p.trim())}</p>`).join('');
+  
+  // Updated: parse === Headings === and [EXAMPLE] blocks
+  const paragraphs = parseContent(f.content);
+  
   const wc         = wordCount(f.content);
   const readMin    = Math.max(1, Math.round(wc/200));
   const iLiked     = myLiked(f);
@@ -323,13 +342,8 @@ function renderArticle() {
 
   const commentsHtml = f.comments.length
     ? f.comments.map(c => {
-        // --- NEW LIKE LOGIC STARTS HERE ---
-        // Count how many keys are in the userLikes object
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
-        // Check if the current user's ID exists in that object
         const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        // ----------------------------------
-
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         
         return `
