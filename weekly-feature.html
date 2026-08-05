@@ -110,10 +110,11 @@
       <div class="form-group">
         <label class="form-label">Essay Content</label>
         <textarea class="form-textarea" id="pubContent"
-          placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved."
+          placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved. Use === Section Title === to add section headers.&#10;Use [EXAMPLE] Your example text [/EXAMPLE] to add highlighted example boxes."
           oninput="updateWordCount()"></textarea>
         <div class="word-count" id="wordCount">0 words</div>
       </div>
+      <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
       <button class="btn-full" onclick="window.publishFeature()">Publish Feature</button>
     </div>
   </div>
@@ -144,6 +145,7 @@
         <textarea class="form-textarea" id="editContent" oninput="window.updateEditWordCount()"></textarea>
         <div class="word-count" id="editWordCount">0 words</div>
       </div>
+      <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
       <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
     </div>
   </div>
