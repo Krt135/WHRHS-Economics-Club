@@ -54,6 +54,7 @@ function loadData() {
                     <p>Ensure your account is set to 'admin' in the database.</p>
                     <small>${error.message}</small>
                 </div>`;
+                window.location.href = "auth.html";
         });
 
     } else if (currentTab === 'moderation') {
