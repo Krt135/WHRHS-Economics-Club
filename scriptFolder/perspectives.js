@@ -5,16 +5,24 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
+import { populateFontSelect, getFontStack, DEFAULT_FONT } from './font-options.js';
+
+
 
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
 const auth = getAuth(app);
 
+// Populate the "Write an Essay" font picker once on load
+populateFontSelect(document.getElementById('wFont'));
+
+
 // 2. ── AUTH STATE ──
 let currentUser  = null;
 let userRole     = "public";
 let userProfile  = null;
+
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -32,14 +40,16 @@ onAuthStateChanged(auth, async (user) => {
   if (currentPostId) renderArticle(); else renderList();
 });
 
+
 // 3. ── GLOBAL STATE ──
 let posts         = [];
-let currentPostId = sessionStorage.getItem("openPerspective") || null; 
+let currentPostId = sessionStorage.getItem("openPerspective") || null;
 let activeTag = 'all';
 let sortMode      = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
 let pinnedIds = new Set();
+
 
 function getDisplayName() {
   if (userProfile && userProfile.displayName) {
@@ -51,6 +61,7 @@ function getDisplayName() {
   return "Member";
 }
 
+
 function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -59,6 +70,7 @@ function rel(ts) {
   if (s < 86400) return Math.floor(s / 3600) + " hours ago";
   return Math.floor(s / 86400) + " days ago";
 }
+
 
 function myLiked(p)    { return !!(currentUser && p.userLikes    && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
@@ -71,16 +83,19 @@ function esc(s) {
     .replace(/'/g, '&#039;');
 }
 
+
 // 4. ── WINDOW BINDINGS ──
 window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
 window.renderList = renderList;
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
 
+
 window.wc = (textareaId, countId) => {
   const v = document.getElementById(textareaId).value;
   document.getElementById(countId).textContent = (v.trim() ? v.trim().split(/\s+/).length : 0) + ' words';
 };
+
 
 window.previewImg = (input, previewId, dataKey) => {
   const file = input.files[0]; if(!file) return;
@@ -92,6 +107,7 @@ window.previewImg = (input, previewId, dataKey) => {
   };
   r.readAsDataURL(file);
 };
+
 
 window.showList = () => {
   document.getElementById('viewList').classList.add('active');
@@ -111,6 +127,7 @@ window.filterTag = (btn, tag) => {
 };
 window.sortPosts = (mode) => { sortMode = mode; renderList(); };
 
+
 window.togglePin = async (id, alreadyPinned) => {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
@@ -120,9 +137,10 @@ window.togglePin = async (id, alreadyPinned) => {
   } else {
     const p = posts.find(x => x.id === id);
     if (!p) return;
-    
+   
     const commentCount = p.comments ? p.comments.length : 0;
     const name = getDisplayName();
+
 
     await set(push(ref(db, "bulletin")), {
       originalId: id,
@@ -143,9 +161,11 @@ window.togglePin = async (id, alreadyPinned) => {
   renderArticle();
 };
 
+
 // 5. ── FIREBASE LISTENER ──
 onValue(ref(db, 'perspectives'), (snapshot) => {
   const data = snapshot.val();
+
 
   if (data) {
     posts = Object.keys(data).map(key => {
@@ -153,6 +173,7 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
       const commentsArray = post.comments ? Object.keys(post.comments).map(cId => ({ id: cId, ...post.comments[cId] })) : [];
       return { id: key, ...post, comments: commentsArray, tags: post.tags || [], postedAt: post.postedAt };
     });
+
 
     if (currentPostId) {
       const postExists = posts.find(p => p.id === currentPostId);
@@ -165,6 +186,7 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
   } else {
     posts = [];
   }
+
 
   if (currentPostId) {
     document.getElementById('viewList').classList.remove('active');
@@ -179,6 +201,7 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
   }
 });
 
+
 // 6. ── RENDER FUNCTIONS ──
 function rebuildFilterBar() {
   const bar = document.getElementById('filterBar'); if(!bar) return;
@@ -188,42 +211,51 @@ function rebuildFilterBar() {
     ${topics.map(t=>`<button class="filter-tag ${activeTag===t?'active':''}" onclick="filterTag(this,'${t}')">${t}</button>`).join('')}`;
 }
 
+
 function renderList() {
   rebuildFilterBar();
   const searchInput = document.getElementById('searchInput');
   const q = searchInput ? searchInput.value.toLowerCase() : '';
 
+
   let filtered = posts.filter(p => {
     const matchTag = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
-    const matchSearch = !q || 
-                        p.title.toLowerCase().includes(q) || 
-                        p.author.toLowerCase().includes(q) || 
+    const matchSearch = !q ||
+                        p.title.toLowerCase().includes(q) ||
+                        p.author.toLowerCase().includes(q) ||
                         (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
     return matchTag && matchSearch;
   });
+
 
   if (sortMode === 'oldest') filtered.sort((a, b) => a.postedAt - b.postedAt);
   else if (sortMode === 'popular') filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
   else filtered.sort((a, b) => b.postedAt - a.postedAt);
 
+
   const el = document.getElementById('postsList');
   if (!el) return;
+
 
   if (!filtered.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
     return;
   }
 
+
   el.innerHTML = filtered.map(p => {
     const iLiked = myLiked(p);
     const iDisliked = myDisliked(p);
     const excerpt = p.content ? (p.content.split('\n\n')[0].slice(0, 240) + (p.content.length > 240 ? '…' : '')) : '';
 
-    const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
-                    : (p.authorRole === "admin") ? "theme-exec" 
+
+    const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me"
+                    : (p.authorRole === "admin") ? "theme-exec"
                     : "theme-member";
 
+
     const isPinned = pinnedIds.has(p.id);
+
 
 return `
 <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
@@ -236,11 +268,11 @@ return `
       Pinned to Bulletin
     </div>` : ''}
   </div>
-      
+     
       ${p.image ? `<img src="${p.image}" class="pc-image" alt="Post Image" loading="lazy">` : ''}
-      
+     
       <div class="pc-excerpt">${esc(excerpt)}</div>
-      
+     
       <div class="pc-meta">
         <span class="author-chip">
           ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
@@ -251,8 +283,9 @@ return `
         ${p.comments ? p.comments.length : 0}
       </div>
 
+
       ${(p.tags && p.tags.length) ? `<div class="pc-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
-      
+     
       <div class="pc-actions" onclick="event.stopPropagation()">
         <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')" title="Like">
           <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
@@ -267,27 +300,31 @@ return `
   }).join('');
 }
 
+
 function renderArticle() {
   const p = posts.find(x => x.id === currentPostId); if (!p) return window.showList();
   const wds     = p.content.trim().split(/\s+/).length;
   const readMin = Math.max(1, Math.round(wds / 200));
-  
+ 
   // Updated: parse === Headings === and [EXAMPLE] blocks
   const paragraphs = parseContent(p.content);
-  
+ 
   const iLiked     = myLiked(p);
   const iDisliked  = myDisliked(p);
-  const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
-                  : (p.authorRole === "admin") ? "theme-exec" 
+  const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me"
+                  : (p.authorRole === "admin") ? "theme-exec"
                   : "theme-member";
+
 
   const canEdit   = currentUser && p.authorId === currentUser.uid;
   const canDelete = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
   const isAdmin = userRole === 'admin';
 
+
   get(ref(db, "bulletin")).then(snap => {
     const bulletinData = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === p.id && b.type === 'perspective');
+
 
     document.getElementById('articleTopActions').innerHTML = `
       ${canEdit ? `
@@ -305,13 +342,14 @@ function renderArticle() {
         </button>` : ''}`;
   });
 
+
   const commentsHtml = p.comments.length
     ? p.comments.map(c => {
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
         const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         const commentTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
-        
+       
         return `
         <div class="comment-item ${commentTheme}">
           ${profileAvatarHtml(c.authorId, "span", "author-av", "", esc(c.initials || "?"), { role: c.authorRole || "member" })}
@@ -336,6 +374,7 @@ function renderArticle() {
       }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
 
+
   document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
   document.getElementById('articleBody').innerHTML = `
     <div class="article-eyebrow">PERSPECTIVES${p.tags.length ? ' · ' + p.tags[0].toUpperCase() : ''}</div>
@@ -351,7 +390,7 @@ function renderArticle() {
     ${p.tags.length ? `<div class="article-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="article-divider"></div>
     ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
-    <div class="article-content">${paragraphs}</div>
+    <div class="article-content" style="font-family:${getFontStack(p.fontFamily)}">${paragraphs}</div>
     <div class="reaction-bar">
       <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')">
         <svg width="15" height="15" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
@@ -375,21 +414,32 @@ function renderArticle() {
     </div>`;
 }
 
+
+// Inline formatting: *bold*, **italic**, ~underline~
+// Runs on already-HTML-escaped text, so it only ever inserts our own safe tags.
+function applyInlineFormatting(s) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<em>$1</em>')       // **italic** — must run before single *
+    .replace(/\*(.+?)\*/g, '<strong>$1</strong>')   // *bold*
+    .replace(/~(.+?)~/g, '<u>$1</u>');              // ~underline~
+}
+
 // Custom Markdown/Syntax Parser
 function parseContent(raw) {
   return (raw || "").split(/\n\n+/).map(para => {
     para = para.trim();
     if (para.startsWith("===")) {
       const h = para.replace(/^===\s*/, "").replace(/\s*===$/, "");
-      return `<h3>${esc(h)}</h3>`;
+      return `<h3>${applyInlineFormatting(esc(h))}</h3>`;
     }
     if (para.startsWith("[EXAMPLE]")) {
       const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim();
-      return `<div class="example-box"><strong>EXAMPLE</strong>${esc(inner)}</div>`;
+      return `<div class="example-box"><strong>EXAMPLE</strong>${applyInlineFormatting(esc(inner))}</div>`;
     }
-    return `<p>${esc(para)}</p>`;
+    return `<p>${applyInlineFormatting(esc(para))}</p>`;
   }).join("");
 }
+
 
 // 7. ── DATABASE MUTATIONS ──
 window.publishPost = () => {
@@ -397,83 +447,93 @@ window.publishPost = () => {
   const title   = document.getElementById('wTitle').value.trim();
   const content = document.getElementById('wContent').value.trim();
   const tag     = document.getElementById('wTags').value;
+  const fontFamily = document.getElementById('wFont').value || DEFAULT_FONT;
   if(!title){document.getElementById('wTitle').focus();return;}
   if(!content){document.getElementById('wContent').focus();return;}
-  
+ 
   const name = getDisplayName();
   const tags = tag ? [tag] : [];
+
 
   console.log("tag value:", document.getElementById('wTags').value);
   console.log("tags array:", tags);
 
+
   set(push(ref(db,'perspectives')),{
-    title, 
-    content, 
+    title,
+    content,
     tags,
-    author: name, 
-    authorInitials: name.substring(0,2).toUpperCase(), 
+    fontFamily,
+    author: name,
+    authorInitials: name.substring(0,2).toUpperCase(),
     authorId: currentUser.uid,
     authorRole: userRole,
-    image: pendingImgData||null, 
+    image: pendingImgData||null,
     postedAt: Date.now(),
-    likes: 0, 
-    dislikes: 0, 
+    likes: 0,
+    dislikes: 0,
     featured: false
   });
   pendingImgData=null;
   document.getElementById('wTitle').value='';
   document.getElementById('wContent').value='';
   document.getElementById('wTags').value='';
+  populateFontSelect(document.getElementById('wFont'));
   document.getElementById('wImgPreview').textContent='';
   document.getElementById('wWC').textContent='0 words';
   window.closeModal('writeModal');
 };
 
+
 window.react = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
-  const p = posts.find(x => x.id === id); 
+  const p = posts.find(x => x.id === id);
   if (!p) return;
-  
+ 
   const uid = currentUser.uid;
   const wasLiked    = !!(p.userLikes    && p.userLikes[uid]);
   const wasDisliked = !!(p.userDislikes && p.userDislikes[uid]);
   let likes    = p.likes    || 0;
   let dislikes = p.dislikes || 0;
 
+
   const postRef = ref(db, `perspectives/${id}`);
   const updates = {};
 
+
   if (type === 'like') {
-    if (wasLiked) { 
-      updates[`userLikes/${uid}`] = null; 
-      likes--; 
+    if (wasLiked) {
+      updates[`userLikes/${uid}`] = null;
+      likes--;
     } else {
-      updates[`userLikes/${uid}`] = true; 
+      updates[`userLikes/${uid}`] = true;
       likes++;
-      if (wasDisliked) { 
-        updates[`userDislikes/${uid}`] = null; 
-        dislikes--; 
+      if (wasDisliked) {
+        updates[`userDislikes/${uid}`] = null;
+        dislikes--;
       }
     }
   } else {
-    if (wasDisliked) { 
-      updates[`userDislikes/${uid}`] = null; 
-      dislikes--; 
+    if (wasDisliked) {
+      updates[`userDislikes/${uid}`] = null;
+      dislikes--;
     } else {
-      updates[`userDislikes/${uid}`] = true; 
+      updates[`userDislikes/${uid}`] = true;
       dislikes++;
-      if (wasLiked) { 
-        updates[`userLikes/${uid}`] = null; 
-        likes--; 
+      if (wasLiked) {
+        updates[`userLikes/${uid}`] = null;
+        likes--;
       }
     }
   }
 
+
   updates[`likes`] = likes;
   updates[`dislikes`] = dislikes;
-  
+ 
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
+
 
 window.postComment = (postId) => {
   if (!currentUser) return alert("Please log in to comment.");
@@ -488,18 +548,22 @@ window.postComment = (postId) => {
   inp.value='';
 };
 
+
 window.likeComment = async (postId, cmtId) => {
   if (!auth.currentUser) {
     alert("Please log in to like comments.");
     return;
   }
 
+
   const uid = auth.currentUser.uid;
   const p = posts.find(x => x.id === postId); if (!p) return;
   const c = p.comments.find(x => x.id === cmtId); if (!c) return;
 
+
   const hasLiked = c.userLikes && c.userLikes[uid];
   const likeRef = ref(db, `perspectives/${postId}/comments/${cmtId}/userLikes/${uid}`);
+
 
   if (hasLiked) {
     await remove(likeRef);
@@ -508,31 +572,37 @@ window.likeComment = async (postId, cmtId) => {
   }
 };
 
+
 window.deleteComment = (postId, cmtId) => {
   if (confirm("Delete this comment?")) remove(ref(db,`perspectives/${postId}/comments/${cmtId}`));
 };
+
 
 window.openEditModal = () => {
   const p=posts.find(x=>x.id===currentPostId); if(!p) return;
   document.getElementById('eTitle').value   = p.title;
   document.getElementById('eContent').value = p.content;
   document.getElementById('eTags').value    = p.tags[0] || '';
+  populateFontSelect(document.getElementById('eFont'), p.fontFamily);
   document.getElementById('eWC').textContent = p.content.trim().split(/\s+/).length+' words';
   document.getElementById('eImgPreview').textContent='';
   editImgData=null;
   window.openModal('editModal');
 };
 
+
 window.saveEdit = () => {
   const p=posts.find(x=>x.id===currentPostId); if(!p) return;
   const updatedData={
     title:   document.getElementById('eTitle').value.trim()||p.title,
     content: document.getElementById('eContent').value.trim()||p.content,
-    tags:    document.getElementById('eTags').value ? [document.getElementById('eTags').value] : []
+    tags:    document.getElementById('eTags').value ? [document.getElementById('eTags').value] : [],
+    fontFamily: document.getElementById('eFont').value || DEFAULT_FONT
   };
   if(editImgData) updatedData.image=editImgData;
   update(ref(db,`perspectives/${currentPostId}`),updatedData).then(()=>window.closeModal('editModal'));
 };
+
 
 window.deletePost = async () => {
   if (currentPostId) {

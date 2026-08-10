@@ -5,11 +5,18 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
+import { populateFontSelect, getFontStack, DEFAULT_FONT } from './font-options.js';
+
+
 
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
 const auth = getAuth(app);
+
+// Populate the "New Feature" font picker once on load
+populateFontSelect(document.getElementById('pubFont'));
+
 
 // 2. ── AUTH STATE ──
 let currentUser  = null;
@@ -18,9 +25,13 @@ let userProfile  = null;
 
 
 
+
+
+
 onAuthStateChanged(auth, async (user) => {
   // Grab the container, not just the button
   const adminControls = document.getElementById('admin-only-controls');
+
 
   if (user) {
     currentUser = user;
@@ -35,32 +46,48 @@ onAuthStateChanged(auth, async (user) => {
     userProfile = null;
   }
 
+
   // Toggle the entire container based on the admin role
   if (adminControls) {
     adminControls.style.display = (userRole === 'admin') ? 'block' : 'none';
   }
 
+
   if (currentFeatureId) renderArticle();
   else renderList();
 });
 
+
 // 3. ── GLOBAL STATE ──
 let features         = [];
 let currentFeatureId = sessionStorage.getItem("openFeature") || null;
+
 
 const urlParams = new URLSearchParams(window.location.search);
 const articleSlug = urlParams.get("article");
 let activeTag        = 'all';
 let pinnedIds = new Set();
 
+
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
   return user.email.split('@')[0];
 }
 
+
 // 4. ── HELPERS ──
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+
+// Inline formatting: *bold*, **italic**, ~underline~
+// Runs on already-HTML-escaped text, so it only ever inserts our own safe tags.
+function applyInlineFormatting(s) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<em>$1</em>')       // **italic** — must run before single *
+    .replace(/\*(.+?)\*/g, '<span style="font-weight: bold;">$1</span>')   // *bold*
+    .replace(/~(.+?)~/g, '<u>$1</u>');              // ~underline~
 }
 
 function parseContent(raw) {
@@ -68,15 +95,16 @@ function parseContent(raw) {
     para = para.trim();
     if (para.startsWith("===")) {
       const h = para.replace(/^===\s*/, "").replace(/\s*===$/, "");
-      return `<h3>${escHtml(h)}</h3>`;
+      return `<h3>${applyInlineFormatting(escHtml(h))}</h3>`;
     }
     if (para.startsWith("[EXAMPLE]")) {
       const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim();
-      return `<div class="example-box"><strong>EXAMPLE</strong>${escHtml(inner)}</div>`;
+      return `<div class="example-box"><strong>EXAMPLE</strong>${applyInlineFormatting(escHtml(inner))}</div>`;
     }
-    return `<p>${escHtml(para)}</p>`;
+    return `<p>${applyInlineFormatting(escHtml(para))}</p>`;
   }).join("");
 }
+
 
 function relativeTime(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -87,9 +115,11 @@ function relativeTime(ts) {
 }
 function wordCount(text) { return text.trim() ? text.trim().split(/\s+/).length : 0; }
 
+
 // Per-user like helpers — reads from userLikes/{uid} map on the post
 function myLiked(f)    { return !!(currentUser && f.userLikes    && f.userLikes[currentUser.uid]); }
 function myDisliked(f) { return !!(currentUser && f.userDislikes && f.userDislikes[currentUser.uid]); }
+
 
 // 5. ── WINDOW BINDINGS ──
 window.updateWordCount     = () => { document.getElementById('wordCount').textContent     = wordCount(document.getElementById('pubContent').value) + ' words'; };
@@ -98,6 +128,7 @@ window.openModal  = (id) => { document.getElementById(id).classList.add('open');
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
 window.renderList = renderList;
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
 
 window.showList = () => {
   document.getElementById('viewList').classList.add('active');
@@ -108,13 +139,16 @@ window.showList = () => {
 window.showArticle = (id) => {
   currentFeatureId = id;
 
+
   const feature = features.find(f => f.id === id);
+
 
   if (feature) {
     const slug = feature.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
+
 
     history.pushState(
       { article: id },
@@ -123,11 +157,13 @@ window.showArticle = (id) => {
     );
   }
 
+
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
 };
 window.openConfirmDelete = () => { window.openModal('confirmModal'); };
+
 
 window.togglePin = async (id, alreadyPinned) => {
   if (alreadyPinned) {
@@ -139,9 +175,10 @@ window.togglePin = async (id, alreadyPinned) => {
   } else {
     const f = features.find(x => x.id === id);
     if (!f) return;
-    
+   
     const commentCount = f.comments ? f.comments.length : 0;
     const name = getDisplayName(currentUser);
+
 
     await set(push(ref(db, "bulletin")), {
       originalId: id,
@@ -162,6 +199,7 @@ window.togglePin = async (id, alreadyPinned) => {
   renderArticle();
 };
 
+
 // 6. ── FIREBASE LISTENER ──
 onValue(ref(db, 'features'), (snapshot) => {
   const data = snapshot.val();
@@ -174,6 +212,7 @@ onValue(ref(db, 'features'), (snapshot) => {
     });
     features.sort((a,b) => b.postedAt - a.postedAt);
 
+
     // Open article from URL if one exists
 if (articleSlug && !currentFeatureId) {
   const matchingArticle = features.find(f => {
@@ -182,8 +221,10 @@ if (articleSlug && !currentFeatureId) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
 
+
     return slug === articleSlug;
   });
+
 
   if (matchingArticle) {
     currentFeatureId = matchingArticle.id;
@@ -198,16 +239,17 @@ if (articleSlug && !currentFeatureId) {
         currentFeatureId = null; // Failsafe
       }
     }
-  } else { 
-    features = []; 
+  } else {
+    features = [];
   }
+
 
   // Force the correct view to show based on the ID state
   if (currentFeatureId) {
     document.getElementById('viewList').classList.remove('active');
     document.getElementById('viewArticle').classList.add('active');
-    renderArticle(); 
-  } else { 
+    renderArticle();
+  } else {
     get(ref(db, 'bulletin')).then(snap => {
     const data = snap.val() || {};
     pinnedIds = new Set(Object.values(data).map(v => v.originalId).filter(Boolean));
@@ -216,50 +258,57 @@ if (articleSlug && !currentFeatureId) {
   }
 });
 
+
 // 7. ── RENDER FUNCTIONS ──
 function renderList() {
-  const el = document.getElementById('featuresList'); 
+  const el = document.getElementById('featuresList');
   if (!el) return;
 
+
   // 1. Handle the "Global" empty state (no posts at all)
-  if (!features || features.length === 0) { 
-    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet. Be the first to contribute!</p></div>`; 
-    return; 
+  if (!features || features.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features published yet. Be the first to contribute!</p></div>`;
+    return;
   }
+
 
   const searchInput = document.getElementById('searchInput');
   const q = searchInput ? searchInput.value.toLowerCase() : '';
+
 
   // 2. Apply filtering (Search + Tags combined)
   let displayFeatures = features.filter(f => {
     // Check if the post matches the active tag
     const matchTag = !activeTag || activeTag === 'all' || f.tag === activeTag;
-    
+   
     // Check if the post matches the search query (title, author, or tag)
-    const matchSearch = !q || 
-                        (f.title && f.title.toLowerCase().includes(q)) || 
-                        (f.author && f.author.toLowerCase().includes(q)) || 
+    const matchSearch = !q ||
+                        (f.title && f.title.toLowerCase().includes(q)) ||
+                        (f.author && f.author.toLowerCase().includes(q)) ||
                         (f.tag && f.tag.toLowerCase().includes(q));
-                        
+                       
     return matchTag && matchSearch;
   });
 
+
   // 3. Handle the "Filter" empty state (posts exist, but not for this tag/search)
-  if (displayFeatures.length === 0) { 
+  if (displayFeatures.length === 0) {
     // Updated this string so it makes sense for both tag and search misses
-    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features found matching your search or tag criteria.</p></div>`; 
-    return; 
+    el.innerHTML = `<div class="empty-state"><p class="empty-text">No features found matching your search or tag criteria.</p></div>`;
+    return;
   }
 
-  // 4. Render the filtered list 
+
+  // 4. Render the filtered list
   el.innerHTML = displayFeatures.map(f => {
     const iLiked    = myLiked(f);
     const iDisliked = myDisliked(f);
-    
+   
     // Create excerpt: first paragraph or first 200 chars
     const excerpt = f.content.split('\n\n')[0].slice(0, 200) + (f.content.length > 200 ? '…' : '');
-    
+   
     const isPinned = typeof pinnedIds !== 'undefined' && pinnedIds.has(f.id);
+
 
     return `
     <div class="feature-card" onclick="showArticle('${f.id}')">
@@ -301,28 +350,30 @@ function renderList() {
   }).join('');
 }
 
+
 function renderArticle() {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return window.showList();
-  
+ 
   // Updated: parse === Headings === and [EXAMPLE] blocks
   const paragraphs = parseContent(f.content);
-  
+ 
   const wc         = wordCount(f.content);
   const readMin    = Math.max(1, Math.round(wc/200));
   const iLiked     = myLiked(f);
   const iDisliked  = myDisliked(f);
 
+
   // Only author or admin sees Edit/Delete, Admin sees Pin
   const canEdit = currentUser && f.authorId === currentUser.uid; // only own posts
   const canDelete = currentUser && (f.authorId === currentUser.uid || userRole === 'admin'); // own + admin
   const isAdmin    = userRole === 'admin';
-  
+ 
   const topActions = document.getElementById('articleTopActions');
   if (topActions) {
     get(ref(db, "bulletin")).then(snap => {
       const bulletinData = snap.val() || {};
       const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === f.id && b.type === 'weekly');
-      
+     
       topActions.innerHTML = `
         ${canEdit ? `
           <button class="topbar-btn btn-edit" onclick="openEditModal()">
@@ -340,15 +391,17 @@ function renderArticle() {
     });
   }
 
+
   const commentsHtml = f.comments.length
     ? f.comments.map(c => {
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
         const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
-        
+       
         return `
         <div class="comment-item" id="comment-${c.id}">
           ${profileAvatarHtml(c.authorId, "span", "author-av", "", escHtml(c.initials || "?"), { role: c.authorRole || "member" })}
+
 
           <div class="comment-bubble">
             <div class="comment-bubble-header">
@@ -371,6 +424,7 @@ function renderArticle() {
       }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px;">No comments yet. Be the first to respond!</p>';
 
+
   document.getElementById('articleBody').innerHTML = `
     <div class="article-eyebrow">WEEKLY FEATURE · ${f.tag?f.tag.toUpperCase():'ECONOMICS'}</div>
     <div class="article-title">${escHtml(f.title)}</div>
@@ -384,7 +438,7 @@ function renderArticle() {
     </div>
     ${f.tag?`<div class="article-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>`:''}
     <div class="article-divider"></div>
-    <div class="article-content">${paragraphs}</div>
+    <div class="article-content" style="font-family:${getFontStack(f.fontFamily)}">${paragraphs}</div>
     <div class="reaction-bar">
       <button class="react-btn ${iLiked?'liked':''}" onclick="reactFeature('${f.id}','like')">
         <svg width="15" height="15" fill="${iLiked?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
@@ -411,15 +465,18 @@ function renderArticle() {
     </div>`;
 }
 
+
 // 8. ── DATABASE MUTATIONS ──
 window.publishFeature = async () => {
   if (!currentUser) return alert("Please log in to post.");
+
 
   // 1. Fetch user role from database before allowing the post
   try {
     const userRef = ref(db, `users/${currentUser.uid}`);
     const userSnapshot = await get(userRef);
     const userData = userSnapshot.val();
+
 
     if (!userData || userData.role !== 'admin') {
       alert("Access Denied: Only Exec Board members can publish Weekly Features.");
@@ -431,30 +488,35 @@ window.publishFeature = async () => {
     return alert("System error. Please try again later.");
   }
 
+
   // 2. Proceed with validation
   const title   = document.getElementById('pubTitle').value.trim();
   const content = document.getElementById('pubContent').value.trim();
   const tag     = document.getElementById('pubTag').value.trim();
+  const fontFamily = document.getElementById('pubFont').value || DEFAULT_FONT;
+
 
   if (!title)   { document.getElementById('pubTitle').focus();   return; }
   if (!content) { document.getElementById('pubContent').focus(); return; }
 
+
   // 3. Perform the mutation
   const name = getDisplayName(currentUser);
   set(push(ref(db, 'features')), {
-    title, content, tag,
-    author: name, 
-    authorInitials: name.substring(0,2).toUpperCase(), 
+    title, content, tag, fontFamily,
+    author: name,
+    authorInitials: name.substring(0,2).toUpperCase(),
     authorId: currentUser.uid,
     authorRole: userRole,
-    postedAt: Date.now(), 
-    likes: 0, 
+    postedAt: Date.now(),
+    likes: 0,
     dislikes: 0
   }).then(() => {
     // 4. Cleanup UI
     document.getElementById('pubTitle').value = '';
     document.getElementById('pubContent').value = '';
     document.getElementById('pubTag').value = '';
+    populateFontSelect(document.getElementById('pubFont'));
     document.getElementById('wordCount').textContent = '0 words';
     window.closeModal('publishModal');
   }).catch((error) => {
@@ -462,65 +524,69 @@ window.publishFeature = async () => {
   });
 };
 
+
 window.reactFeature = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
-  const f = features.find(x => x.id === id); 
+  const f = features.find(x => x.id === id);
   if (!f) return;
-  
+ 
   const uid = currentUser.uid;
   const wasLiked    = !!(f.userLikes    && f.userLikes[uid]);
   const wasDisliked = !!(f.userDislikes && f.userDislikes[uid]);
   let likes    = f.likes    || 0;
   let dislikes = f.dislikes || 0;
-  
+ 
   // 1. Target the specific feature post, NOT the root db
   const postRef = ref(db, `features/${id}`);
   const updates = {}; // Keys will now be relative to the post
 
+
   if (type === 'like') {
-    if (wasLiked) { 
-      updates[`userLikes/${uid}`] = null; 
-      likes--; 
+    if (wasLiked) {
+      updates[`userLikes/${uid}`] = null;
+      likes--;
     } else {
-      updates[`userLikes/${uid}`] = true; 
+      updates[`userLikes/${uid}`] = true;
       likes++;
-      if (wasDisliked) { 
-        updates[`userDislikes/${uid}`] = null; 
-        dislikes--; 
+      if (wasDisliked) {
+        updates[`userDislikes/${uid}`] = null;
+        dislikes--;
       }
     }
   } else {
-    if (wasDisliked) { 
-      updates[`userDislikes/${uid}`] = null; 
-      dislikes--; 
+    if (wasDisliked) {
+      updates[`userDislikes/${uid}`] = null;
+      dislikes--;
     } else {
-      updates[`userDislikes/${uid}`] = true; 
+      updates[`userDislikes/${uid}`] = true;
       dislikes++;
-      if (wasLiked) { 
-        updates[`userLikes/${uid}`] = null; 
-        likes--; 
+      if (wasLiked) {
+        updates[`userLikes/${uid}`] = null;
+        likes--;
       }
     }
   }
-  
+ 
   updates[`likes`]    = likes;
   updates[`dislikes`] = dislikes;
+
 
   // Update reactions list (for "See reactions" modal), keyed by uid
   const userName     = getDisplayName(currentUser);
   const userInitials = userName.substring(0,2).toUpperCase();
   const newType = type === 'like' ? '👍' : '👎';
   const alreadyToggled = (type === 'like' && wasLiked) || (type === 'dislike' && wasDisliked);
-  
+ 
   if (alreadyToggled) {
     updates[`reactionsByUser/${uid}`] = null;
   } else {
     updates[`reactionsByUser/${uid}`] = { uid, name: userName, initials: userInitials, type: newType };
   }
-  
+ 
   // 2. Execute the update specifically on this post
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
+
 
 window.openReactions = (id) => {
   const f = features.find(x => x.id === id); if (!f) return;
@@ -532,6 +598,7 @@ window.openReactions = (id) => {
   document.getElementById('reactionsList').innerHTML = html;
   window.openModal('reactionsModal');
 };
+
 
 window.postComment = (featureId) => {
   if (!currentUser) return alert("Please log in to comment.");
@@ -546,6 +613,7 @@ window.postComment = (featureId) => {
   input.value = '';
 };
 
+
 window.likeComment = async (featureId, commentId) => {
   // 1. Ensure user is logged in
   if (!auth.currentUser) {
@@ -553,19 +621,23 @@ window.likeComment = async (featureId, commentId) => {
     return;
   }
 
+
   const uid = auth.currentUser.uid;
   const f = features.find(x => x.id === featureId);
   if (!f) return;
 
+
   const c = f.comments.find(x => x.id === commentId);
   if (!c) return;
+
 
   // 2. Check if THIS specific user has already liked it
   // We check the 'userLikes' object for the user's UID
   const hasLiked = c.userLikes && c.userLikes[uid];
-  
+ 
   // 3. Reference to the user's specific like slot
   const likeRef = ref(db, `features/${featureId}/comments/${commentId}/userLikes/${uid}`);
+
 
   if (hasLiked) {
     // If already liked, remove the UID entry
@@ -576,27 +648,34 @@ window.likeComment = async (featureId, commentId) => {
   }
 };
 
+
 window.deleteComment = (featureId, commentId) => {
   if (confirm("Delete this comment?")) remove(ref(db,`features/${featureId}/comments/${commentId}`));
 };
+
 
 window.openEditModal = () => {
   const f = features.find(x=>x.id===currentFeatureId); if(!f) return;
   document.getElementById('editTitle').value   = f.title;
   document.getElementById('editTag').value     = f.tag||'';
   document.getElementById('editContent').value = f.content;
+  populateFontSelect(document.getElementById('editFont'), f.fontFamily);
   document.getElementById('editWordCount').textContent = wordCount(f.content)+' words';
   window.openModal('editModal');
 };
+
 
 window.saveEdit = () => {
   const f = features.find(x=>x.id===currentFeatureId); if(!f) return;
   update(ref(db,`features/${currentFeatureId}`),{
     title:   document.getElementById('editTitle').value.trim()||f.title,
     tag:     document.getElementById('editTag').value.trim(),
-    content: document.getElementById('editContent').value.trim()||f.content
+    content: document.getElementById('editContent').value.trim()||f.content,
+    fontFamily: document.getElementById('editFont').value || DEFAULT_FONT
   }).then(()=>window.closeModal('editModal'));
 };
+
+
 
 
 window.deleteFeature = async () => {
@@ -606,11 +685,11 @@ window.deleteFeature = async () => {
     }
 };
 
+
 window.filterByTag = (btn, tag) => {
   activeTag = tag; // This works now because we declared it above!
   document.querySelectorAll(".filter-tag").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  
+ 
   renderList(); // <--- Changed this from renderArticle() to renderList()
 };
-

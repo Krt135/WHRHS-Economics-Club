@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/weekly-feature.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
   <script src="scriptFolder/footer.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/weekly-feature.js" defer></script>
@@ -109,13 +108,19 @@
 </div>
 
       <div class="form-group">
+        <label class="form-label">Font</label>
+        <select class="form-input" id="pubFont"></select>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Essay Content</label>
         <textarea class="form-textarea" id="pubContent"
-          placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved. Use === Section Title === to add section headers.&#10;Use [EXAMPLE] Your example text [/EXAMPLE] to add highlighted example boxes."
+          placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved. Use === Section Title === to add section headers.&#10;Use [EXAMPLE] Your example text [/EXAMPLE] to add highlighted example boxes. Other text formatting: *bold*, **italic**, ~underline~"
           oninput="updateWordCount()"></textarea>
+        <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
+        <div class="form-hint">Other text formatting: *bold*, **italic**, ~underline~</div>
         <div class="word-count" id="wordCount">0 words</div>
       </div>
-      <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
       <button class="btn-full" onclick="window.publishFeature()">Publish Feature</button>
     </div>
   </div>
@@ -142,11 +147,17 @@
   </select>
 </div>
       <div class="form-group">
+        <label class="form-label">Font</label>
+        <select class="form-input" id="editFont"></select>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Essay Content</label>
         <textarea class="form-textarea" id="editContent" oninput="window.updateEditWordCount()"></textarea>
+        <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
+        <div class="form-hint">Other text formatting: *bold*, **italic**, ~underline~</div>
         <div class="word-count" id="editWordCount">0 words</div>
       </div>
-      <div class="form-hint">Use === Heading === for sections · [EXAMPLE] ... [/EXAMPLE] for highlighted examples</div>
       <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
     </div>
   </div>
