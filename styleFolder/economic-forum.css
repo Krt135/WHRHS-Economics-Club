@@ -457,7 +457,7 @@
 
   .hero-eyebrow { justify-content: center; margin-bottom: 1rem; }
 
-  .hero-title { font-size: 2.6rem; line-height: 1; }
+  .hero-title { font-size: 3.5rem; line-height: 1; }
 
   .hero-subtitle { font-size: 1.5rem; margin-bottom: 1.25rem; }
 
@@ -469,7 +469,7 @@
 
   .badge-circle { width: 110px; height: 110px; }
 
-  .badge-svg { width: 300px; height: 300px; }
+  .badge-svg { height: 400px; width: auto; margin-top: -70px; margin-bottom: -50px; }
 
   /* ── TICKER ── */
   .ticker-item { font-size: 10px; padding: 0 14px; }
