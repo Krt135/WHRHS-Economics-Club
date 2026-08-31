@@ -4,16 +4,22 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 
-const app  = initializeApp(firebaseConfig);
-const db   = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
+async function uploadFileToStorage(file, folderPath) {
+  if (!file) return null;
+  const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  const sRef = storageRef(storage, `${folderPath}/${fileName}`);
+  await uploadBytes(sRef, file);
+  return await getDownloadURL(sRef);
+}
 
 // ── QUILL SETUP ──
-// Identical config to weekly-feature.js and perspectives.js.
-// All CSS (font classes, picker labels, dark-theme overrides) lives in style.css globally.
-
 const Font = Quill.import('formats/font');
 Font.whitelist = [
   'arial', 'times-new-roman', 'georgia',
@@ -27,11 +33,13 @@ Quill.register(QuillSize, true);
 
 const QUILL_TOOLBAR = [
   ['bold', 'italic', 'underline'],
-  [{ font: [
-    false,
-    'arial', 'times-new-roman', 'georgia',
-    'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
-  ]}],
+  [{
+    font: [
+      false,
+      'arial', 'times-new-roman', 'georgia',
+      'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+    ]
+  }],
   [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
   ['link'],
   ['clean']
@@ -49,7 +57,6 @@ const eQuill = new Quill('#eEditor', {
   placeholder: 'Edit your lesson content…'
 });
 
-// Real-time word count while typing
 cQuill.on('text-change', () => {
   const text = cQuill.getText();
   document.getElementById('cWC').textContent =
@@ -61,14 +68,13 @@ eQuill.on('text-change', () => {
     (text.trim() ? text.trim().split(/\s+/).length : 0) + ' words';
 });
 
-
 // ─────────────────────────────────────────────
 //  AUTH STATE
 // ─────────────────────────────────────────────
 
-let currentUser  = null;
-let userRole     = "public";
-let userProfile  = null;
+let currentUser = null;
+let userRole = "public";
+let userProfile = null;
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -80,7 +86,7 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     currentUser = null;
-    userRole    = "public";
+    userRole = "public";
     userProfile = null;
   }
   if (currentId) renderLesson(); else renderList();
@@ -91,45 +97,41 @@ function getDisplayName(user) {
   return user.email.split('@')[0];
 }
 
-
 // ─────────────────────────────────────────────
 //  CONSTANTS / HELPERS
 // ─────────────────────────────────────────────
 
-const ICONS   = { macro:"📊", micro:"🏪", trade:"🌍", money:"💵", markets:"📈", policy:"🏛️" };
-const COLOURS = ["#0f1f3d","#1a2e52","#7c3aed","#0369a1","#065f46","#92400e"];
-function avColour(name) { let h=0; for(let c of (name||'')) h=(h*31+c.charCodeAt(0))%COLOURS.length; return COLOURS[h]; }
-function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+const ICONS = { macro: "📊", micro: "🏪", trade: "🌍", money: "💵", markets: "📈", policy: "🏛️" };
+const COLOURS = ["#0f1f3d", "#1a2e52", "#7c3aed", "#0369a1", "#065f46", "#92400e"];
+function avColour(name) { let h = 0; for (let c of (name || '')) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length; return COLOURS[h]; }
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function rel(ts) {
-  const s = Math.floor((Date.now()-ts)/1000);
-  if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+" min ago";
-  if(s<86400) return Math.floor(s/3600)+" hours ago"; return Math.floor(s/86400)+" days ago";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " hours ago"; return Math.floor(s / 86400) + " days ago";
 }
 function wdCt(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
 
-// Per-user like helpers
-function myLiked(l)    { return !!(currentUser && l.userLikes    && l.userLikes[currentUser.uid]); }
+function myLiked(l) { return !!(currentUser && l.userLikes && l.userLikes[currentUser.uid]); }
 function myDisliked(l) { return !!(currentUser && l.userDislikes && l.userDislikes[currentUser.uid]); }
-
 
 // ─────────────────────────────────────────────
 //  STATE
 // ─────────────────────────────────────────────
 
-let lessons     = {};
-let currentId   = null;
+let lessons = {};
+let currentId = null;
 let topicFilter = "all";
 let levelFilter = "all";
-let sortMode    = "newest";
-let quizState   = {};
+let sortMode = "newest";
+let quizState = {};
 let qbQuestions = [];
-
 
 // ─────────────────────────────────────────────
 //  FIREBASE LISTENER
 // ─────────────────────────────────────────────
 
-onValue(ref(db,"lessons"), snapshot => {
+onValue(ref(db, "lessons"), snapshot => {
   lessons = snapshot.val() || {};
   if (currentId) {
     if (lessons[currentId]) renderLesson();
@@ -137,95 +139,90 @@ onValue(ref(db,"lessons"), snapshot => {
   } else { renderList(); }
 });
 
-
 // ─────────────────────────────────────────────
 //  MODAL HELPERS
 // ─────────────────────────────────────────────
 
-function openModal(id)  { document.getElementById(id).classList.add("open"); }
+function openModal(id) { document.getElementById(id).classList.add("open"); }
 function closeModal(id) { document.getElementById(id).classList.remove("open"); }
 document.querySelectorAll(".modal-overlay").forEach(o =>
-  o.addEventListener("click", e => { if(e.target===o) o.classList.remove("open"); })
+  o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); })
 );
-
 
 // ─────────────────────────────────────────────
 //  VIEWS
 // ─────────────────────────────────────────────
 
 function showList() {
-  currentId=null; quizState={};
+  currentId = null; quizState = {};
   document.getElementById("viewList").classList.add("active");
   document.getElementById("viewLesson").classList.remove("active");
   renderList();
 }
 
 function showLesson(firebaseKey) {
-  currentId=firebaseKey; quizState={};
+  currentId = firebaseKey; quizState = {};
   document.getElementById("viewList").classList.remove("active");
   document.getElementById("viewLesson").classList.add("active");
   renderLesson();
 }
-
 
 // ─────────────────────────────────────────────
 //  FILTER / SORT
 // ─────────────────────────────────────────────
 
 function setTopicFilter(btn, val) {
-  topicFilter=val;
-  document.querySelectorAll(".filter-chip").forEach(b=>b.classList.remove("active"));
+  topicFilter = val;
+  document.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
   btn.classList.add("active"); renderList();
 }
 
 function setLevelFilter(btn, val) {
-  levelFilter=val;
-  document.querySelectorAll(".level-chip").forEach(b=>b.classList.remove("active"));
+  levelFilter = val;
+  document.querySelectorAll(".level-chip").forEach(b => b.classList.remove("active"));
   btn.classList.add("active"); renderList();
 }
-
 
 // ─────────────────────────────────────────────
 //  RENDER LIST
 // ─────────────────────────────────────────────
 
 function renderList() {
-  const q = (document.getElementById("searchInput")?.value||"").toLowerCase();
-  let items = Object.entries(lessons).map(([key,val])=>({...val,_key:key}));
-  if(topicFilter!=="all") items=items.filter(l=>l.topic===topicFilter);
-  if(levelFilter!=="all") items=items.filter(l=>l.level===levelFilter);
-  if(q) items=items.filter(l=>
+  const q = (document.getElementById("searchInput")?.value || "").toLowerCase();
+  let items = Object.entries(lessons).map(([key, val]) => ({ ...val, _key: key }));
+  if (topicFilter !== "all") items = items.filter(l => l.topic === topicFilter);
+  if (levelFilter !== "all") items = items.filter(l => l.level === levelFilter);
+  if (q) items = items.filter(l =>
     l.title.toLowerCase().includes(q) ||
     l.topic.includes(q) ||
     l.level.toLowerCase().includes(q) ||
-    (l.desc||"").toLowerCase().includes(q)
+    (l.desc || "").toLowerCase().includes(q)
   );
-  if(sortMode==="oldest")       items.sort((a,b)=>a.postedAt-b.postedAt);
-  else if(sortMode==="popular") items.sort((a,b)=>(b.likes||0)-(a.likes||0));
-  else                          items.sort((a,b)=>b.postedAt-a.postedAt);
+  if (sortMode === "oldest") items.sort((a, b) => a.postedAt - b.postedAt);
+  else if (sortMode === "popular") items.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  else items.sort((a, b) => b.postedAt - a.postedAt);
 
   const el = document.getElementById("lessonsList");
-  if(!items.length){
-    el.innerHTML=`<div class="empty-state"><div class="empty-italic">Educational lessons coming soon.</div><div class="empty-sub">Exec members will publish simplified economics lessons here.</div></div>`;
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-italic">Educational lessons coming soon.</div><div class="empty-sub">Exec members will publish simplified economics lessons here.</div></div>`;
     return;
   }
-  el.innerHTML = items.map(l=>{
-    const iconBg = {Beginner:"#dcfce7",Intermediate:"#fef3c7",Advanced:"#fee2e2"}[l.level]||"#f3f4f6";
-    // Use plain text for read-time estimate (works for both legacy and rich posts)
+  el.innerHTML = items.map(l => {
+    const iconBg = { Beginner: "#dcfce7", Intermediate: "#fef3c7", Advanced: "#fee2e2" }[l.level] || "#f3f4f6";
     const rawText = l.richText ? (l.contentText || '') : (l.content || '');
     const readMin = Math.max(1, Math.round(wdCt(rawText) / 130));
     const commentCount = l.comments ? Object.keys(l.comments).length : 0;
     return `
     <div class="lesson-card" onclick="showLesson('${l._key}')">
       <div class="lc-top">
-        <div class="lc-icon" style="background:${iconBg}">${esc(l.icon||ICONS[l.topic]||"📚")}</div>
+        <div class="lc-icon" style="background:${iconBg}">${esc(l.icon || ICONS[l.topic] || "📚")}</div>
         <div class="lc-badges">
           <span class="level-badge ${l.level.toLowerCase()}">${esc(l.level)}</span>
           <span class="topic-badge">${esc(l.topic)}</span>
         </div>
       </div>
       <div class="lc-title">${esc(l.title)}</div>
-      <div class="lc-desc">${esc(l.desc||"")}</div>
+      <div class="lc-desc">${esc(l.desc || "")}</div>
       <div class="lc-footer">
         <div class="lc-meta">
           <span>${rel(l.postedAt)}</span><span>·</span>
@@ -234,27 +231,24 @@ function renderList() {
         </div>
         <span class="lc-read">~${readMin} min read</span>
       </div>
-      ${l.author?`<div class="lc-author" style="font-size:12px;color:var(--text-muted);margin-top:6px">By ${esc(l.author)}</div>`:''}
+      ${l.author ? `<div class="lc-author" style="font-size:12px;color:var(--text-muted);margin-top:6px">By ${esc(l.author)}</div>` : ''}
     </div>`;
   }).join("");
 }
-
 
 // ─────────────────────────────────────────────
 //  RENDER LESSON
 // ─────────────────────────────────────────────
 
 function renderLesson() {
-  const l = lessons[currentId]; if(!l) return showList();
+  const l = lessons[currentId]; if (!l) return showList();
 
-  // ── Body HTML ──
-  // Legacy plain-text parser (kept for backward-compat with old lessons)
   function parseContent(raw) {
-    return (raw||"").split(/\n\n+/).map(para=>{
-      para=para.trim();
-      if(para.startsWith("===")){const h=para.replace(/^===\s*/,"").replace(/\s*===$/,"");return`<h3>${esc(h)}</h3>`;}
-      if(para.startsWith("[EXAMPLE]")){const inner=para.replace("[EXAMPLE]","").replace("[/EXAMPLE]","").trim();return`<div class="example-box"><strong>EXAMPLE</strong>${esc(inner)}</div>`;}
-      return`<p>${esc(para)}</p>`;
+    return (raw || "").split(/\n\n+/).map(para => {
+      para = para.trim();
+      if (para.startsWith("===")) { const h = para.replace(/^===\s*/, "").replace(/\s*===$/, ""); return `<h3>${esc(h)}</h3>`; }
+      if (para.startsWith("[EXAMPLE]")) { const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim(); return `<div class="example-box"><strong>EXAMPLE</strong>${esc(inner)}</div>`; }
+      return `<p>${esc(para)}</p>`;
     }).join("");
   }
 
@@ -262,64 +256,64 @@ function renderLesson() {
     ? (l.contentHtml || '')
     : parseContent(l.content || '');
 
-  // ── Read time ──
   const rawText = l.richText ? (l.contentText || '') : (l.content || '');
   const readMin = Math.max(1, Math.round(wdCt(rawText) / 130));
 
-  const iLiked    = myLiked(l);
+  const iLiked = myLiked(l);
   const iDisliked = myDisliked(l);
 
-  // ── Quiz ──
+  const imgHtml = l.imageUrl ? `<img src="${l.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const fileHtml = l.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${l.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${l.fileName || 'Attachment'}</a></div>` : '';
+
   const qs = Array.isArray(l.quiz) ? l.quiz : [];
   let quizHtml = "";
-  if(qs.length){
-    const qi=quizState.qi||0, score=quizState.score||0, done=quizState.done||false;
-    if(done){
-      const pct=Math.round(score/qs.length*100);
-      const icon=pct===100?"🏆":pct>=70?"🎯":"📚";
-      quizHtml=`<div class="quiz-section"><div class="quiz-header">✅ COMPREHENSION CHECK</div><div class="quiz-body"><div class="quiz-done">
+  if (qs.length) {
+    const qi = quizState.qi || 0, score = quizState.score || 0, done = quizState.done || false;
+    if (done) {
+      const pct = Math.round(score / qs.length * 100);
+      const icon = pct === 100 ? "🏆" : pct >= 70 ? "🎯" : "📚";
+      quizHtml = `<div class="quiz-section"><div class="quiz-header">✅ COMPREHENSION CHECK</div><div class="quiz-body"><div class="quiz-done">
         <div class="quiz-done-icon">${icon}</div>
-        <div class="quiz-done-title">${pct===100?"Perfect!":pct>=70?"Well done!":"Keep studying!"}</div>
+        <div class="quiz-done-title">${pct === 100 ? "Perfect!" : pct >= 70 ? "Well done!" : "Keep studying!"}</div>
         <div class="quiz-done-score">${score} / ${qs.length} correct · ${pct}%</div>
         <button class="quiz-retry" onclick="quizState={};renderLesson()">Try Again</button>
       </div></div></div>`;
     } else {
-      const q=qs[qi], answered=quizState.answered||false, chosen=quizState.chosen;
-      quizHtml=`<div class="quiz-section">
+      const q = qs[qi], answered = quizState.answered || false, chosen = quizState.chosen;
+      quizHtml = `<div class="quiz-section">
         <div class="quiz-header" style="justify-content:space-between">
-          <span>📝 COMPREHENSION CHECK</span><span class="quiz-score">Q${qi+1} of ${qs.length} · ${score} correct</span>
+          <span>📝 COMPREHENSION CHECK</span><span class="quiz-score">Q${qi + 1} of ${qs.length} · ${score} correct</span>
         </div>
         <div class="quiz-body">
           <div class="quiz-q">${esc(q.q)}</div>
           <div class="quiz-options">
-            ${(q.opts||[]).map((o,i)=>{let cls="quiz-opt";if(answered)cls+=i===q.correct?" correct":i===chosen?" wrong":" dimmed";return`<button class="${cls}" ${answered?"disabled":""} onclick="answerQuiz(${i})">${esc(o)}</button>`;}).join("")}
+            ${(q.opts || []).map((o, i) => { let cls = "quiz-opt"; if (answered) cls += i === q.correct ? " correct" : i === chosen ? " wrong" : " dimmed"; return `<button class="${cls}" ${answered ? "disabled" : ""} onclick="answerQuiz(${i})">${esc(o)}</button>`; }).join("")}
           </div>
-          <div class="quiz-feedback ${answered?"visible":""}">
-            <strong>${answered&&chosen===q.correct?"✓ Correct! ":"✗ Not quite. "}</strong>
-            ${answered?esc(q.exp||""):""}
+          <div class="quiz-feedback ${answered ? "visible" : ""}">
+            <strong>${answered && chosen === q.correct ? "✓ Correct! " : "✗ Not quite. "}</strong>
+            ${answered ? esc(q.exp || "") : ""}
           </div>
-          <button class="quiz-next ${answered?"visible":""}" onclick="nextQuiz()">
-            ${qi+1<qs.length?"Next Question →":"See Results →"}
+          <button class="quiz-next ${answered ? "visible" : ""}" onclick="nextQuiz()">
+            ${qi + 1 < qs.length ? "Next Question →" : "See Results →"}
           </button>
         </div>
       </div>`;
     }
   }
 
-  // ── Comments ──
   const commentEntries = l.comments
-    ? Object.entries(l.comments).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.postedAt-b.postedAt)
+    ? Object.entries(l.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
     : [];
 
-  const canEdit   = currentUser && l.authorId === currentUser.uid;
+  const canEdit = currentUser && l.authorId === currentUser.uid;
   const canDelete = currentUser && (l.authorId === currentUser.uid || userRole === 'admin');
 
   const commentsHtml = commentEntries.length
-    ? commentEntries.map(c=>{
-        const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
-        const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
-        return `
+    ? commentEntries.map(c => {
+      const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
+      const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+      const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+      return `
         <div class="comment-item">
           ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avColour(c.author)}`, esc(c.initials || "?"))}
           <div class="comment-bubble">
@@ -333,15 +327,15 @@ function renderLesson() {
                 <svg width="12" height="12" fill="${amILiked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 002 2.3H14z"/></svg>
                 ${totalCommentLikes}
               </button>
-              ${canDeleteComment?`
+              ${canDeleteComment ? `
               <button class="cmt-act cmt-del" onclick="deleteComment('${currentId}','${c._key}')">
                 <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
                 Delete
-              </button>`:''}
+              </button>`: ''}
             </div>
           </div>
         </div>`;
-      }).join("")
+    }).join("")
     : `<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet — ask a question or leave a thought!</p>`;
 
   document.getElementById("lessonTopActions").innerHTML = `
@@ -356,32 +350,34 @@ function renderLesson() {
 
   const concepts = Array.isArray(l.concepts) ? l.concepts : [];
 
-  document.getElementById("lessonBody").innerHTML = `
+document.getElementById("lessonBody").innerHTML = `
     <div class="lesson-eyebrow">THE ACADEMY · ${esc(l.topic.toUpperCase())} · <span class="level-badge ${l.level.toLowerCase()}">${esc(l.level)}</span></div>
-    <div class="lesson-hero-icon">${esc(l.icon||ICONS[l.topic]||"📚")}</div>
+    <div class="lesson-hero-icon">${esc(l.icon || ICONS[l.topic] || "📚")}</div>
     <div class="lesson-title">${esc(l.title)}</div>
     <div class="lesson-meta-row">
-      ${l.author?`<span style="font-size:13px;color:var(--text-muted)">By <strong>${esc(l.author)}</strong></span><span style="font-size:13px;color:var(--text-muted)">·</span>`:''}
+      ${l.author ? `<span style="font-size:13px;color:var(--text-muted)">By <strong>${esc(l.author)}</strong></span><span style="font-size:13px;color:var(--text-muted)">·</span>` : ''}
       <span style="font-size:13px;color:var(--text-muted)">${rel(l.postedAt)}</span>
       <span style="font-size:13px;color:var(--text-muted)">·</span>
       <span style="font-size:13px;color:var(--text-muted)">~${readMin} min read</span>
       <span style="font-size:13px;color:var(--text-muted)">·</span>
-      <span style="font-size:13px;color:var(--text-muted)">${commentEntries.length} comment${commentEntries.length!==1?"s":""}</span>
+      <span style="font-size:13px;color:var(--text-muted)">${commentEntries.length} comment${commentEntries.length !== 1 ? "s" : ""}</span>
     </div>
-    ${concepts.length?`<div class="key-concepts"><div class="kc-title">KEY CONCEPTS IN THIS LESSON</div><ul class="kc-list">${concepts.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`:""}
+    ${concepts.length ? `<div class="key-concepts"><div class="kc-title">KEY CONCEPTS IN THIS LESSON</div><ul class="kc-list">${concepts.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
     <div class="lesson-divider"></div>
+    ${imgHtml}
+    ${fileHtml}
     <div class="lesson-content">${lessonHtml}</div>
     ${quizHtml}
     <div class="lesson-reaction">
-      <button class="react-btn ${iLiked?"liked":""}" onclick="reactLesson('like')">
-        👍 Helpful (${l.likes||0})
+      <button class="react-btn ${iLiked ? "liked" : ""}" onclick="reactLesson('like')">
+        👍 Helpful (${l.likes || 0})
       </button>
-      <button class="react-btn ${iDisliked?"disliked":""}" onclick="reactLesson('dislike')">
-        👎 Not Helpful (${l.dislikes||0})
+      <button class="react-btn ${iDisliked ? "disliked" : ""}" onclick="reactLesson('dislike')">
+        👎 Not Helpful (${l.dislikes || 0})
       </button>
     </div>
     <div class="comments-area">
-      <div class="comments-title">💬 ${commentEntries.length} Comment${commentEntries.length!==1?"s":""}</div>
+      <div class="comments-title">💬 ${commentEntries.length} Comment${commentEntries.length !== 1 ? "s" : ""}</div>
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:16px">
         <textarea class="new-comment-input" id="cmtInput" placeholder="Ask a question or leave a comment..."></textarea>
@@ -390,7 +386,6 @@ function renderLesson() {
     </div>`;
 }
 
-
 // ─────────────────────────────────────────────
 //  PUBLISH LESSON
 // ─────────────────────────────────────────────
@@ -398,58 +393,72 @@ function renderLesson() {
 async function publishLesson() {
   if (!currentUser) return alert("Please log in to post.");
 
-  const title       = document.getElementById("cTitle").value.trim();
+  const title = document.getElementById("cTitle").value.trim();
   const contentHtml = cQuill.root.innerHTML;
   const contentText = cQuill.getText().trim();
 
-  if (!title)       { document.getElementById("cTitle").focus(); return; }
+  if (!title) { document.getElementById("cTitle").focus(); return; }
   if (!contentText) { cQuill.focus(); return; }
 
-  const name      = getDisplayName(currentUser);
-  const initials  = name.substring(0, 2).toUpperCase();
-  const concepts  = document.getElementById("cConcepts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const name = getDisplayName(currentUser);
+  const initials = name.substring(0, 2).toUpperCase();
+  const concepts = document.getElementById("cConcepts").value.split("\n").map(s => s.trim()).filter(Boolean);
   const validQuiz = qbQuestions.filter(q => q.q && q.opts.filter(Boolean).length >= 2);
+
+  const imgFile = document.getElementById("cImage").files[0];
+  const attFile = document.getElementById("cFile").files[0];
+
+  const imageUrl = await uploadFileToStorage(imgFile, 'academy_images');
+  const fileUrl = await uploadFileToStorage(attFile, 'academy_files');
+  const fileName = attFile ? attFile.name : null;
 
   const newRef = push(ref(db, "lessons"));
   await set(newRef, {
-    icon:     document.getElementById("cIcon").value.trim() || ICONS[document.getElementById("cTopic").value] || "📚",
+    icon: document.getElementById("cIcon").value.trim() || ICONS[document.getElementById("cTopic").value] || "📚",
     title,
-    topic:    document.getElementById("cTopic").value,
-    level:    document.getElementById("cLevel").value,
-    desc:     document.getElementById("cDesc").value.trim() || title,
+    topic: document.getElementById("cTopic").value,
+    level: document.getElementById("cLevel").value,
+    desc: document.getElementById("cDesc").value.trim() || title,
     concepts,
-    richText:    true,
-    contentHtml,      // Quill HTML — used for lesson rendering
-    contentText,      // Plain text — used for read-time, word count, search
-    quiz:     validQuiz,
+    richText: true,
+    contentHtml,      
+    contentText,      
+    quiz: validQuiz,
+    imageUrl,
+    fileUrl,
+    fileName,
     author: name, authorInitials: initials, authorId: currentUser.uid,
     postedAt: Date.now(), likes: 0, dislikes: 0
   });
 
-  ["cTitle","cDesc","cIcon","cConcepts"].forEach(id => document.getElementById(id).value = "");
+  ["cTitle", "cDesc", "cIcon", "cConcepts"].forEach(id => document.getElementById(id).value = "");
   cQuill.setContents([]);
   document.getElementById("cWC").textContent = "0 words";
+  document.getElementById("cImage").value = "";
+  document.getElementById("cFile").value = "";
   qbQuestions = []; renderQuizBuilder(); closeModal("createModal");
 }
-
 
 // ─────────────────────────────────────────────
 //  EDIT / DELETE LESSON
 // ─────────────────────────────────────────────
 
 function openEditModal() {
-  const l = lessons[currentId]; if(!l) return;
-  document.getElementById("eTitle").value    = l.title;
-  document.getElementById("eTopic").value    = l.topic;
-  document.getElementById("eLevel").value    = l.level;
-  document.getElementById("eIcon").value     = l.icon || "";
-  document.getElementById("eDesc").value     = l.desc || "";
+  const l = lessons[currentId]; if (!l) return;
+  document.getElementById("eTitle").value = l.title;
+  document.getElementById("eTopic").value = l.topic;
+  document.getElementById("eLevel").value = l.level;
+  document.getElementById("eIcon").value = l.icon || "";
+  document.getElementById("eDesc").value = l.desc || "";
   document.getElementById("eConcepts").value = (Array.isArray(l.concepts) ? l.concepts : []).join("\n");
+  document.getElementById("eImage").value = "";
+  document.getElementById("eFile").value = "";
+  document.getElementById("eImageStatus").innerHTML = l.imageUrl ? `Current: <a href="${l.imageUrl}" target="_blank">View Image</a>` : 'None';
+  document.getElementById("eFileStatus").innerHTML = l.fileUrl ? `Current: <a href="${l.fileUrl}" target="_blank">${l.fileName || 'View File'}</a>` : 'None';
 
   if (l.richText) {
     eQuill.clipboard.dangerouslyPasteHTML(l.contentHtml || '');
   } else {
-    // Legacy lesson: load as plain text; upgrades to richText on save
     eQuill.setText(l.content || '');
   }
 
@@ -459,25 +468,36 @@ function openEditModal() {
 }
 
 async function saveEdit() {
-  const l = lessons[currentId]; if(!l) return;
+  const l = lessons[currentId]; if (!l) return;
 
   const contentHtml = eQuill.root.innerHTML;
   const contentText = eQuill.getText().trim();
   if (!contentText) { eQuill.focus(); return; }
 
-  const concepts = document.getElementById("eConcepts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const concepts = document.getElementById("eConcepts").value.split("\n").map(s => s.trim()).filter(Boolean);
 
-  await update(ref(db, `lessons/${currentId}`), {
-    title:    document.getElementById("eTitle").value.trim() || l.title,
-    topic:    document.getElementById("eTopic").value,
-    level:    document.getElementById("eLevel").value,
-    icon:     document.getElementById("eIcon").value.trim() || ICONS[document.getElementById("eTopic").value] || "📚",
-    desc:     document.getElementById("eDesc").value.trim() || l.desc,
+  const updates = {
+    title: document.getElementById("eTitle").value.trim() || l.title,
+    topic: document.getElementById("eTopic").value,
+    level: document.getElementById("eLevel").value,
+    icon: document.getElementById("eIcon").value.trim() || ICONS[document.getElementById("eTopic").value] || "📚",
+    desc: document.getElementById("eDesc").value.trim() || l.desc,
     concepts,
-    richText:    true,
+    richText: true,
     contentHtml,
     contentText
-  });
+  };
+
+  const imgFile = document.getElementById("eImage").files[0];
+  const attFile = document.getElementById("eFile").files[0];
+
+  if (imgFile) updates.imageUrl = await uploadFileToStorage(imgFile, 'academy_images');
+  if (attFile) {
+    updates.fileUrl = await uploadFileToStorage(attFile, 'academy_files');
+    updates.fileName = attFile.name;
+  }
+
+  await update(ref(db, `lessons/${currentId}`), updates);
   closeModal("editModal");
 }
 
@@ -486,39 +506,38 @@ async function deleteLesson() {
   closeModal("confirmModal"); showList();
 }
 
-
 // ─────────────────────────────────────────────
 //  REACTIONS (per-user)
 // ─────────────────────────────────────────────
 
 async function reactLesson(type) {
   if (!currentUser) return alert("Please log in to react.");
-  const l = lessons[currentId]; if(!l) return;
+  const l = lessons[currentId]; if (!l) return;
 
   const uid = currentUser.uid;
-  const wasLiked    = !!(l.userLikes    && l.userLikes[uid]);
+  const wasLiked = !!(l.userLikes && l.userLikes[uid]);
   const wasDisliked = !!(l.userDislikes && l.userDislikes[uid]);
-  let likes    = l.likes    || 0;
+  let likes = l.likes || 0;
   let dislikes = l.dislikes || 0;
 
   const lessonRef = ref(db, `lessons/${currentId}`);
   const updates = {};
 
   if (type === "like") {
-    if (wasLiked) { updates[`userLikes/${uid}`]=null; likes--; }
+    if (wasLiked) { updates[`userLikes/${uid}`] = null; likes--; }
     else {
-      updates[`userLikes/${uid}`]=true; likes++;
-      if (wasDisliked) { updates[`userDislikes/${uid}`]=null; dislikes--; }
+      updates[`userLikes/${uid}`] = true; likes++;
+      if (wasDisliked) { updates[`userDislikes/${uid}`] = null; dislikes--; }
     }
   } else {
-    if (wasDisliked) { updates[`userDislikes/${uid}`]=null; dislikes--; }
+    if (wasDisliked) { updates[`userDislikes/${uid}`] = null; dislikes--; }
     else {
-      updates[`userDislikes/${uid}`]=true; dislikes++;
-      if (wasLiked) { updates[`userLikes/${uid}`]=null; likes--; }
+      updates[`userDislikes/${uid}`] = true; dislikes++;
+      if (wasLiked) { updates[`userLikes/${uid}`] = null; likes--; }
     }
   }
 
-  updates['likes']    = likes;
+  updates['likes'] = likes;
   updates['dislikes'] = dislikes;
 
   try {
@@ -529,7 +548,6 @@ async function reactLesson(type) {
   }
 }
 
-
 // ─────────────────────────────────────────────
 //  COMMENTS
 // ─────────────────────────────────────────────
@@ -537,11 +555,11 @@ async function reactLesson(type) {
 async function postComment() {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById("cmtInput");
-  if(!inp || !inp.value.trim()) return;
+  if (!inp || !inp.value.trim()) return;
   const name = getDisplayName(currentUser);
   const cmtRef = push(ref(db, `lessons/${currentId}/comments`));
   await set(cmtRef, {
-    author: name, initials: name.substring(0,2).toUpperCase(),
+    author: name, initials: name.substring(0, 2).toUpperCase(),
     authorId: currentUser.uid, text: inp.value.trim(),
     postedAt: Date.now(), likes: 0, liked: false
   });
@@ -555,61 +573,58 @@ async function likeComment(lessonKey, commentKey) {
   const c = l && l.comments ? l.comments[commentKey] : null;
   if (!c) return;
   const hasLiked = c.userLikes && c.userLikes[uid];
-  const likeRef  = ref(db, `lessons/${lessonKey}/comments/${commentKey}/userLikes/${uid}`);
+  const likeRef = ref(db, `lessons/${lessonKey}/comments/${commentKey}/userLikes/${uid}`);
   if (hasLiked) { await remove(likeRef); } else { await set(likeRef, true); }
 }
 
 async function deleteComment(lessonKey, commentKey) {
-  if(confirm("Delete this comment?")) await remove(ref(db, `lessons/${lessonKey}/comments/${commentKey}`));
+  if (confirm("Delete this comment?")) await remove(ref(db, `lessons/${lessonKey}/comments/${commentKey}`));
 }
-
 
 // ─────────────────────────────────────────────
 //  QUIZ
 // ─────────────────────────────────────────────
 
 function answerQuiz(i) {
-  const l=lessons[currentId]; if(!l) return;
-  const q=(l.quiz||[])[quizState.qi||0];
-  if(quizState.answered) return;
-  quizState.answered=true; quizState.chosen=i;
-  if(i===q.correct) quizState.score=(quizState.score||0)+1;
+  const l = lessons[currentId]; if (!l) return;
+  const q = (l.quiz || [])[quizState.qi || 0];
+  if (quizState.answered) return;
+  quizState.answered = true; quizState.chosen = i;
+  if (i === q.correct) quizState.score = (quizState.score || 0) + 1;
   renderLesson();
 }
 
 function nextQuiz() {
-  const l=lessons[currentId]; if(!l) return;
-  const qi=(quizState.qi||0)+1;
-  if(qi>=(l.quiz||[]).length){ quizState.done=true; }
-  else{ quizState.qi=qi; quizState.answered=false; quizState.chosen=undefined; }
+  const l = lessons[currentId]; if (!l) return;
+  const qi = (quizState.qi || 0) + 1;
+  if (qi >= (l.quiz || []).length) { quizState.done = true; }
+  else { quizState.qi = qi; quizState.answered = false; quizState.chosen = undefined; }
   renderLesson();
 }
-
 
 // ─────────────────────────────────────────────
 //  QUIZ BUILDER
 // ─────────────────────────────────────────────
 
-function addQuizQuestion() { qbQuestions.push({q:"",opts:["","","",""],correct:0,exp:""}); renderQuizBuilder(); }
+function addQuizQuestion() { qbQuestions.push({ q: "", opts: ["", "", "", ""], correct: 0, exp: "" }); renderQuizBuilder(); }
 
 function renderQuizBuilder() {
   const el = document.getElementById("quizBuilder");
-  el.innerHTML = qbQuestions.map((qq,qi)=>`
+  el.innerHTML = qbQuestions.map((qq, qi) => `
     <div class="qb-question">
-      <div class="qb-q-label">Question ${qi+1}</div>
+      <div class="qb-q-label">Question ${qi + 1}</div>
       <input class="form-input" style="margin-bottom:8px;font-size:14px" placeholder="Question text..." value="${esc(qq.q)}" oninput="qbQuestions[${qi}].q=this.value">
       <div class="qb-opts">
-        ${qq.opts.map((o,oi)=>`
+        ${qq.opts.map((o, oi) => `
           <div class="qb-opt-row">
-            <input class="qb-opt-input" placeholder="Option ${oi+1}" value="${esc(o)}" oninput="qbQuestions[${qi}].opts[${oi}]=this.value">
-            <input type="radio" class="qb-correct-radio" name="correct_${qi}" ${qq.correct===oi?"checked":""} onchange="qbQuestions[${qi}].correct=${oi}" title="Mark as correct">
+            <input class="qb-opt-input" placeholder="Option ${oi + 1}" value="${esc(o)}" oninput="qbQuestions[${qi}].opts[${oi}]=this.value">
+            <input type="radio" class="qb-correct-radio" name="correct_${qi}" ${qq.correct === oi ? "checked" : ""} onchange="qbQuestions[${qi}].correct=${oi}" title="Mark as correct">
             <span class="qb-correct-label">✓ correct</span>
           </div>`).join("")}
       </div>
       <input class="form-input" style="margin-top:8px;font-size:13px" placeholder="Explanation (shown after answering)..." value="${esc(qq.exp)}" oninput="qbQuestions[${qi}].exp=this.value">
     </div>`).join("");
 }
-
 
 // ─────────────────────────────────────────────
 //  EXPOSE TO HTML
@@ -623,4 +638,4 @@ Object.assign(window, {
   answerQuiz, nextQuiz, addQuizQuestion, renderQuizBuilder,
 });
 
-window.setSortMode = (val) => { sortMode=val; renderList(); };
+window.setSortMode = (val) => { sortMode = val; renderList(); };

@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/the-floor.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
   <script src="scriptFolder/footer.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/the-floor.js"></script>
@@ -118,6 +117,12 @@
     <div class="form-group">
       <label class="form-label">Content</label>
       <textarea class="form-textarea" id="discContent" placeholder="Write your post here..."></textarea>
+      <button type="button" class="btn-outline" style="margin-top:8px" onclick="window.insertLink()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px">
+          <path d="M10 13a5 5 0 007.07 0l2.83-2.83a5 5 0 00-7.07-7.07l-1.5 1.5"/>
+          <path d="M14 11a5 5 0 00-7.07 0L4.1 13.83a5 5 0 007.07 7.07l1.5-1.5"/>
+        </svg>Insert Link
+      </button>
     </div>
     <div class="form-group">
       <label class="form-label">Attachments</label>

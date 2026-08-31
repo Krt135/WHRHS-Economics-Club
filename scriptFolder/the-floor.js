@@ -12,6 +12,7 @@ import {
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
+import { renderWithLinks, insertLinkAtCursor } from './link-format.js';
 
 
 const app = initializeApp(firebaseConfig);
@@ -151,7 +152,7 @@ return `
     <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
     Pinned to Bulletin
   </div>` : ''}
-      <div class="disc-body">${esc(d.body)}</div>
+      <div class="disc-body">${renderWithLinks(d.body, esc)}</div>
       <div class="disc-meta">
         <span class="author">
           ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
@@ -294,7 +295,7 @@ Delete</button>` : ""}
         <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentEntries.length} comments
       </div>
       ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
-      <div class="disc-view-body">${esc(d.body)}</div>
+      <div class="disc-view-body">${renderWithLinks(d.body, esc)}</div>
     </div>
     
     <div class="comments-area">
@@ -738,13 +739,17 @@ function previewFile(input) {
   if (file) reader.readAsDataURL(file);
 }
 
+function insertLink() {
+  insertLinkAtCursor(document.getElementById("discContent"));
+}
+
 // ─────────────────────────────────────────────
 //  EXPOSE TO GLOBAL
 // ─────────────────────────────────────────────
 
 Object.assign(window, {
   showList, showDiscussion, switchTab,
-  openModal, closeModal, previewFile,
+  openModal, closeModal, previewFile, insertLink,
   postComment, deleteComment,
   toggleReplyBox, postReply, deleteReply,
   publishDiscussion, deleteDiscussion,

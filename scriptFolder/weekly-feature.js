@@ -5,32 +5,36 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
-// Inline font-stack lookup — used only when rendering legacy posts that have a
-// saved fontFamily field. Quill handles fonts for all new posts via inline styles.
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+const storage = getStorage(app); 
+
+async function uploadFileToStorage(file, folderPath) {
+  if (!file) return null;
+  const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  const sRef = storageRef(storage, `${folderPath}/${fileName}`);
+  await uploadBytes(sRef, file);
+  return await getDownloadURL(sRef);
+}
+
 const LEGACY_FONT_STACKS = {
-  'Arial':         'Arial, sans-serif',
+  'Arial': 'Arial, sans-serif',
   'Times New Roman': '"Times New Roman", serif',
-  'Georgia':       'Georgia, serif',
-  'Courier New':   '"Courier New", monospace',
-  'Verdana':       'Verdana, sans-serif',
-  'Trebuchet MS':  '"Trebuchet MS", sans-serif',
-  'Palatino':      '"Palatino Linotype", Palatino, serif',
-  'Garamond':      'Garamond, serif',
+  'Georgia': 'Georgia, serif',
+  'Courier New': '"Courier New", monospace',
+  'Verdana': 'Verdana, sans-serif',
+  'Trebuchet MS': '"Trebuchet MS", sans-serif',
+  'Palatino': '"Palatino Linotype", Palatino, serif',
+  'Garamond': 'Garamond, serif',
 };
 function getFontStack(name) {
   return LEGACY_FONT_STACKS[name] || LEGACY_FONT_STACKS['Georgia'];
 }
 
-const app  = initializeApp(firebaseConfig);
-const db   = getDatabase(app);
-const auth = getAuth(app);
-
-
 // ── QUILL SETUP ──
-// Class-based font format: writes class="ql-font-georgia" on spans.
-// Slugified keys (no spaces) are required for valid CSS class names.
-// The matching .ql-font-* CSS rules live in weekly-feature.html's <style> block,
-// so they render correctly both in the editor and in the article view.
 const Font = Quill.import('formats/font');
 Font.whitelist = [
   'arial', 'times-new-roman', 'georgia',
@@ -38,18 +42,19 @@ Font.whitelist = [
 ];
 Quill.register(Font, true);
 
-// Style-based size attributor: writes style="font-size: 14px" on spans.
 const QuillSize = Quill.import('attributors/style/size');
 QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
 Quill.register(QuillSize, true);
 
 const QUILL_TOOLBAR = [
   ['bold', 'italic', 'underline'],
-  [{ font: [
-    false,                                                              // "Default" — clears font
-    'arial', 'times-new-roman', 'georgia',
-    'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
-  ]}],
+  [{
+    font: [
+      false,
+      'arial', 'times-new-roman', 'georgia',
+      'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+    ]
+  }],
   [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
   ['link'],
   ['clean']
@@ -67,7 +72,6 @@ const editQuill = new Quill('#editEditor', {
   placeholder: 'Edit your essay here…'
 });
 
-// Real-time word count while typing (requirement #7)
 pubQuill.on('text-change', () => {
   document.getElementById('wordCount').textContent =
     wordCount(pubQuill.getText()) + ' words';
@@ -77,11 +81,10 @@ editQuill.on('text-change', () => {
     wordCount(editQuill.getText()) + ' words';
 });
 
-
 // 2. ── AUTH STATE ──
-let currentUser  = null;
-let userRole     = "public";
-let userProfile  = null;
+let currentUser = null;
+let userRole = "public";
+let userProfile = null;
 
 onAuthStateChanged(auth, async (user) => {
   const adminControls = document.getElementById('admin-only-controls');
@@ -95,7 +98,7 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     currentUser = null;
-    userRole    = "public";
+    userRole = "public";
     userProfile = null;
   }
 
@@ -107,33 +110,30 @@ onAuthStateChanged(auth, async (user) => {
   else renderList();
 });
 
-
 // 3. ── GLOBAL STATE ──
-let features         = [];
+let features = [];
 let currentFeatureId = sessionStorage.getItem("openFeature") || null;
 
-const urlParams    = new URLSearchParams(window.location.search);
-const articleSlug  = urlParams.get("article");
-let activeTag      = 'all';
-let pinnedIds      = new Set();
+const urlParams = new URLSearchParams(window.location.search);
+const articleSlug = urlParams.get("article");
+let activeTag = 'all';
+let pinnedIds = new Set();
 
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
   return user.email.split('@')[0];
 }
 
-
 // 4. ── HELPERS ──
 function escHtml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── Legacy plain-text helpers — kept for backward-compat with old posts ──
 function applyInlineFormatting(s) {
   return s
     .replace(/\*\*(.+?)\*\*/g, '<em>$1</em>')
-    .replace(/\*(.+?)\*/g,     '<span style="font-weight:bold">$1</span>')
-    .replace(/~(.+?)~/g,       '<u>$1</u>');
+    .replace(/\*(.+?)\*/g, '<span style="font-weight:bold">$1</span>')
+    .replace(/~(.+?)~/g, '<u>$1</u>');
 }
 
 function parseContent(raw) {
@@ -150,24 +150,22 @@ function parseContent(raw) {
     return `<p>${applyInlineFormatting(escHtml(para))}</p>`;
   }).join("");
 }
-// ── End legacy helpers ──
 
 function relativeTime(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60)    return 'just now';
-  if (s < 3600)  return Math.floor(s / 60) + ' min ago';
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
   if (s < 86400) return Math.floor(s / 3600) + ' hours ago';
   return Math.floor(s / 86400) + ' days ago';
 }
 
 function wordCount(text) { return text.trim() ? text.trim().split(/\s+/).length : 0; }
 
-function myLiked(f)    { return !!(currentUser && f.userLikes    && f.userLikes[currentUser.uid]); }
+function myLiked(f) { return !!(currentUser && f.userLikes && f.userLikes[currentUser.uid]); }
 function myDisliked(f) { return !!(currentUser && f.userDislikes && f.userDislikes[currentUser.uid]); }
 
-
 // 5. ── WINDOW BINDINGS ──
-window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
+window.openModal = (id) => { document.getElementById(id).classList.add('open'); };
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
 window.renderList = renderList;
 
@@ -213,27 +211,25 @@ window.togglePin = async (id, alreadyPinned) => {
 
     const commentCount = f.comments ? f.comments.length : 0;
     const name = getDisplayName(currentUser);
-    // Bulletin previews always use plain text (works for both old and new posts)
     const bodyText = f.richText ? (f.contentText || '') : (f.content || '');
 
     await set(push(ref(db, "bulletin")), {
-      originalId:     id,
-      type:           'weekly',
-      title:          f.title,
-      body:           bodyText,
-      author:         f.author,
-      authorId:       f.authorId || null,
+      originalId: id,
+      type: 'weekly',
+      title: f.title,
+      body: bodyText,
+      author: f.author,
+      authorId: f.authorId || null,
       authorInitials: f.authorInitials || "?",
-      tags:           f.tag ? [f.tag] : [],
-      postedAt:       f.postedAt,
+      tags: f.tag ? [f.tag] : [],
+      postedAt: f.postedAt,
       commentCount,
-      pinnedAt:       Date.now(),
-      pinnedBy:       name
+      pinnedAt: Date.now(),
+      pinnedBy: name
     });
   }
   renderArticle();
 };
-
 
 // 6. ── FIREBASE LISTENER ──
 onValue(ref(db, 'features'), (snapshot) => {
@@ -241,7 +237,7 @@ onValue(ref(db, 'features'), (snapshot) => {
   if (data) {
     features = Object.keys(data).map(key => {
       const f = data[key];
-      const commentsArray  = f.comments  ? Object.keys(f.comments).map(cId => ({ id: cId, ...f.comments[cId] })) : [];
+      const commentsArray = f.comments ? Object.keys(f.comments).map(cId => ({ id: cId, ...f.comments[cId] })) : [];
       const reactionsArray = f.reactions ? (Array.isArray(f.reactions) ? f.reactions : Object.values(f.reactions)) : [];
       return { id: key, ...f, comments: commentsArray, reactions: reactionsArray };
     });
@@ -283,7 +279,6 @@ onValue(ref(db, 'features'), (snapshot) => {
   }
 });
 
-
 // 7. ── RENDER FUNCTIONS ──
 function renderList() {
   const el = document.getElementById('featuresList');
@@ -298,11 +293,11 @@ function renderList() {
   const q = searchInput ? searchInput.value.toLowerCase() : '';
 
   let displayFeatures = features.filter(f => {
-    const matchTag    = !activeTag || activeTag === 'all' || f.tag === activeTag;
+    const matchTag = !activeTag || activeTag === 'all' || f.tag === activeTag;
     const matchSearch = !q ||
-      (f.title  && f.title.toLowerCase().includes(q))  ||
+      (f.title && f.title.toLowerCase().includes(q)) ||
       (f.author && f.author.toLowerCase().includes(q)) ||
-      (f.tag    && f.tag.toLowerCase().includes(q));
+      (f.tag && f.tag.toLowerCase().includes(q));
     return matchTag && matchSearch;
   });
 
@@ -312,13 +307,11 @@ function renderList() {
   }
 
   el.innerHTML = displayFeatures.map(f => {
-    const iLiked    = myLiked(f);
+    const iLiked = myLiked(f);
     const iDisliked = myDisliked(f);
 
-    // Excerpt: contentText for rich posts, content for legacy posts
     const rawText = f.richText ? (f.contentText || '') : (f.content || '');
     const excerpt = rawText.slice(0, 200) + (rawText.length > 200 ? '…' : '');
-
     const isPinned = pinnedIds.has(f.id);
 
     return `
@@ -363,34 +356,33 @@ function renderList() {
   }).join('');
 }
 
-
 function renderArticle() {
   const f = features.find(x => x.id === currentFeatureId);
   if (!f) return window.showList();
 
-  // ── Body HTML ──
-  // Rich posts: render contentHtml directly (Quill output, inline styles intact)
-  // Legacy posts: run through the plain-text parser as before
   const articleHtml = f.richText
     ? (f.contentHtml || '')
     : parseContent(f.content);
 
-  // ── Word count ──
   const rawText = f.richText ? (f.contentText || '') : (f.content || '');
-  const wc      = wordCount(rawText);
+  const wc = wordCount(rawText);
   const readMin = Math.max(1, Math.round(wc / 200));
 
-  const iLiked    = myLiked(f);
+  const iLiked = myLiked(f);
   const iDisliked = myDisliked(f);
 
-  const canEdit   = currentUser && f.authorId === currentUser.uid;
+  const canEdit = currentUser && f.authorId === currentUser.uid;
   const canDelete = currentUser && (f.authorId === currentUser.uid || userRole === 'admin');
-  const isAdmin   = userRole === 'admin';
+  const isAdmin = userRole === 'admin';
+
+  // Fixed specific variable scopes referencing the 'f' object rather than 'l'
+  const imgHtml = f.imageUrl ? `<img src="${f.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const fileHtml = f.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${f.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${f.fileName || 'Attachment'}</a></div>` : '';
 
   const topActions = document.getElementById('articleTopActions');
   if (topActions) {
     get(ref(db, "bulletin")).then(snap => {
-      const bulletinData  = snap.val() || {};
+      const bulletinData = snap.val() || {};
       const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === f.id && b.type === 'weekly');
 
       topActions.innerHTML = `
@@ -422,11 +414,11 @@ function renderArticle() {
 
   const commentsHtml = f.comments.length
     ? f.comments.map(c => {
-        const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
-        const amILiked          = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        const canDeleteComment   = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+      const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
+      const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+      const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
 
-        return `
+      return `
         <div class="comment-item" id="comment-${c.id}">
           ${profileAvatarHtml(c.authorId, "span", "author-av", "", escHtml(c.initials || "?"), { role: c.authorRole || "member" })}
           <div class="comment-bubble">
@@ -452,11 +444,9 @@ function renderArticle() {
             </div>
           </div>
         </div>`;
-      }).join('')
+    }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px;">No comments yet. Be the first to respond!</p>';
 
-  // For legacy posts, wrap the article-content div with the saved font-family.
-  // Rich posts already carry inline styles from Quill, so no wrapper style needed.
   const fontStyle = f.richText ? '' : `font-family:${getFontStack(f.fontFamily)}`;
 
   document.getElementById('articleBody').innerHTML = `
@@ -472,6 +462,8 @@ function renderArticle() {
     </div>
     ${f.tag ? `<div class="article-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>` : ''}
     <div class="article-divider"></div>
+    ${imgHtml}
+    ${fileHtml}
     <div class="article-content" style="${fontStyle}">${articleHtml}</div>
     <div class="reaction-bar">
       <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="reactFeature('${f.id}','like')">
@@ -512,7 +504,6 @@ function renderArticle() {
     </div>`;
 }
 
-
 // 8. ── DATABASE MUTATIONS ──
 window.publishFeature = async () => {
   if (!currentUser) return alert("Please log in to post.");
@@ -530,32 +521,42 @@ window.publishFeature = async () => {
     return alert("System error. Please try again later.");
   }
 
-  const title       = document.getElementById('pubTitle').value.trim();
-  const tag         = document.getElementById('pubTag').value.trim();
+  const title = document.getElementById('pubTitle').value.trim();
+  const tag = document.getElementById('pubTag').value.trim();
   const contentHtml = pubQuill.root.innerHTML;
   const contentText = pubQuill.getText().trim();
+  const imgFile = document.getElementById("cImage").files[0];
+  const attFile = document.getElementById("cFile").files[0];
 
-  if (!title)       { document.getElementById('pubTitle').focus(); return; }
+  const imageUrl = await uploadFileToStorage(imgFile, 'weekly_images');
+  const fileUrl = await uploadFileToStorage(attFile, 'weekly_files');
+  const fileName = attFile ? attFile.name : null;
+
+  if (!title) { document.getElementById('pubTitle').focus(); return; }
   if (!contentText) { pubQuill.focus(); return; }
 
   const name = getDisplayName(currentUser);
 
   set(push(ref(db, 'features')), {
     title, tag,
-    // ── Rich-text schema ──
-    richText:    true,
-    contentHtml,          // Quill HTML output — used for article rendering
-    contentText,          // Plain text — used for excerpts, word count, search
-    author:         name,
+    richText: true,
+    contentHtml,          
+    contentText,
+    imageUrl,
+    fileUrl,
+    fileName,
+    author: name,
     authorInitials: name.substring(0, 2).toUpperCase(),
-    authorId:       currentUser.uid,
-    authorRole:     userRole,
-    postedAt:       Date.now(),
-    likes:          0,
-    dislikes:       0
+    authorId: currentUser.uid,
+    authorRole: userRole,
+    postedAt: Date.now(),
+    likes: 0,
+    dislikes: 0
   }).then(() => {
     document.getElementById('pubTitle').value = '';
-    document.getElementById('pubTag').value   = '';
+    document.getElementById('pubTag').value = '';
+    document.getElementById('cImage').value = '';
+    document.getElementById('cFile').value = '';
     pubQuill.setContents([]);
     document.getElementById('wordCount').textContent = '0 words';
     window.closeModal('publishModal');
@@ -564,16 +565,15 @@ window.publishFeature = async () => {
   });
 };
 
-
 window.reactFeature = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
   const f = features.find(x => x.id === id);
   if (!f) return;
 
-  const uid         = currentUser.uid;
-  const wasLiked    = !!(f.userLikes    && f.userLikes[uid]);
+  const uid = currentUser.uid;
+  const wasLiked = !!(f.userLikes && f.userLikes[uid]);
   const wasDisliked = !!(f.userDislikes && f.userDislikes[uid]);
-  let likes    = f.likes    || 0;
+  let likes = f.likes || 0;
   let dislikes = f.dislikes || 0;
 
   const postRef = ref(db, `features/${id}`);
@@ -595,12 +595,12 @@ window.reactFeature = (id, type) => {
     }
   }
 
-  updates['likes']    = likes;
+  updates['likes'] = likes;
   updates['dislikes'] = dislikes;
 
-  const userName     = getDisplayName(currentUser);
+  const userName = getDisplayName(currentUser);
   const userInitials = userName.substring(0, 2).toUpperCase();
-  const newType      = type === 'like' ? '👍' : '👎';
+  const newType = type === 'like' ? '👍' : '👎';
   const alreadyToggled = (type === 'like' && wasLiked) || (type === 'dislike' && wasDisliked);
 
   updates[`reactionsByUser/${uid}`] = alreadyToggled
@@ -609,7 +609,6 @@ window.reactFeature = (id, type) => {
 
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
-
 
 window.openReactions = (id) => {
   const f = features.find(x => x.id === id); if (!f) return;
@@ -625,25 +624,23 @@ window.openReactions = (id) => {
   window.openModal('reactionsModal');
 };
 
-
 window.postComment = (featureId) => {
   if (!currentUser) return alert("Please log in to comment.");
   const input = document.getElementById('newCommentInput');
   if (!input || !input.value.trim()) return;
   const name = getDisplayName(currentUser);
   set(push(ref(db, `features/${featureId}/comments`)), {
-    author:     name,
-    initials:   name.substring(0, 2).toUpperCase(),
-    authorId:   currentUser.uid,
+    author: name,
+    initials: name.substring(0, 2).toUpperCase(),
+    authorId: currentUser.uid,
     authorRole: userRole,
-    text:       input.value.trim(),
-    postedAt:   Date.now(),
-    likes:      0,
-    liked:      false
+    text: input.value.trim(),
+    postedAt: Date.now(),
+    likes: 0,
+    liked: false
   });
   input.value = '';
 };
-
 
 window.likeComment = async (featureId, commentId) => {
   if (!auth.currentUser) { alert("Please log in to like comments."); return; }
@@ -651,28 +648,29 @@ window.likeComment = async (featureId, commentId) => {
   const f = features.find(x => x.id === featureId); if (!f) return;
   const c = f.comments.find(x => x.id === commentId); if (!c) return;
   const hasLiked = c.userLikes && c.userLikes[uid];
-  const likeRef  = ref(db, `features/${featureId}/comments/${commentId}/userLikes/${uid}`);
+  const likeRef = ref(db, `features/${featureId}/comments/${commentId}/userLikes/${uid}`);
   if (hasLiked) { await remove(likeRef); } else { await set(likeRef, true); }
 };
-
 
 window.deleteComment = (featureId, commentId) => {
   if (confirm("Delete this comment?"))
     remove(ref(db, `features/${featureId}/comments/${commentId}`));
 };
 
-
 window.openEditModal = () => {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return;
 
   document.getElementById('editTitle').value = f.title;
-  document.getElementById('editTag').value   = f.tag || '';
+  document.getElementById('editTag').value = f.tag || '';
+  
+  document.getElementById('eImage').value = '';
+  document.getElementById('eFile').value = '';
+  document.getElementById('eImageStatus').innerHTML = f.imageUrl ? `Current: <a href="${f.imageUrl}" target="_blank">View Image</a>` : 'None';
+  document.getElementById('eFileStatus').innerHTML = f.fileUrl ? `Current: <a href="${f.fileUrl}" target="_blank">${f.fileName || 'View File'}</a>` : 'None';
 
   if (f.richText) {
-    // Load saved Quill HTML back into the editor
     editQuill.clipboard.dangerouslyPasteHTML(f.contentHtml || '');
   } else {
-    // Legacy post: load plain text; it will be saved as richText on next save
     editQuill.setText(f.content || '');
   }
 
@@ -681,26 +679,32 @@ window.openEditModal = () => {
   window.openModal('editModal');
 };
 
-
-window.saveEdit = () => {
+window.saveEdit = async () => {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return;
 
   const contentHtml = editQuill.root.innerHTML;
   const contentText = editQuill.getText().trim();
-
+  const imgFile = document.getElementById("eImage").files[0];
+  const attFile = document.getElementById("eFile").files[0];
+  
   if (!contentText) { editQuill.focus(); return; }
 
-  update(ref(db, `features/${currentFeatureId}`), {
-    title:       document.getElementById('editTitle').value.trim() || f.title,
-    tag:         document.getElementById('editTag').value.trim(),
-    richText:    true,
+  const updates = {
+    title: document.getElementById('editTitle').value.trim() || f.title,
+    tag: document.getElementById('editTag').value.trim(),
+    richText: true,
     contentHtml,
     contentText
-    // Note: legacy 'content' and 'fontFamily' fields are left untouched in Firebase
-    // so the old plain-text path still works if ever needed, but new renders use richText.
-  }).then(() => window.closeModal('editModal'));
-};
+  };
 
+  if (imgFile) updates.imageUrl = await uploadFileToStorage(imgFile, 'weekly_images');
+  if (attFile) {
+    updates.fileUrl = await uploadFileToStorage(attFile, 'weekly_files');
+    updates.fileName = attFile.name;
+  }
+
+  update(ref(db, `features/${currentFeatureId}`), updates).then(() => window.closeModal('editModal'));
+};
 
 window.deleteFeature = async () => {
   if (currentFeatureId) {
@@ -709,7 +713,6 @@ window.deleteFeature = async () => {
     window.showList();
   }
 };
-
 
 window.filterByTag = (btn, tag) => {
   activeTag = tag;

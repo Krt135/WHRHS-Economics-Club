@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Academy — The Economic Forum</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
   <!-- Quill Snow base styles — must come before style.css so our overrides in style.css win -->
   <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
   <link rel="stylesheet" href="styleFolder/style.css">
@@ -33,7 +35,8 @@
 
       <div class="page-header">
         <h1>The Academy</h1>
-        <p class="subtitle">Simplified educational resources for younger students and the community. Learn economics, made accessible.</p>
+        <p class="subtitle">Simplified educational resources for younger students and the community. Learn economics,
+          made accessible.</p>
         <div class="header-rule"></div>
       </div>
 
@@ -61,8 +64,7 @@
             </svg>
           </span>
           <input class="search-input" id="searchInput" type="text"
-            placeholder="Search lessons by title, topic, or level..."
-            oninput="window.renderList()">
+            placeholder="Search lessons by title, topic, or level..." oninput="window.renderList()">
         </div>
 
         <div class="filter-bar">
@@ -81,7 +83,8 @@
           <span class="filter-label">LEVEL:</span>
           <button class="level-chip all active" onclick="window.setLevelFilter(this,'all')">All Levels</button>
           <button class="level-chip beginner" onclick="window.setLevelFilter(this,'Beginner')">Beginner</button>
-          <button class="level-chip intermediate" onclick="window.setLevelFilter(this,'Intermediate')">Intermediate</button>
+          <button class="level-chip intermediate"
+            onclick="window.setLevelFilter(this,'Intermediate')">Intermediate</button>
           <button class="level-chip advanced" onclick="window.setLevelFilter(this,'Advanced')">Advanced</button>
         </div>
 
@@ -158,6 +161,15 @@ Consumer spending"></textarea>
       </div>
 
       <div class="form-group">
+        <label class="form-label">Cover Image (Optional)</label>
+        <input class="form-input" id="cImage" type="file" accept="image/*">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Attached File (Optional)</label>
+        <input class="form-input" id="cFile" type="file">
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Lesson Content</label>
         <!-- Quill mounts here -->
         <div id="cEditor"></div>
@@ -228,6 +240,17 @@ Consumer spending"></textarea>
       <div class="form-group">
         <label class="form-label">Key Concepts (one per line)</label>
         <textarea class="form-textarea" id="eConcepts" style="min-height:80px"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Update Cover Image (Optional)</label>
+        <input class="form-input" id="eImage" type="file" accept="image/*">
+        <div id="eImageStatus" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Update Attached File (Optional)</label>
+        <input class="form-input" id="eFile" type="file">
+        <div id="eFileStatus" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
       </div>
 
       <div class="form-group">

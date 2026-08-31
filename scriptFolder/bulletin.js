@@ -7,6 +7,7 @@ import { getDatabase, ref, onValue, remove, get } from "https://www.gstatic.com/
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
+import { plainTextExcerpt } from "./link-format.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -96,7 +97,7 @@ function renderBulletin() {
         PINNED BY EXEC BOARD · ${rel(item.pinnedAt)}
       </div>
       <div class="bc-title">${esc(item.title)}</div>
-      <div class="bc-body">${esc((item.body || "").slice(0, 200))}${(item.body || "").length > 200 ? "…" : ""}</div>
+      <div class="bc-body">${esc(plainTextExcerpt(item.body || "", 200))}</div>
       ${tags.length ? `<div class="bc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="bc-meta">
         <span class="author-chip">
