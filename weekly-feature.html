@@ -7,8 +7,15 @@
   <title>Weekly Feature — The Economic Forum</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/weekly-feature.css">
+
+
+  <!-- Quill must load before the deferred module script; no defer here so it
+       executes synchronously while the module waits for DOMContentLoaded. -->
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+
   <script src="scriptFolder/footer.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/weekly-feature.js" defer></script>
@@ -55,14 +62,14 @@
         <div class="filter-bar" id="filterBar">
           <span class="filter-label">FILTER:</span>
           <button class="filter-tag active" onclick="window.filterByTag(this,'all')">All</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Macro')">Macro</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Micro')">Micro</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Money')">Money</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Trade')">Trade</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Markets')">Markets</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Macro')">Macro</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Micro')">Micro</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Money')">Money</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Trade')">Trade</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Markets')">Markets</button>
+          <button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
         </div>
-        
+
         <div id="featuresList"></div>
       </div>
       <tef-footer></tef-footer>
@@ -83,71 +90,79 @@
 
   </main>
 
+  <!-- ── PUBLISH MODAL ── -->
   <div class="modal-overlay" id="publishModal">
     <div class="modal">
       <button class="modal-close" onclick="window.closeModal('publishModal')">×</button>
       <div class="modal-title">Publish Feature</div>
       <div class="modal-subtitle">Write your weekly academic essay. It will appear on The Weekly Feature page.</div>
-      
+
       <div class="form-group">
         <label class="form-label">Title</label>
         <input class="form-input" id="pubTitle" type="text" placeholder="Enter essay title...">
       </div>
 
       <div class="form-group">
-  <label class="form-label">Topic</label>
-  <select class="form-input" id="pubTag">
-    <option value="">All</option>
-    <option value="Macro">Macro</option>
-    <option value="Micro">Micro</option>
-    <option value="Money">Money</option>
-    <option value="Trade">Trade</option>
-    <option value="Markets">Markets</option>
-    <option value="Policy">Policy</option>
-  </select>
-</div>
+        <label class="form-label">Topic</label>
+        <select class="form-input" id="pubTag">
+          <option value="">All</option>
+          <option value="Macro">Macro</option>
+          <option value="Micro">Micro</option>
+          <option value="Money">Money</option>
+          <option value="Trade">Trade</option>
+          <option value="Markets">Markets</option>
+          <option value="Policy">Policy</option>
+        </select>
+      </div>
 
       <div class="form-group">
         <label class="form-label">Essay Content</label>
-        <textarea class="form-textarea" id="pubContent"
-          placeholder="Write your essay here. You can structure it with paragraphs — blank lines between paragraphs will be preserved."
-          oninput="updateWordCount()"></textarea>
+        <!-- Quill mounts here — toolbar + editor rendered by JS -->
+        <div id="pubEditor"></div>
         <div class="word-count" id="wordCount">0 words</div>
       </div>
+
       <button class="btn-full" onclick="window.publishFeature()">Publish Feature</button>
     </div>
   </div>
 
+  <!-- ── EDIT MODAL ── -->
   <div class="modal-overlay" id="editModal">
     <div class="modal">
       <button class="modal-close" onclick="window.closeModal('editModal')">×</button>
       <div class="modal-title">Edit Feature</div>
       <div class="modal-subtitle">Make changes to your published essay.</div>
+
       <div class="form-group">
         <label class="form-label">Title</label>
         <input class="form-input" id="editTitle" type="text">
       </div>
+
       <div class="form-group">
-  <label class="form-label">Topic</label>
-  <select class="form-input" id="editTag">
-    <option value="">All</option>
-    <option value="Macro">Macro</option>
-    <option value="Micro">Micro</option>
-    <option value="Money">Money</option>
-    <option value="Trade">Trade</option>
-    <option value="Markets">Markets</option>
-    <option value="Policy">Policy</option>
-  </select>
-</div>
+        <label class="form-label">Topic</label>
+        <select class="form-input" id="editTag">
+          <option value="">All</option>
+          <option value="Macro">Macro</option>
+          <option value="Micro">Micro</option>
+          <option value="Money">Money</option>
+          <option value="Trade">Trade</option>
+          <option value="Markets">Markets</option>
+          <option value="Policy">Policy</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Essay Content</label>
-        <textarea class="form-textarea" id="editContent" oninput="window.updateEditWordCount()"></textarea>
+        <!-- Quill mounts here — toolbar + editor rendered by JS -->
+        <div id="editEditor"></div>
         <div class="word-count" id="editWordCount">0 words</div>
       </div>
+
       <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
     </div>
   </div>
 
+  <!-- ── CONFIRM DELETE MODAL ── -->
   <div class="modal-overlay" id="confirmModal">
     <div class="modal confirm-modal">
       <div class="confirm-icon">🗑️</div>
@@ -160,6 +175,7 @@
     </div>
   </div>
 
+  <!-- ── REACTIONS MODAL ── -->
   <div class="modal-overlay" id="reactionsModal">
     <div class="modal reactions-modal">
       <button class="modal-close" onclick="window.closeModal('reactionsModal')">×</button>

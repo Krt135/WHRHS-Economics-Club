@@ -6,26 +6,28 @@
 <title>Perspectives — The Economic Forum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- Quill Snow base styles — must come before style.css so our overrides in style.css win -->
+<link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
 <link rel="stylesheet" href="styleFolder/style.css">
 <link rel="stylesheet" href="styleFolder/perspectives.css">
+<!-- Quill JS: no defer so window.Quill exists before the deferred module script runs -->
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script src="scriptFolder/footer.js" defer></script>
-<script type = "module" src="scriptFolder/sidebar.js" defer></script>
+<script type="module" src="scriptFolder/sidebar.js" defer></script>
 <script type="module" src="scriptFolder/perspectives.js" defer></script>
 <script type="module" src="scriptFolder/announcement.js"></script>
-
-
 </head>
 <body>
 
 <!-- SIDEBAR -->
 <tef-sidebar active-page="perspectives"></tef-sidebar>
+
 <!-- MAIN -->
 <main class="main">
-  <tef-announcement></tef-announcement>  
+  <tef-announcement></tef-announcement>
+
   <!-- ── LIST VIEW ── -->
   <div class="view active" id="viewList">
-
-    
 
     <div class="page-header">
       <h1>Perspectives</h1>
@@ -55,23 +57,20 @@
 
       <div class="filter-bar" id="filterBar">
         <span class="filter-label">FILTER:</span>
-        <button class="filter-tag active" onclick="window.filterByTag(this,'all')">All</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Macro')">Macro</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Micro')">Micro</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Money')">Money</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Trade')">Trade</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Markets')">Markets</button>
-<button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
+        <button class="filter-tag active" onclick="window.filterTag(this,'all')">All</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Macro')">Macro</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Micro')">Micro</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Money')">Money</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Trade')">Trade</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Markets')">Markets</button>
+        <button class="filter-tag" onclick="window.filterTag(this,'Policy')">Policy</button>
       </div>
 
       <div id="postsList"></div>
     </div>
 
     <tef-footer></tef-footer>
-
-    </div>
-
-    
+  </div>
 
   <!-- ── ARTICLE VIEW ── -->
   <div class="view" id="viewArticle">
@@ -92,28 +91,32 @@
   <div class="modal">
     <button class="modal-close" onclick="window.closeModal('writeModal')">×</button>
     <div class="modal-title">Write an Essay</div>
+
     <div class="form-group">
       <label class="form-label">Title</label>
       <input class="form-input" id="wTitle" type="text" placeholder="Enter a compelling title...">
     </div>
+
     <div class="form-group">
       <label class="form-label">Content</label>
-      <textarea class="form-textarea" id="wContent" placeholder="Write your essay here..." oninput="wc('wContent','wWC')"></textarea>
+      <!-- Quill mounts here -->
+      <div id="wEditor"></div>
       <div class="word-count" id="wWC">0 words</div>
     </div>
-    <!-- AFTER -->
-<div class="form-group">
-  <label class="form-label">Topic</label>
-  <select class="form-input" id="wTags">
-    <option value="">All</option>
-    <option value="Macro">Macro</option>
-    <option value="Micro">Micro</option>
-    <option value="Money">Money</option>
-    <option value="Trade">Trade</option>
-    <option value="Markets">Markets</option>
-    <option value="Policy">Policy</option>
-  </select>
-</div>
+
+    <div class="form-group">
+      <label class="form-label">Topic</label>
+      <select class="form-input" id="wTags">
+        <option value="">All</option>
+        <option value="Macro">Macro</option>
+        <option value="Micro">Micro</option>
+        <option value="Money">Money</option>
+        <option value="Trade">Trade</option>
+        <option value="Markets">Markets</option>
+        <option value="Policy">Policy</option>
+      </select>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Attachments</label>
       <div class="attach-area" onclick="document.getElementById('fileInput').click()">
@@ -123,6 +126,7 @@
       <input type="file" id="fileInput" accept="image/*" onchange="window.previewImg(this,'wImgPreview','wImgData')">
       <div class="attach-preview" id="wImgPreview"></div>
     </div>
+
     <button class="btn-full" onclick="window.publishPost()">Publish Post</button>
   </div>
 </div>
@@ -132,27 +136,32 @@
   <div class="modal">
     <button class="modal-close" onclick="window.closeModal('editModal')">×</button>
     <div class="modal-title">Edit Essay</div>
+
     <div class="form-group">
       <label class="form-label">Title</label>
       <input class="form-input" id="eTitle" type="text">
     </div>
+
     <div class="form-group">
       <label class="form-label">Content</label>
-      <textarea class="form-textarea" id="eContent" oninput="window.wc('eContent','eWC')"></textarea>
+      <!-- Quill mounts here -->
+      <div id="eEditor"></div>
       <div class="word-count" id="eWC">0 words</div>
     </div>
-<div class="form-group">
-  <label class="form-label">Topic</label>
-  <select class="form-input" id="eTags">
-    <option value="">All</option>
-    <option value="Macro">Macro</option>
-    <option value="Micro">Micro</option>
-    <option value="Money">Money</option>
-    <option value="Trade">Trade</option>
-    <option value="Markets">Markets</option>
-    <option value="Policy">Policy</option>
-  </select>
-</div>
+
+    <div class="form-group">
+      <label class="form-label">Topic</label>
+      <select class="form-input" id="eTags">
+        <option value="">All</option>
+        <option value="Macro">Macro</option>
+        <option value="Micro">Micro</option>
+        <option value="Money">Money</option>
+        <option value="Trade">Trade</option>
+        <option value="Markets">Markets</option>
+        <option value="Policy">Policy</option>
+      </select>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Replace Image</label>
       <div class="attach-area" onclick="document.getElementById('editFileInput').click()">
@@ -162,6 +171,7 @@
       <input type="file" id="editFileInput" accept="image/*" onchange="window.previewImg(this,'eImgPreview','eImgData')">
       <div class="attach-preview" id="eImgPreview"></div>
     </div>
+
     <button class="btn-full" onclick="window.saveEdit()">Save Changes</button>
   </div>
 </div>
@@ -178,10 +188,6 @@
     </div>
   </div>
 </div>
-
-
-
-
 
 </body>
 </html>

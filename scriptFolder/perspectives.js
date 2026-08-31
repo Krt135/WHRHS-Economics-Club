@@ -6,10 +6,78 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 
+// Inline font-stack lookup — used only when rendering legacy posts that have a
+// saved fontFamily field. Quill handles fonts for all new posts via CSS classes.
+const LEGACY_FONT_STACKS = {
+  'Arial':          'Arial, sans-serif',
+  'Times New Roman':'\"Times New Roman\", serif',
+  'Georgia':        'Georgia, serif',
+  'Courier New':    '\"Courier New\", monospace',
+  'Verdana':        'Verdana, sans-serif',
+  'Trebuchet MS':   '\"Trebuchet MS\", sans-serif',
+  'Palatino':       '\"Palatino Linotype\", Palatino, serif',
+  'Garamond':       'Garamond, serif',
+};
+function getFontStack(name) {
+  return LEGACY_FONT_STACKS[name] || LEGACY_FONT_STACKS['Georgia'];
+}
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
 const auth = getAuth(app);
+
+
+// ── QUILL SETUP ──
+// Identical config to weekly-feature.js — CSS classes and picker labels
+// are defined globally in style.css so no page-level styles are needed.
+
+const Font = Quill.import('formats/font');
+Font.whitelist = [
+  'arial', 'times-new-roman', 'georgia',
+  'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+];
+Quill.register(Font, true);
+
+const QuillSize = Quill.import('attributors/style/size');
+QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
+Quill.register(QuillSize, true);
+
+const QUILL_TOOLBAR = [
+  ['bold', 'italic', 'underline'],
+  [{ font: [
+    false,
+    'arial', 'times-new-roman', 'georgia',
+    'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+  ]}],
+  [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
+  ['link'],
+  ['clean']
+];
+
+const wQuill = new Quill('#wEditor', {
+  theme: 'snow',
+  modules: { toolbar: QUILL_TOOLBAR },
+  placeholder: 'Write your essay here…'
+});
+
+const eQuill = new Quill('#eEditor', {
+  theme: 'snow',
+  modules: { toolbar: QUILL_TOOLBAR },
+  placeholder: 'Edit your essay here…'
+});
+
+// Real-time word count while typing
+wQuill.on('text-change', () => {
+  const text = wQuill.getText();
+  document.getElementById('wWC').textContent =
+    (text.trim() ? text.trim().split(/\s+/).length : 0) + ' words';
+});
+eQuill.on('text-change', () => {
+  const text = eQuill.getText();
+  document.getElementById('eWC').textContent =
+    (text.trim() ? text.trim().split(/\s+/).length : 0) + ' words';
+});
+
 
 // 2. ── AUTH STATE ──
 let currentUser  = null;
@@ -32,56 +100,57 @@ onAuthStateChanged(auth, async (user) => {
   if (currentPostId) renderArticle(); else renderList();
 });
 
+
 // 3. ── GLOBAL STATE ──
-let posts         = [];
-let currentPostId = sessionStorage.getItem("openPerspective") || null; 
-let activeTag = 'all';
-let sortMode      = 'newest';
+let posts          = [];
+let currentPostId  = sessionStorage.getItem("openPerspective") || null;
+let activeTag      = 'all';
+let sortMode       = 'newest';
 let pendingImgData = null;
 let editImgData    = null;
-let pinnedIds = new Set();
+let pinnedIds      = new Set();
 
 function getDisplayName() {
-  if (userProfile && userProfile.displayName) {
-    return userProfile.displayName;
-  }
-  if (currentUser && currentUser.email) {
-    return currentUser.email.split("@")[0];
-  }
+  if (userProfile && userProfile.displayName) return userProfile.displayName;
+  if (currentUser && currentUser.email) return currentUser.email.split("@")[0];
   return "Member";
 }
 
 function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 60)    return "just now";
+  if (s < 3600)  return Math.floor(s / 60) + " min ago";
   if (s < 86400) return Math.floor(s / 3600) + " hours ago";
   return Math.floor(s / 86400) + " days ago";
 }
 
 function myLiked(p)    { return !!(currentUser && p.userLikes    && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
+
 function esc(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
+
 
 // 4. ── WINDOW BINDINGS ──
 window.openModal  = (id) => { document.getElementById(id).classList.add('open'); };
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
 window.renderList = renderList;
-document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
-
-window.wc = (textareaId, countId) => {
-  const v = document.getElementById(textareaId).value;
-  document.getElementById(countId).textContent = (v.trim() ? v.trim().split(/\s+/).length : 0) + ' words';
-};
+document.querySelectorAll('.modal-overlay').forEach(o =>
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
+);
 
 window.previewImg = (input, previewId, dataKey) => {
-  const file = input.files[0]; if(!file) return;
+  const file = input.files[0]; if (!file) return;
   const r = new FileReader();
   r.onload = e => {
-    if(dataKey==='wImgData') pendingImgData = e.target.result;
+    if (dataKey === 'wImgData') pendingImgData = e.target.result;
     else editImgData = e.target.result;
     document.getElementById(previewId).textContent = '📎 ' + file.name;
   };
@@ -91,7 +160,8 @@ window.previewImg = (input, previewId, dataKey) => {
 window.showList = () => {
   document.getElementById('viewList').classList.add('active');
   document.getElementById('viewArticle').classList.remove('active');
-  currentPostId = null; renderList();
+  currentPostId = null;
+  renderList();
 };
 window.showArticle = (id) => {
   currentPostId = id;
@@ -99,10 +169,12 @@ window.showArticle = (id) => {
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
 };
+
 window.filterTag = (btn, tag) => {
   activeTag = tag;
-  document.querySelectorAll('.filter-tag').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); renderList();
+  document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
 };
 window.sortPosts = (mode) => { sortMode = mode; renderList(); };
 
@@ -115,28 +187,31 @@ window.togglePin = async (id, alreadyPinned) => {
   } else {
     const p = posts.find(x => x.id === id);
     if (!p) return;
-    
+
     const commentCount = p.comments ? p.comments.length : 0;
     const name = getDisplayName();
+    // Bulletin previews always use plain text
+    const bodyText = p.richText ? (p.contentText || '') : (p.content || '');
 
     await set(push(ref(db, "bulletin")), {
-      originalId: id,
-      type: 'perspective',
-      title: p.title,
-      body: p.content || "",
-      author: p.author,
-      authorId: p.authorId || null,
+      originalId:     id,
+      type:           'perspective',
+      title:          p.title,
+      body:           bodyText,
+      author:         p.author,
+      authorId:       p.authorId || null,
       authorInitials: p.authorInitials || "?",
-      authorRole: p.authorRole || userRole,
-      tags: p.tags || [],
-      postedAt: p.postedAt,
+      authorRole:     p.authorRole || userRole,
+      tags:           p.tags || [],
+      postedAt:       p.postedAt,
       commentCount,
-      pinnedAt: Date.now(),
-      pinnedBy: name
+      pinnedAt:       Date.now(),
+      pinnedBy:       name
     });
   }
   renderArticle();
 };
+
 
 // 5. ── FIREBASE LISTENER ──
 onValue(ref(db, 'perspectives'), (snapshot) => {
@@ -145,7 +220,9 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
   if (data) {
     posts = Object.keys(data).map(key => {
       const post = data[key];
-      const commentsArray = post.comments ? Object.keys(post.comments).map(cId => ({ id: cId, ...post.comments[cId] })) : [];
+      const commentsArray = post.comments
+        ? Object.keys(post.comments).map(cId => ({ id: cId, ...post.comments[cId] }))
+        : [];
       return { id: key, ...post, comments: commentsArray, tags: post.tags || [], postedAt: post.postedAt };
     });
 
@@ -167,20 +244,21 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
     renderArticle();
   } else {
     get(ref(db, 'bulletin')).then(snap => {
-    const data = snap.val() || {};
-    pinnedIds = new Set(Object.values(data).map(v => v.originalId).filter(Boolean));
-    renderList();
-});
+      const bData = snap.val() || {};
+      pinnedIds = new Set(Object.values(bData).map(v => v.originalId).filter(Boolean));
+      renderList();
+    });
   }
 });
 
+
 // 6. ── RENDER FUNCTIONS ──
 function rebuildFilterBar() {
-  const bar = document.getElementById('filterBar'); if(!bar) return;
+  const bar = document.getElementById('filterBar'); if (!bar) return;
   const topics = ['Macro', 'Micro', 'Money', 'Trade', 'Markets', 'Policy'];
   bar.innerHTML = `<span class="filter-label">FILTER:</span>
-    <button class="filter-tag ${activeTag==='all'?'active':''}" onclick="filterTag(this,'all')">All</button>
-    ${topics.map(t=>`<button class="filter-tag ${activeTag===t?'active':''}" onclick="filterTag(this,'${t}')">${t}</button>`).join('')}`;
+    <button class="filter-tag ${activeTag === 'all' ? 'active' : ''}" onclick="filterTag(this,'all')">All</button>
+    ${topics.map(t => `<button class="filter-tag ${activeTag === t ? 'active' : ''}" onclick="filterTag(this,'${t}')">${t}</button>`).join('')}`;
 }
 
 function renderList() {
@@ -189,15 +267,15 @@ function renderList() {
   const q = searchInput ? searchInput.value.toLowerCase() : '';
 
   let filtered = posts.filter(p => {
-    const matchTag = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
-    const matchSearch = !q || 
-                        p.title.toLowerCase().includes(q) || 
-                        p.author.toLowerCase().includes(q) || 
-                        (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
+    const matchTag    = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
+    const matchSearch = !q ||
+      p.title.toLowerCase().includes(q) ||
+      p.author.toLowerCase().includes(q) ||
+      (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
     return matchTag && matchSearch;
   });
 
-  if (sortMode === 'oldest') filtered.sort((a, b) => a.postedAt - b.postedAt);
+  if (sortMode === 'oldest')  filtered.sort((a, b) => a.postedAt - b.postedAt);
   else if (sortMode === 'popular') filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
   else filtered.sort((a, b) => b.postedAt - a.postedAt);
 
@@ -210,17 +288,19 @@ function renderList() {
   }
 
   el.innerHTML = filtered.map(p => {
-    const iLiked = myLiked(p);
+    const iLiked    = myLiked(p);
     const iDisliked = myDisliked(p);
-    const excerpt = p.content ? (p.content.split('\n\n')[0].slice(0, 240) + (p.content.length > 240 ? '…' : '')) : '';
 
-    const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
-                    : (p.authorRole === "admin") ? "theme-exec" 
+    // Excerpt: contentText for rich posts, content for legacy posts
+    const rawText = p.richText ? (p.contentText || '') : (p.content || '');
+    const excerpt = rawText.slice(0, 240) + (rawText.length > 240 ? '…' : '');
+
+    const cardTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me"
+                    : (p.authorRole === "admin") ? "theme-exec"
                     : "theme-member";
-
     const isPinned = pinnedIds.has(p.id);
 
-return `
+    return `
 <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
   <div class="pc-header">
     <div class="pc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(p.title)}</div>
@@ -231,54 +311,85 @@ return `
       Pinned to Bulletin
     </div>` : ''}
   </div>
-      
-      ${p.image ? `<img src="${p.image}" class="pc-image" alt="Post Image" loading="lazy">` : ''}
-      
-      <div class="pc-excerpt">${esc(excerpt)}</div>
-      
-      <div class="pc-meta">
-        <span class="author-chip">
-          ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
-          ${esc(p.author)}
-        </span>
-        <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${p.comments ? p.comments.length : 0}
-      </div>
-
-      ${(p.tags && p.tags.length) ? `<div class="pc-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
-      
-      <div class="pc-actions" onclick="event.stopPropagation()">
-        <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')" title="Like">
-          <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-          <span>${p.likes || 0}</span>
-        </button>
-        <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')" title="Dislike">
-          <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-          <span>${p.dislikes || 0}</span>
-        </button>
-      </div>
-    </div>`;
+  ${p.image ? `<img src="${p.image}" class="pc-image" alt="Post Image" loading="lazy">` : ''}
+  <div class="pc-excerpt">${esc(excerpt)}</div>
+  <div class="pc-meta">
+    <span class="author-chip">
+      ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
+      ${esc(p.author)}
+    </span>
+    <span>·</span><span>${rel(p.postedAt)}</span><span>·</span>
+    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    ${p.comments ? p.comments.length : 0}
+  </div>
+  ${(p.tags && p.tags.length) ? `<div class="pc-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
+  <div class="pc-actions" onclick="event.stopPropagation()">
+    <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')" title="Like">
+      <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+      <span>${p.likes || 0}</span>
+    </button>
+    <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')" title="Dislike">
+      <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+      <span>${p.dislikes || 0}</span>
+    </button>
+  </div>
+</div>`;
   }).join('');
 }
 
+
+// ── Legacy plain-text helpers — kept for backward-compat with old posts ──
+function applyInlineFormatting(s) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<em>$1</em>')
+    .replace(/\*(.+?)\*/g,     '<strong>$1</strong>')
+    .replace(/~(.+?)~/g,       '<u>$1</u>');
+}
+
+function parseContent(raw) {
+  return (raw || "").split(/\n\n+/).map(para => {
+    para = para.trim();
+    if (para.startsWith("===")) {
+      const h = para.replace(/^===\s*/, "").replace(/\s*===$/, "");
+      return `<h3>${applyInlineFormatting(esc(h))}</h3>`;
+    }
+    if (para.startsWith("[EXAMPLE]")) {
+      const inner = para.replace("[EXAMPLE]", "").replace("[/EXAMPLE]", "").trim();
+      return `<div class="example-box"><strong>EXAMPLE</strong>${applyInlineFormatting(esc(inner))}</div>`;
+    }
+    return `<p>${applyInlineFormatting(esc(para))}</p>`;
+  }).join("");
+}
+// ── End legacy helpers ──
+
+
 function renderArticle() {
-  const p = posts.find(x => x.id === currentPostId); if (!p) return window.showList();
-  const wds     = p.content.trim().split(/\s+/).length;
+  const p = posts.find(x => x.id === currentPostId);
+  if (!p) return window.showList();
+
+  // ── Body HTML ──
+  const articleHtml = p.richText
+    ? (p.contentHtml || '')
+    : parseContent(p.content);
+
+  // ── Word count ──
+  const rawText = p.richText ? (p.contentText || '') : (p.content || '');
+  const wds     = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
   const readMin = Math.max(1, Math.round(wds / 200));
-  const paragraphs = p.content.split(/\n\n+/).map(s => `<p>${esc(s.trim())}</p>`).join('');
-  const iLiked     = myLiked(p);
-  const iDisliked  = myDisliked(p);
-  const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me" 
-                  : (p.authorRole === "admin") ? "theme-exec" 
+
+  const iLiked    = myLiked(p);
+  const iDisliked = myDisliked(p);
+
+  const mainTheme = (currentUser && p.authorId === currentUser.uid) ? "theme-me"
+                  : (p.authorRole === "admin") ? "theme-exec"
                   : "theme-member";
 
   const canEdit   = currentUser && p.authorId === currentUser.uid;
   const canDelete = currentUser && (p.authorId === currentUser.uid || userRole === 'admin');
-  const isAdmin = userRole === 'admin';
+  const isAdmin   = userRole === 'admin';
 
   get(ref(db, "bulletin")).then(snap => {
-    const bulletinData = snap.val() || {};
+    const bulletinData  = snap.val() || {};
     const alreadyPinned = Object.values(bulletinData).some(b => b.originalId === p.id && b.type === 'perspective');
 
     document.getElementById('articleTopActions').innerHTML = `
@@ -291,19 +402,19 @@ function renderArticle() {
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
         </button>` : ''}
       ${isAdmin ? `
-        <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${p.id}', ${alreadyPinned})">
-          <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-          ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+        <button class="topbar-btn btn-pin-tb ${alreadyPinned ? 'pinned' : ''}" onclick="window.togglePin('${p.id}', ${alreadyPinned})">
+          <svg width="13" height="13" fill="${alreadyPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          ${alreadyPinned ? 'Unpin' : 'Pin to Bulletin'}
         </button>` : ''}`;
   });
 
   const commentsHtml = p.comments.length
     ? p.comments.map(c => {
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
-        const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
-        const commentTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
-        
+        const amILiked          = currentUser && c.userLikes && c.userLikes[currentUser.uid];
+        const canDeleteComment   = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
+        const commentTheme       = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : "theme-member";
+
         return `
         <div class="comment-item ${commentTheme}">
           ${profileAvatarHtml(c.authorId, "span", "author-av", "", esc(c.initials || "?"), { role: c.authorRole || "member" })}
@@ -315,18 +426,21 @@ function renderArticle() {
             <div class="comment-bubble-text">${esc(c.text)}</div>
             <div class="comment-bubble-actions">
               <button class="comment-action ${amILiked ? 'liked' : ''}" onclick="likeComment('${p.id}','${c.id}')">
-                <svg width="12" height="12" fill="${amILiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
+                <svg width="12" height="12" fill="${amILiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 002 2.3H14z"/></svg>
                 ${totalCommentLikes}
               </button>
-              ${canDeleteComment?`
+              ${canDeleteComment ? `
               <button class="comment-action delete-comment" onclick="deleteComment('${p.id}','${c.id}')">
                 <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Delete
-              </button>`:''}
+              </button>` : ''}
             </div>
           </div>
         </div>`;
       }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
+
+  // Font style only needed for legacy posts (richText posts have Quill classes on spans)
+  const fontStyle = p.richText ? '' : `font-family:${getFontStack(p.fontFamily)}`;
 
   document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
   document.getElementById('articleBody').innerHTML = `
@@ -343,7 +457,7 @@ function renderArticle() {
     ${p.tags.length ? `<div class="article-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="article-divider"></div>
     ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
-    <div class="article-content">${paragraphs}</div>
+    <div class="article-content" style="${fontStyle}">${articleHtml}</div>
     <div class="reaction-bar">
       <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')">
         <svg width="15" height="15" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
@@ -367,50 +481,53 @@ function renderArticle() {
     </div>`;
 }
 
+
 // 7. ── DATABASE MUTATIONS ──
 window.publishPost = () => {
   if (!currentUser) return alert("Please log in to post.");
-  const title   = document.getElementById('wTitle').value.trim();
-  const content = document.getElementById('wContent').value.trim();
-  const tag     = document.getElementById('wTags').value;
-  if(!title){document.getElementById('wTitle').focus();return;}
-  if(!content){document.getElementById('wContent').focus();return;}
-  
+
+  const title       = document.getElementById('wTitle').value.trim();
+  const tag         = document.getElementById('wTags').value;
+  const contentHtml = wQuill.root.innerHTML;
+  const contentText = wQuill.getText().trim();
+
+  if (!title)       { document.getElementById('wTitle').focus(); return; }
+  if (!contentText) { wQuill.focus(); return; }
+
   const name = getDisplayName();
   const tags = tag ? [tag] : [];
 
-  console.log("tag value:", document.getElementById('wTags').value);
-  console.log("tags array:", tags);
-
-  set(push(ref(db,'perspectives')),{
-    title, 
-    content, 
-    tags,
-    author: name, 
-    authorInitials: name.substring(0,2).toUpperCase(), 
-    authorId: currentUser.uid,
-    authorRole: userRole,
-    image: pendingImgData||null, 
-    postedAt: Date.now(),
-    likes: 0, 
-    dislikes: 0, 
-    featured: false
+  set(push(ref(db, 'perspectives')), {
+    title, tags,
+    richText:       true,
+    contentHtml,          // Quill HTML — used for article rendering
+    contentText,          // Plain text — used for excerpts, word count, search
+    author:         name,
+    authorInitials: name.substring(0, 2).toUpperCase(),
+    authorId:       currentUser.uid,
+    authorRole:     userRole,
+    image:          pendingImgData || null,
+    postedAt:       Date.now(),
+    likes:          0,
+    dislikes:       0,
+    featured:       false
   });
-  pendingImgData=null;
-  document.getElementById('wTitle').value='';
-  document.getElementById('wContent').value='';
-  document.getElementById('wTags').value='';
-  document.getElementById('wImgPreview').textContent='';
-  document.getElementById('wWC').textContent='0 words';
+
+  pendingImgData = null;
+  document.getElementById('wTitle').value           = '';
+  document.getElementById('wTags').value            = '';
+  document.getElementById('wImgPreview').textContent = '';
+  wQuill.setContents([]);
+  document.getElementById('wWC').textContent = '0 words';
   window.closeModal('writeModal');
 };
 
+
 window.react = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
-  const p = posts.find(x => x.id === id); 
-  if (!p) return;
-  
-  const uid = currentUser.uid;
+  const p = posts.find(x => x.id === id); if (!p) return;
+
+  const uid         = currentUser.uid;
   const wasLiked    = !!(p.userLikes    && p.userLikes[uid]);
   const wasDisliked = !!(p.userDislikes && p.userDislikes[uid]);
   let likes    = p.likes    || 0;
@@ -420,99 +537,109 @@ window.react = (id, type) => {
   const updates = {};
 
   if (type === 'like') {
-    if (wasLiked) { 
-      updates[`userLikes/${uid}`] = null; 
-      likes--; 
+    if (wasLiked) {
+      updates[`userLikes/${uid}`] = null; likes--;
     } else {
-      updates[`userLikes/${uid}`] = true; 
-      likes++;
-      if (wasDisliked) { 
-        updates[`userDislikes/${uid}`] = null; 
-        dislikes--; 
-      }
+      updates[`userLikes/${uid}`] = true; likes++;
+      if (wasDisliked) { updates[`userDislikes/${uid}`] = null; dislikes--; }
     }
   } else {
-    if (wasDisliked) { 
-      updates[`userDislikes/${uid}`] = null; 
-      dislikes--; 
+    if (wasDisliked) {
+      updates[`userDislikes/${uid}`] = null; dislikes--;
     } else {
-      updates[`userDislikes/${uid}`] = true; 
-      dislikes++;
-      if (wasLiked) { 
-        updates[`userLikes/${uid}`] = null; 
-        likes--; 
-      }
+      updates[`userDislikes/${uid}`] = true; dislikes++;
+      if (wasLiked) { updates[`userLikes/${uid}`] = null; likes--; }
     }
   }
 
-  updates[`likes`] = likes;
-  updates[`dislikes`] = dislikes;
-  
+  updates['likes']    = likes;
+  updates['dislikes'] = dislikes;
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };
+
 
 window.postComment = (postId) => {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById('cmtInput');
-  if (!inp||!inp.value.trim()) return;
+  if (!inp || !inp.value.trim()) return;
   const name = getDisplayName();
-  set(push(ref(db,`perspectives/${postId}/comments`)),{
-    author: name, initials: name.substring(0,2).toUpperCase(),
-    authorId: currentUser.uid, text: inp.value.trim(),
-    postedAt: Date.now(), likes: 0, liked: false
+  set(push(ref(db, `perspectives/${postId}/comments`)), {
+    author:   name,
+    initials: name.substring(0, 2).toUpperCase(),
+    authorId: currentUser.uid,
+    text:     inp.value.trim(),
+    postedAt: Date.now(),
+    likes:    0,
+    liked:    false
   });
-  inp.value='';
+  inp.value = '';
 };
 
-window.likeComment = async (postId, cmtId) => {
-  if (!auth.currentUser) {
-    alert("Please log in to like comments.");
-    return;
-  }
 
+window.likeComment = async (postId, cmtId) => {
+  if (!auth.currentUser) { alert("Please log in to like comments."); return; }
   const uid = auth.currentUser.uid;
   const p = posts.find(x => x.id === postId); if (!p) return;
   const c = p.comments.find(x => x.id === cmtId); if (!c) return;
-
   const hasLiked = c.userLikes && c.userLikes[uid];
-  const likeRef = ref(db, `perspectives/${postId}/comments/${cmtId}/userLikes/${uid}`);
-
-  if (hasLiked) {
-    await remove(likeRef);
-  } else {
-    await set(likeRef, true);
-  }
+  const likeRef  = ref(db, `perspectives/${postId}/comments/${cmtId}/userLikes/${uid}`);
+  if (hasLiked) { await remove(likeRef); } else { await set(likeRef, true); }
 };
+
 
 window.deleteComment = (postId, cmtId) => {
-  if (confirm("Delete this comment?")) remove(ref(db,`perspectives/${postId}/comments/${cmtId}`));
+  if (confirm("Delete this comment?"))
+    remove(ref(db, `perspectives/${postId}/comments/${cmtId}`));
 };
 
+
 window.openEditModal = () => {
-  const p=posts.find(x=>x.id===currentPostId); if(!p) return;
-  document.getElementById('eTitle').value   = p.title;
-  document.getElementById('eContent').value = p.content;
-  document.getElementById('eTags').value    = p.tags[0] || '';
-  document.getElementById('eWC').textContent = p.content.trim().split(/\s+/).length+' words';
-  document.getElementById('eImgPreview').textContent='';
-  editImgData=null;
+  const p = posts.find(x => x.id === currentPostId); if (!p) return;
+
+  document.getElementById('eTitle').value = p.title;
+  document.getElementById('eTags').value  = p.tags[0] || '';
+
+  if (p.richText) {
+    eQuill.clipboard.dangerouslyPasteHTML(p.contentHtml || '');
+  } else {
+    // Legacy post: load as plain text; upgrades to richText on save
+    eQuill.setText(p.content || '');
+  }
+
+  const rawText = p.richText ? (p.contentText || '') : (p.content || '');
+  document.getElementById('eWC').textContent =
+    (rawText.trim() ? rawText.trim().split(/\s+/).length : 0) + ' words';
+  document.getElementById('eImgPreview').textContent = '';
+  editImgData = null;
   window.openModal('editModal');
 };
 
+
 window.saveEdit = () => {
-  const p=posts.find(x=>x.id===currentPostId); if(!p) return;
-  const updatedData={
-    title:   document.getElementById('eTitle').value.trim()||p.title,
-    content: document.getElementById('eContent').value.trim()||p.content,
-    tags:    document.getElementById('eTags').value ? [document.getElementById('eTags').value] : []
+  const p = posts.find(x => x.id === currentPostId); if (!p) return;
+
+  const contentHtml = eQuill.root.innerHTML;
+  const contentText = eQuill.getText().trim();
+  if (!contentText) { eQuill.focus(); return; }
+
+  const updatedData = {
+    title:       document.getElementById('eTitle').value.trim() || p.title,
+    tags:        document.getElementById('eTags').value ? [document.getElementById('eTags').value] : [],
+    richText:    true,
+    contentHtml,
+    contentText
   };
-  if(editImgData) updatedData.image=editImgData;
-  update(ref(db,`perspectives/${currentPostId}`),updatedData).then(()=>window.closeModal('editModal'));
+  if (editImgData) updatedData.image = editImgData;
+
+  update(ref(db, `perspectives/${currentPostId}`), updatedData)
+    .then(() => window.closeModal('editModal'));
 };
+
 
 window.deletePost = async () => {
   if (currentPostId) {
     await softDelete('perspectives', currentPostId);
-    window.closeModal('confirmModal'); window.showList();
+    window.closeModal('confirmModal');
+    window.showList();
   }
 };

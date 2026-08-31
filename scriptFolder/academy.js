@@ -5,10 +5,62 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 
-
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
 const auth = getAuth(app);
+
+
+// ── QUILL SETUP ──
+// Identical config to weekly-feature.js and perspectives.js.
+// All CSS (font classes, picker labels, dark-theme overrides) lives in style.css globally.
+
+const Font = Quill.import('formats/font');
+Font.whitelist = [
+  'arial', 'times-new-roman', 'georgia',
+  'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+];
+Quill.register(Font, true);
+
+const QuillSize = Quill.import('attributors/style/size');
+QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
+Quill.register(QuillSize, true);
+
+const QUILL_TOOLBAR = [
+  ['bold', 'italic', 'underline'],
+  [{ font: [
+    false,
+    'arial', 'times-new-roman', 'georgia',
+    'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+  ]}],
+  [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
+  ['link'],
+  ['clean']
+];
+
+const cQuill = new Quill('#cEditor', {
+  theme: 'snow',
+  modules: { toolbar: QUILL_TOOLBAR },
+  placeholder: 'Write your lesson here in simple, accessible language…'
+});
+
+const eQuill = new Quill('#eEditor', {
+  theme: 'snow',
+  modules: { toolbar: QUILL_TOOLBAR },
+  placeholder: 'Edit your lesson content…'
+});
+
+// Real-time word count while typing
+cQuill.on('text-change', () => {
+  const text = cQuill.getText();
+  document.getElementById('cWC').textContent =
+    (text.trim() ? text.trim().split(/\s+/).length : 0) + ' words';
+});
+eQuill.on('text-change', () => {
+  const text = eQuill.getText();
+  document.getElementById('eWC').textContent =
+    (text.trim() ? text.trim().split(/\s+/).length : 0) + ' words';
+});
+
 
 // ─────────────────────────────────────────────
 //  AUTH STATE
@@ -39,12 +91,6 @@ function getDisplayName(user) {
   return user.email.split('@')[0];
 }
 
-///WINDOW BINDINGS
-
-window.renderList = renderList;
-window.showList = showList;
-window.showLesson = showLesson;
-
 
 // ─────────────────────────────────────────────
 //  CONSTANTS / HELPERS
@@ -65,6 +111,7 @@ function wdCt(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
 function myLiked(l)    { return !!(currentUser && l.userLikes    && l.userLikes[currentUser.uid]); }
 function myDisliked(l) { return !!(currentUser && l.userDislikes && l.userDislikes[currentUser.uid]); }
 
+
 // ─────────────────────────────────────────────
 //  STATE
 // ─────────────────────────────────────────────
@@ -77,8 +124,9 @@ let sortMode    = "newest";
 let quizState   = {};
 let qbQuestions = [];
 
+
 // ─────────────────────────────────────────────
-//  FIREBASE LISTENERS
+//  FIREBASE LISTENER
 // ─────────────────────────────────────────────
 
 onValue(ref(db,"lessons"), snapshot => {
@@ -89,6 +137,7 @@ onValue(ref(db,"lessons"), snapshot => {
   } else { renderList(); }
 });
 
+
 // ─────────────────────────────────────────────
 //  MODAL HELPERS
 // ─────────────────────────────────────────────
@@ -98,6 +147,7 @@ function closeModal(id) { document.getElementById(id).classList.remove("open"); 
 document.querySelectorAll(".modal-overlay").forEach(o =>
   o.addEventListener("click", e => { if(e.target===o) o.classList.remove("open"); })
 );
+
 
 // ─────────────────────────────────────────────
 //  VIEWS
@@ -117,6 +167,7 @@ function showLesson(firebaseKey) {
   renderLesson();
 }
 
+
 // ─────────────────────────────────────────────
 //  FILTER / SORT
 // ─────────────────────────────────────────────
@@ -133,6 +184,7 @@ function setLevelFilter(btn, val) {
   btn.classList.add("active"); renderList();
 }
 
+
 // ─────────────────────────────────────────────
 //  RENDER LIST
 // ─────────────────────────────────────────────
@@ -142,7 +194,12 @@ function renderList() {
   let items = Object.entries(lessons).map(([key,val])=>({...val,_key:key}));
   if(topicFilter!=="all") items=items.filter(l=>l.topic===topicFilter);
   if(levelFilter!=="all") items=items.filter(l=>l.level===levelFilter);
-  if(q) items=items.filter(l=>l.title.toLowerCase().includes(q)||l.topic.includes(q)||l.level.toLowerCase().includes(q)||(l.desc||"").toLowerCase().includes(q));
+  if(q) items=items.filter(l=>
+    l.title.toLowerCase().includes(q) ||
+    l.topic.includes(q) ||
+    l.level.toLowerCase().includes(q) ||
+    (l.desc||"").toLowerCase().includes(q)
+  );
   if(sortMode==="oldest")       items.sort((a,b)=>a.postedAt-b.postedAt);
   else if(sortMode==="popular") items.sort((a,b)=>(b.likes||0)-(a.likes||0));
   else                          items.sort((a,b)=>b.postedAt-a.postedAt);
@@ -154,8 +211,10 @@ function renderList() {
   }
   el.innerHTML = items.map(l=>{
     const iconBg = {Beginner:"#dcfce7",Intermediate:"#fef3c7",Advanced:"#fee2e2"}[l.level]||"#f3f4f6";
-    const readMin = Math.max(1,Math.round(wdCt(l.content||"")/130));
-    const commentCount = l.comments?Object.keys(l.comments).length:0;
+    // Use plain text for read-time estimate (works for both legacy and rich posts)
+    const rawText = l.richText ? (l.contentText || '') : (l.content || '');
+    const readMin = Math.max(1, Math.round(wdCt(rawText) / 130));
+    const commentCount = l.comments ? Object.keys(l.comments).length : 0;
     return `
     <div class="lesson-card" onclick="showLesson('${l._key}')">
       <div class="lc-top">
@@ -180,16 +239,16 @@ function renderList() {
   }).join("");
 }
 
+
 // ─────────────────────────────────────────────
 //  RENDER LESSON
 // ─────────────────────────────────────────────
 
 function renderLesson() {
   const l = lessons[currentId]; if(!l) return showList();
-  const readMin = Math.max(1,Math.round(wdCt(l.content||"")/130));
-  const iLiked     = myLiked(l);
-  const iDisliked = myDisliked(l);
 
+  // ── Body HTML ──
+  // Legacy plain-text parser (kept for backward-compat with old lessons)
   function parseContent(raw) {
     return (raw||"").split(/\n\n+/).map(para=>{
       para=para.trim();
@@ -199,9 +258,20 @@ function renderLesson() {
     }).join("");
   }
 
-  // Quiz HTML logic remains the same...
-  const qs = Array.isArray(l.quiz)?l.quiz:[];
-  let quizHtml="";
+  const lessonHtml = l.richText
+    ? (l.contentHtml || '')
+    : parseContent(l.content || '');
+
+  // ── Read time ──
+  const rawText = l.richText ? (l.contentText || '') : (l.content || '');
+  const readMin = Math.max(1, Math.round(wdCt(rawText) / 130));
+
+  const iLiked    = myLiked(l);
+  const iDisliked = myDisliked(l);
+
+  // ── Quiz ──
+  const qs = Array.isArray(l.quiz) ? l.quiz : [];
+  let quizHtml = "";
   if(qs.length){
     const qi=quizState.qi||0, score=quizState.score||0, done=quizState.done||false;
     if(done){
@@ -236,7 +306,7 @@ function renderLesson() {
     }
   }
 
-  // Comments
+  // ── Comments ──
   const commentEntries = l.comments
     ? Object.entries(l.comments).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.postedAt-b.postedAt)
     : [];
@@ -246,11 +316,8 @@ function renderLesson() {
 
   const commentsHtml = commentEntries.length
     ? commentEntries.map(c=>{
-        // --- NEW LIKE CALCULATION ---
         const totalCommentLikes = c.userLikes ? Object.keys(c.userLikes).length : 0;
         const amILiked = currentUser && c.userLikes && c.userLikes[currentUser.uid];
-        // ----------------------------
-
         const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
         return `
         <div class="comment-item">
@@ -263,7 +330,7 @@ function renderLesson() {
             <div class="comment-text">${esc(c.text)}</div>
             <div class="comment-acts">
               <button class="cmt-act ${amILiked ? "liked" : ""}" onclick="likeComment('${currentId}','${c._key}')">
-                <svg width="12" height="12" fill="${amILiked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/></svg>
+                <svg width="12" height="12" fill="${amILiked ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 002 2.3H14z"/></svg>
                 ${totalCommentLikes}
               </button>
               ${canDeleteComment?`
@@ -287,7 +354,7 @@ function renderLesson() {
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
     </button>` : ""}`;
 
-  const concepts = Array.isArray(l.concepts)?l.concepts:[];
+  const concepts = Array.isArray(l.concepts) ? l.concepts : [];
 
   document.getElementById("lessonBody").innerHTML = `
     <div class="lesson-eyebrow">THE ACADEMY · ${esc(l.topic.toUpperCase())} · <span class="level-badge ${l.level.toLowerCase()}">${esc(l.level)}</span></div>
@@ -303,7 +370,7 @@ function renderLesson() {
     </div>
     ${concepts.length?`<div class="key-concepts"><div class="kc-title">KEY CONCEPTS IN THIS LESSON</div><ul class="kc-list">${concepts.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`:""}
     <div class="lesson-divider"></div>
-    <div class="lesson-content">${parseContent(l.content)}</div>
+    <div class="lesson-content">${lessonHtml}</div>
     ${quizHtml}
     <div class="lesson-reaction">
       <button class="react-btn ${iLiked?"liked":""}" onclick="reactLesson('like')">
@@ -323,125 +390,137 @@ function renderLesson() {
     </div>`;
 }
 
+
 // ─────────────────────────────────────────────
 //  PUBLISH LESSON
 // ─────────────────────────────────────────────
 
 async function publishLesson() {
   if (!currentUser) return alert("Please log in to post.");
-  const title   = document.getElementById("cTitle").value.trim();
-  const content = document.getElementById("cContent").value.trim();
-  if(!title){document.getElementById("cTitle").focus();return;}
-  if(!content){document.getElementById("cContent").focus();return;}
-  const name     = getDisplayName(currentUser);
-  const initials = name.substring(0,2).toUpperCase();
+
+  const title       = document.getElementById("cTitle").value.trim();
+  const contentHtml = cQuill.root.innerHTML;
+  const contentText = cQuill.getText().trim();
+
+  if (!title)       { document.getElementById("cTitle").focus(); return; }
+  if (!contentText) { cQuill.focus(); return; }
+
+  const name      = getDisplayName(currentUser);
+  const initials  = name.substring(0, 2).toUpperCase();
   const concepts  = document.getElementById("cConcepts").value.split("\n").map(s=>s.trim()).filter(Boolean);
-  const validQuiz = qbQuestions.filter(q=>q.q&&q.opts.filter(Boolean).length>=2);
-  const newRef = push(ref(db,"lessons"));
-  await set(newRef,{
-    icon:     document.getElementById("cIcon").value.trim()||ICONS[document.getElementById("cTopic").value]||"📚",
-    title, topic: document.getElementById("cTopic").value, level: document.getElementById("cLevel").value,
-    desc:     document.getElementById("cDesc").value.trim()||title,
-    concepts, content, quiz: validQuiz,
+  const validQuiz = qbQuestions.filter(q => q.q && q.opts.filter(Boolean).length >= 2);
+
+  const newRef = push(ref(db, "lessons"));
+  await set(newRef, {
+    icon:     document.getElementById("cIcon").value.trim() || ICONS[document.getElementById("cTopic").value] || "📚",
+    title,
+    topic:    document.getElementById("cTopic").value,
+    level:    document.getElementById("cLevel").value,
+    desc:     document.getElementById("cDesc").value.trim() || title,
+    concepts,
+    richText:    true,
+    contentHtml,      // Quill HTML — used for lesson rendering
+    contentText,      // Plain text — used for read-time, word count, search
+    quiz:     validQuiz,
     author: name, authorInitials: initials, authorId: currentUser.uid,
     postedAt: Date.now(), likes: 0, dislikes: 0
   });
-  ["cTitle","cDesc","cContent","cIcon","cConcepts"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("cWC").textContent="0 words";
-  qbQuestions=[]; renderQuizBuilder(); closeModal("createModal");
+
+  ["cTitle","cDesc","cIcon","cConcepts"].forEach(id => document.getElementById(id).value = "");
+  cQuill.setContents([]);
+  document.getElementById("cWC").textContent = "0 words";
+  qbQuestions = []; renderQuizBuilder(); closeModal("createModal");
 }
+
 
 // ─────────────────────────────────────────────
 //  EDIT / DELETE LESSON
 // ─────────────────────────────────────────────
 
 function openEditModal() {
-  const l=lessons[currentId]; if(!l) return;
+  const l = lessons[currentId]; if(!l) return;
   document.getElementById("eTitle").value    = l.title;
   document.getElementById("eTopic").value    = l.topic;
   document.getElementById("eLevel").value    = l.level;
-  document.getElementById("eIcon").value     = l.icon||"";
-  document.getElementById("eDesc").value     = l.desc||"";
-  document.getElementById("eConcepts").value = (Array.isArray(l.concepts)?l.concepts:[]).join("\n");
-  document.getElementById("eContent").value  = l.content||"";
-  document.getElementById("eWC").textContent = wdCt(l.content||"")+" words";
+  document.getElementById("eIcon").value     = l.icon || "";
+  document.getElementById("eDesc").value     = l.desc || "";
+  document.getElementById("eConcepts").value = (Array.isArray(l.concepts) ? l.concepts : []).join("\n");
+
+  if (l.richText) {
+    eQuill.clipboard.dangerouslyPasteHTML(l.contentHtml || '');
+  } else {
+    // Legacy lesson: load as plain text; upgrades to richText on save
+    eQuill.setText(l.content || '');
+  }
+
+  const rawText = l.richText ? (l.contentText || '') : (l.content || '');
+  document.getElementById("eWC").textContent = wdCt(rawText) + " words";
   openModal("editModal");
 }
 
 async function saveEdit() {
-  const l=lessons[currentId]; if(!l) return;
-  const concepts=document.getElementById("eConcepts").value.split("\n").map(s=>s.trim()).filter(Boolean);
-  await update(ref(db,`lessons/${currentId}`),{
-    title:   document.getElementById("eTitle").value.trim()||l.title,
-    topic:   document.getElementById("eTopic").value,
-    level:   document.getElementById("eLevel").value,
-    icon:    document.getElementById("eIcon").value.trim()||ICONS[document.getElementById("eTopic").value]||"📚",
-    desc:    document.getElementById("eDesc").value.trim()||l.desc,
-    concepts, content: document.getElementById("eContent").value.trim()||l.content,
+  const l = lessons[currentId]; if(!l) return;
+
+  const contentHtml = eQuill.root.innerHTML;
+  const contentText = eQuill.getText().trim();
+  if (!contentText) { eQuill.focus(); return; }
+
+  const concepts = document.getElementById("eConcepts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+
+  await update(ref(db, `lessons/${currentId}`), {
+    title:    document.getElementById("eTitle").value.trim() || l.title,
+    topic:    document.getElementById("eTopic").value,
+    level:    document.getElementById("eLevel").value,
+    icon:     document.getElementById("eIcon").value.trim() || ICONS[document.getElementById("eTopic").value] || "📚",
+    desc:     document.getElementById("eDesc").value.trim() || l.desc,
+    concepts,
+    richText:    true,
+    contentHtml,
+    contentText
   });
   closeModal("editModal");
 }
 
 async function deleteLesson() {
-    await softDelete('lessons', currentId);
-    closeModal("confirmModal"); showList();
+  await softDelete('lessons', currentId);
+  closeModal("confirmModal"); showList();
 }
 
-// ─────────────────────────────────────────────
-//  REACTIONS  (per-user)
-// ─────────────────────────────────────────────
 
 // ─────────────────────────────────────────────
-//  REACTIONS  (Updated for the new Like System)
+//  REACTIONS (per-user)
 // ─────────────────────────────────────────────
 
 async function reactLesson(type) {
   if (!currentUser) return alert("Please log in to react.");
-  
-  const l = lessons[currentId]; 
-  if (!l) return;
+  const l = lessons[currentId]; if(!l) return;
 
   const uid = currentUser.uid;
   const wasLiked    = !!(l.userLikes    && l.userLikes[uid]);
   const wasDisliked = !!(l.userDislikes && l.userDislikes[uid]);
-  
   let likes    = l.likes    || 0;
   let dislikes = l.dislikes || 0;
 
-  // 1. Target the specific lesson node
   const lessonRef = ref(db, `lessons/${currentId}`);
-  const updates = {}; // Keys are now relative to the lessonRef
+  const updates = {};
 
   if (type === "like") {
-    if (wasLiked) { 
-      updates[`userLikes/${uid}`] = null; 
-      likes--; 
-    } else {
-      updates[`userLikes/${uid}`] = true; 
-      likes++;
-      if (wasDisliked) { 
-        updates[`userDislikes/${uid}`] = null; 
-        dislikes--; 
-      }
+    if (wasLiked) { updates[`userLikes/${uid}`]=null; likes--; }
+    else {
+      updates[`userLikes/${uid}`]=true; likes++;
+      if (wasDisliked) { updates[`userDislikes/${uid}`]=null; dislikes--; }
     }
   } else {
-    if (wasDisliked) { 
-      updates[`userDislikes/${uid}`] = null; 
-      dislikes--; 
-    } else {
-      updates[`userDislikes/${uid}`] = true; 
-      dislikes++;
-      if (wasLiked) { 
-        updates[`userLikes/${uid}`] = null; 
-        likes--; 
-      }
+    if (wasDisliked) { updates[`userDislikes/${uid}`]=null; dislikes--; }
+    else {
+      updates[`userDislikes/${uid}`]=true; dislikes++;
+      if (wasLiked) { updates[`userLikes/${uid}`]=null; likes--; }
     }
   }
 
-  updates[`likes`]    = likes;
-  updates[`dislikes`] = dislikes;
+  updates['likes']    = likes;
+  updates['dislikes'] = dislikes;
 
-  // 2. Perform the targeted update
   try {
     await update(lessonRef, updates);
   } catch (error) {
@@ -450,52 +529,40 @@ async function reactLesson(type) {
   }
 }
 
+
 // ─────────────────────────────────────────────
 //  COMMENTS
 // ─────────────────────────────────────────────
 
 async function postComment() {
   if (!currentUser) return alert("Please log in to comment.");
-  const inp=document.getElementById("cmtInput");
-  if(!inp||!inp.value.trim()) return;
-  const name=getDisplayName(currentUser);
-  const cmtRef=push(ref(db,`lessons/${currentId}/comments`));
-  await set(cmtRef,{
+  const inp = document.getElementById("cmtInput");
+  if(!inp || !inp.value.trim()) return;
+  const name = getDisplayName(currentUser);
+  const cmtRef = push(ref(db, `lessons/${currentId}/comments`));
+  await set(cmtRef, {
     author: name, initials: name.substring(0,2).toUpperCase(),
     authorId: currentUser.uid, text: inp.value.trim(),
     postedAt: Date.now(), likes: 0, liked: false
   });
-  inp.value="";
+  inp.value = "";
 }
 
 async function likeComment(lessonKey, commentKey) {
-  if (!currentUser) {
-    alert("Please log in to like comments.");
-    return;
-  }
-
+  if (!currentUser) { alert("Please log in to like comments."); return; }
   const uid = currentUser.uid;
-  // Get the specific lesson and comment from your local state
   const l = lessons[lessonKey];
   const c = l && l.comments ? l.comments[commentKey] : null;
   if (!c) return;
-
-  // Check if this specific user has already liked it
   const hasLiked = c.userLikes && c.userLikes[uid];
-  const likeRef = ref(db, `lessons/${lessonKey}/comments/${commentKey}/userLikes/${uid}`);
-
-  if (hasLiked) {
-    // If already liked, remove my specific ID
-    await remove(likeRef);
-  } else {
-    // If not liked, add my ID
-    await set(likeRef, true);
-  }
+  const likeRef  = ref(db, `lessons/${lessonKey}/comments/${commentKey}/userLikes/${uid}`);
+  if (hasLiked) { await remove(likeRef); } else { await set(likeRef, true); }
 }
 
 async function deleteComment(lessonKey, commentKey) {
-  if(confirm("Delete this comment?")) await remove(ref(db,`lessons/${lessonKey}/comments/${commentKey}`));
+  if(confirm("Delete this comment?")) await remove(ref(db, `lessons/${lessonKey}/comments/${commentKey}`));
 }
+
 
 // ─────────────────────────────────────────────
 //  QUIZ
@@ -513,10 +580,11 @@ function answerQuiz(i) {
 function nextQuiz() {
   const l=lessons[currentId]; if(!l) return;
   const qi=(quizState.qi||0)+1;
-  if(qi>=(l.quiz||[]).length){quizState.done=true;}
-  else{quizState.qi=qi;quizState.answered=false;quizState.chosen=undefined;}
+  if(qi>=(l.quiz||[]).length){ quizState.done=true; }
+  else{ quizState.qi=qi; quizState.answered=false; quizState.chosen=undefined; }
   renderLesson();
 }
+
 
 // ─────────────────────────────────────────────
 //  QUIZ BUILDER
@@ -525,8 +593,8 @@ function nextQuiz() {
 function addQuizQuestion() { qbQuestions.push({q:"",opts:["","","",""],correct:0,exp:""}); renderQuizBuilder(); }
 
 function renderQuizBuilder() {
-  const el=document.getElementById("quizBuilder");
-  el.innerHTML=qbQuestions.map((qq,qi)=>`
+  const el = document.getElementById("quizBuilder");
+  el.innerHTML = qbQuestions.map((qq,qi)=>`
     <div class="qb-question">
       <div class="qb-q-label">Question ${qi+1}</div>
       <input class="form-input" style="margin-bottom:8px;font-size:14px" placeholder="Question text..." value="${esc(qq.q)}" oninput="qbQuestions[${qi}].q=this.value">
@@ -542,25 +610,17 @@ function renderQuizBuilder() {
     </div>`).join("");
 }
 
-// ─────────────────────────────────────────────
-//  WORD COUNT / ANNOUNCEMENT
-// ─────────────────────────────────────────────
-
-function updateWC()  { document.getElementById("cWC").textContent = wdCt(document.getElementById("cContent").value)+" words"; }
-function updateEWC() { document.getElementById("eWC").textContent = wdCt(document.getElementById("eContent").value)+" words"; }
-
 
 // ─────────────────────────────────────────────
 //  EXPOSE TO HTML
 // ─────────────────────────────────────────────
 
-Object.assign(window,{
-  showList, showLesson, openModal, closeModal,
+Object.assign(window, {
+  renderList, showList, showLesson, openModal, closeModal,
   setTopicFilter, setLevelFilter,
   publishLesson, openEditModal, saveEdit, deleteLesson,
   reactLesson, postComment, likeComment, deleteComment,
   answerQuiz, nextQuiz, addQuizQuestion, renderQuizBuilder,
-  updateWC, updateEWC,
 });
 
 window.setSortMode = (val) => { sortMode=val; renderList(); };
