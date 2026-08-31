@@ -84,12 +84,12 @@
 
 .article-body { padding:56px 80px 40px; max-width:820px; margin:0 auto; width:100%; }
 .article-eyebrow { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.14em; color:var(--gold); margin-bottom:16px; }
-.article-title { font-family:'Playfair Display',serif; font-size:42px; font-weight:900; color:var(--navy); line-height:1.12; margin-bottom:20px; }
+.article-title { font-family:'Playfair Display',serif; font-size:42px; font-weight:900; color:var(--navy); line-height:1.12; margin-bottom:20px; overflow-wrap:break-word; }
 .article-meta { display:flex; align-items:center; gap:14px; font-size:14px; color:var(--text-muted); margin-bottom:8px; flex-wrap:wrap; }
 .article-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:28px; }
 .article-divider { height:1px; background:#ddd; margin-bottom:32px; }
 .article-img { width:100%; max-height:380px; object-fit:cover; border-radius:2px; margin-bottom:32px; border:1px solid var(--border); }
-.article-content { font-size:18px; line-height:1.85; color:#1f2937; font-weight:300; }
+.article-content { font-size:18px; line-height:1.85; color:#1f2937; font-weight:300; overflow-wrap:break-word; word-break:break-word; }
 .article-content p { margin-bottom:1.4em; }
 
 /* REACTION BAR */
@@ -202,4 +202,75 @@
 .persp-card:hover {
     transform: translateY(-3px);
     transition: 0.2s ease-in-out;
+}
+
+.example-box { background:#fff; border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:2px; padding:16px 20px; margin:1.4em 0; font-size:16px; }
+
+.example-box strong { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--gold); display:block; margin-bottom:6px; }
+
+.form-hint { font-size:12px; color:var(--text-muted); margin-top:5px; font-style:italic; }
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main { margin-left: 0; }
+
+  /* Safety net: prevent any long unbroken string from forcing horizontal scroll on mobile */
+  .article-body, .article-content, .article-title, .pc-title, .pc-excerpt, .comment-bubble-text {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* ── ANNOUNCE BAR ── */
+  .announce-bar { padding: 10px 16px; }
+  .announce-text { font-size: 9px; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { padding: 28px 22px 24px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header .subtitle { font-size: 14px; }
+
+  /* ── LIST CONTENT ── */
+  .list-content { padding: 24px 16px 40px; max-width: 100%; }
+
+  /* ── TOOLBAR ── */
+  .toolbar { gap: 10px; }
+  .toolbar-left { width: 100%; }
+  .btn-write { flex: 1; justify-content: center; }
+  .sort-select { flex: 1; }
+
+  /* ── PERSPECTIVE CARD ── */
+  .persp-card { padding: 16px 16px; }
+  .pc-header { flex-wrap: wrap; }
+  .pc-title { font-size: 17px; }
+  .pc-meta, .pc-actions { flex-wrap: wrap; gap: 8px; }
+
+  /* ── ARTICLE VIEW TOPBAR ── */
+  .article-topbar { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+  .topbar-actions { flex-wrap: wrap; gap: 8px; }
+  .topbar-btn { padding: 7px 12px; font-size: 12px; }
+
+  /* ── ARTICLE BODY ── */
+  .article-body { padding: 28px 18px 32px; }
+  .article-title { font-size: 26px; }
+  .article-content { font-size: 16px; }
+  .article-img { max-height: 220px; }
+  .reaction-bar { flex-wrap: wrap; gap: 10px; padding: 16px 0; margin: 24px 0 22px; }
+  .reaction-bar .react-btn { padding: 7px 12px; font-size: 14px; }
+
+  /* Special essay wrapper used on this page */
+  #articleBody.article-container {
+    margin: 20px auto;
+    padding: 20px;
+  }
+
+  /* ── COMMENTS ── */
+  .comment-item { gap: 8px; }
+  .new-comment-box { flex-direction: column; gap: 8px; }
+  .btn-post-comment { align-self: stretch; text-align: center; }
+
+  /* ── MODALS ── */
+  .modal { padding: 24px 20px 20px; max-height: 85vh; }
+  .modal-title { font-size: 19px; }
+  .confirm-modal { padding: 28px 22px; }
 }

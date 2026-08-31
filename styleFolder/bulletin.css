@@ -1,4 +1,4 @@
-    .bulletin-card {
+.bulletin-card {
       background: var(--gold-bg);
       border: 1px solid #e8ddb8;
       border-radius: 2px;
@@ -108,3 +108,23 @@
       font-size: 14px;
       color: #b0b7c3;
     }
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+   NOTE: .main / .page-header / .content are handled
+   by the-floor.css, which this page also loads.
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .bulletin-card {
+    padding: 16px 16px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .bc-title { font-size: 17px; }
+
+  .bc-meta { gap: 8px; }
+
+  .bc-goto { margin-left: 0; }
+
+  .bc-admin-row { justify-content: flex-start; }
+}

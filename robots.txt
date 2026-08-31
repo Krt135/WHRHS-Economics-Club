@@ -1,0 +1,10 @@
+# Allow all search engine crawlers
+User-agent: *
+
+# Block admin and authentication pages
+Disallow: /admin.html
+Disallow: /auth.html
+Disallow: /auth-action
+
+# Optional: Point crawlers to your sitemap once you create one
+# Sitemap: https://yourwebsite.com/sitemap.xml

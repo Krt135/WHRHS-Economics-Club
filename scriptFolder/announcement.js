@@ -317,6 +317,21 @@ const style = `
     }
 
     .ann-popup-text { margin: 0; }
+
+    /* ── Mobile ── */
+    @media (max-width: 700px) {
+      .announcement-bar { min-height: 60px; }
+      .slide { padding: 0 20px; gap: 6px; }
+      .slide-text { font-size: 1rem; }
+      .slide-badge { display: none; }
+      .slide-link { font-size: 0.72rem; }
+      .admin-trigger { padding: 8px 14px; }
+      .admin-compose { flex-wrap: wrap; padding: 10px 14px; }
+      .compose-input { min-width: 100%; }
+      .compose-input.short { flex: 1 1 auto; min-width: 0; }
+      .delete-btn { right: 6px; }
+      .ann-popup { padding: 24px 22px; width: 88%; }
+    }
   </style>
 `;
 

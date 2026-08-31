@@ -250,3 +250,40 @@
   .how-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
   .how-desc  { font-size: 13px; color: #4b5563; line-height: 1.6; font-weight: 300; }
 
+
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main { margin-left: 0; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { padding: 28px 22px 24px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header .subtitle { font-size: 14px; }
+
+  /* ── CONTENT ── */
+  .content { padding: 24px 16px 40px; }
+
+  /* ── QUIZ CARD ── */
+  .quiz-question { font-size: 16.5px; padding: 20px 18px 16px; }
+  .quiz-header { padding: 16px 18px 0; }
+  .progress-bar { margin: 12px 18px 0; }
+  .quiz-options { padding: 0 18px 6px; }
+  .option-btn { padding: 12px 14px; font-size: 15px; }
+  .explanation-box { margin: 14px 18px; padding: 12px 14px; }
+  .quiz-footer { padding: 10px 18px 18px; }
+
+  /* ── RESULTS CARD ── */
+  .results-card { padding: 36px 22px; }
+  .results-title { font-size: 24px; }
+  .results-message { font-size: 15.5px; }
+
+  /* ── HOW IT WORKS ── */
+  .how-grid { grid-template-columns: 1fr; }
+  .how-card {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .how-card:last-child { border-bottom: none; }
+}

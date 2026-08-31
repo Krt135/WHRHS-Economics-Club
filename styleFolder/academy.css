@@ -93,7 +93,7 @@
 .lesson-body { padding:52px 80px 40px; max-width:820px; margin:0 auto; width:100%; }
 .lesson-eyebrow { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.14em; color:var(--gold); margin-bottom:14px; }
 .lesson-hero-icon { font-size:52px; margin-bottom:16px; }
-.lesson-title { font-family:'Playfair Display',serif; font-size:40px; font-weight:900; color:var(--navy); line-height:1.12; margin-bottom:18px; }
+.lesson-title { font-family:'Playfair Display',serif; font-size:40px; font-weight:900; color:var(--navy); line-height:1.12; margin-bottom:18px; overflow-wrap:break-word; }
 .lesson-meta-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
 .lesson-divider { height:1px; background:#ddd; margin:24px 0 32px; }
 
@@ -105,7 +105,7 @@
 .kc-list li::before { content:'✦'; color:var(--gold); font-size:10px; margin-top:3px; flex-shrink:0; }
 
 /* LESSON CONTENT */
-.lesson-content { font-size:18px; line-height:1.85; color:#1f2937; font-weight:300; }
+.lesson-content { font-size:18px; line-height:1.85; color:#1f2937; font-weight:300; overflow-wrap:break-word; word-break:break-word; }
 .lesson-content p { margin-bottom:1.4em; }
 .lesson-content h3 { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:var(--navy); margin:2em 0 0.6em; }
 .lesson-content .example-box { background:#fff; border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:2px; padding:16px 20px; margin:1.4em 0; font-size:16px; }
@@ -210,3 +210,72 @@
 .btn-cancel:hover { border-color:var(--navy); }
 .btn-conf-del { flex:1; padding:12px; background:#dc2626; color:#fff; border:none; font-family:'Crimson Pro',serif; font-size:15px; font-weight:600; cursor:pointer; }
 .btn-conf-del:hover { background:#b91c1c; }
+
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main { margin-left: 0; }
+
+  /* Safety net against long unbroken strings forcing horizontal scroll */
+  .lesson-body, .lesson-content, .lesson-title, .lc-title, .lc-desc, .comment-text {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* ── ANNOUNCE BAR ── */
+  .announce-bar { padding: 10px 16px; }
+  .announce-text { font-size: 9px; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { padding: 28px 22px 24px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header .subtitle { font-size: 14px; }
+
+  /* ── LIST CONTENT ── */
+  .list-content { padding: 24px 16px 40px; max-width: 100%; }
+
+  /* ── TOOLBAR / FILTERS ── */
+  .toolbar { gap: 10px; }
+  .btn-create { flex: 1; justify-content: center; }
+  .sort-select { flex: 1; }
+  .filter-bar { gap: 6px; }
+
+  /* ── LESSON CARD ── */
+  .lesson-card { padding: 16px 16px; }
+  .lc-title { font-size: 16px; }
+
+  /* ── LESSON VIEW TOPBAR ── */
+  .lesson-topbar { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+  .topbar-actions { flex-wrap: wrap; gap: 8px; }
+  .topbar-btn { padding: 7px 12px; font-size: 12px; }
+
+  /* ── LESSON BODY ── */
+  .lesson-body { padding: 28px 18px 32px; }
+  .lesson-title { font-size: 26px; }
+  .lesson-hero-icon { font-size: 40px; }
+  .lesson-content { font-size: 16px; }
+  .key-concepts { padding: 16px 18px; }
+
+  /* ── QUIZ SECTION ── */
+  .quiz-header { padding: 14px 18px; }
+  .quiz-body { padding: 16px; }
+  .quiz-q { font-size: 15.5px; }
+  .quiz-opt { padding: 10px 12px; font-size: 14px; }
+
+  /* ── LESSON REACTION BAR ── */
+  .lesson-reaction { flex-wrap: wrap; gap: 10px; padding: 16px 0; margin: 22px 0; }
+  .lesson-reaction .react-btn { padding: 7px 12px; font-size: 14px; }
+
+  /* ── COMMENTS ── */
+  .comment-item { gap: 8px; }
+  .new-comment-box { flex-direction: column; gap: 8px; }
+  .btn-post-cmt { align-self: stretch; text-align: center; }
+
+  /* ── MODALS (incl. quiz builder) ── */
+  .modal { padding: 24px 20px 20px; max-height: 85vh; }
+  .modal-title { font-size: 19px; }
+  .confirm-modal { padding: 28px 22px; }
+  .qb-opt-row { flex-wrap: wrap; }
+  .qb-correct-label { white-space: normal; }
+}

@@ -67,7 +67,7 @@
     gap: 12px;
   }
 
-  .mission-badge-svg { width: 400px; height: 400px; }
+  .mission-badge-svg { height: 400px; width: auto; margin-top: -50px; margin-bottom: -30px; }
 
   .mission-text-col { padding: 60px 56px; }
 
@@ -282,3 +282,45 @@
     }
   }
 
+/* ═══════════════════════════════════════════════
+   MOBILE (added for mobile compatibility)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main { margin-left: 0; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { padding: 28px 22px 24px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header .subtitle { font-size: 14px; }
+
+  /* ── MISSION SECTION ── */
+  .mission-section { grid-template-columns: 1fr; }
+  .mission-logo-col {
+    padding: 32px 24px 8px;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+  }
+  .mission-badge-svg { width: 300px; height: 300px; }
+  .mission-text-col { padding: 28px 24px; }
+  .mission-text-col h2 { font-size: 22px; }
+  .mission-text-col p { font-size: 15.5px; }
+
+  /* ── SECTION WRAPPER ── */
+  .section-wrap { padding: 32px 22px; }
+  .section-title { font-size: 22px; margin-bottom: 20px; }
+
+  /* ── WHAT WE DO CARDS ── */
+  .cards-grid { grid-template-columns: 1fr; }
+  .feature-card {
+    border-right: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+  }
+  .feature-card:last-child { border-bottom: none !important; }
+
+  /* ── MEMBERSHIP TIERS ── */
+  .tiers-grid { grid-template-columns: 1fr; }
+
+  /* ── SOCIAL ── */
+  .social-row { padding: 14px 16px; }
+  .social-name { font-size: 14px; }
+}
