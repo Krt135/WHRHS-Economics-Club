@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Weekly Feature — The Economic Forum</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/weekly-feature.css">
@@ -29,7 +31,8 @@
     <div class="view active" id="viewList">
       <div class="page-header">
         <h1>The Weekly Feature</h1>
-        <p class="subtitle">Flagship academic essays on economic topics — voted on by members, published by the Exec Board.</p>
+        <p class="subtitle">Flagship academic essays on economic topics — voted on by members, published by the Exec
+          Board.</p>
         <div class="header-rule"></div>
       </div>
 
@@ -52,8 +55,7 @@
             </svg>
           </span>
           <input class="search-input" id="searchInput" type="text"
-            placeholder="Search lessons by title, topic, or level..."
-            oninput="window.renderList()">
+            placeholder="Search lessons by title, topic, or level..." oninput="window.renderList()">
         </div>
 
         <div class="filter-bar" id="filterBar">
@@ -97,6 +99,10 @@
       <div class="form-group">
         <label class="form-label">Title</label>
         <input class="form-input" id="pubTitle" type="text" placeholder="Enter essay title...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subtitle</label>
+        <input class="form-input" id="pubSubtitle" type="text" placeholder="Enter essay subtitle...">
       </div>
 
       <div class="form-group">
@@ -143,6 +149,10 @@
         <label class="form-label">Title</label>
         <input class="form-input" id="editTitle" type="text">
       </div>
+      <div class="form-group">
+        <label class="form-label">Subtitle</label>
+        <input class="form-input" id="editSubtitle" type="text" placeholder="Enter essay subtitle...">
+      </div>
 
       <div class="form-group">
         <label class="form-label">Topic</label>
@@ -184,7 +194,8 @@
     <div class="modal confirm-modal">
       <div class="confirm-icon">🗑️</div>
       <div class="confirm-title">Delete this feature?</div>
-      <div class="confirm-desc">This will permanently remove the essay and all its comments. This action cannot be undone.</div>
+      <div class="confirm-desc">This will permanently remove the essay and all its comments. This action cannot be
+        undone.</div>
       <div class="confirm-btns">
         <button class="btn-cancel" onclick="window.closeModal('confirmModal')">Cancel</button>
         <button class="btn-confirm-delete" onclick="window.deleteFeature()">Yes, Delete</button>

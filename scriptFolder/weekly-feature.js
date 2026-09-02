@@ -10,7 +10,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "http
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-const storage = getStorage(app); 
+const storage = getStorage(app);
 
 async function uploadFileToStorage(file, folderPath) {
   if (!file) return null;
@@ -217,6 +217,7 @@ window.togglePin = async (id, alreadyPinned) => {
       originalId: id,
       type: 'weekly',
       title: f.title,
+      subtitle: f.subtitle || '',
       body: bodyText,
       author: f.author,
       authorId: f.authorId || null,
@@ -322,6 +323,7 @@ function renderList() {
         Pinned to Bulletin
       </div>` : ''}
       <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
+      ${f.subtitle ? `<div class="fc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 8px;">${escHtml(f.subtitle)}</div>` : ''}
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">
@@ -522,6 +524,7 @@ window.publishFeature = async () => {
   }
 
   const title = document.getElementById('pubTitle').value.trim();
+  const subtitle = document.getElementById('pubSubtitle').value.trim();
   const tag = document.getElementById('pubTag').value.trim();
   const contentHtml = pubQuill.root.innerHTML;
   const contentText = pubQuill.getText().trim();
@@ -532,15 +535,17 @@ window.publishFeature = async () => {
   const fileUrl = await uploadFileToStorage(attFile, 'weekly_files');
   const fileName = attFile ? attFile.name : null;
 
+  
+
   if (!title) { document.getElementById('pubTitle').focus(); return; }
   if (!contentText) { pubQuill.focus(); return; }
 
   const name = getDisplayName(currentUser);
 
   set(push(ref(db, 'features')), {
-    title, tag,
+    title, subtitle, tag,
     richText: true,
-    contentHtml,          
+    contentHtml,
     contentText,
     imageUrl,
     fileUrl,
@@ -554,6 +559,7 @@ window.publishFeature = async () => {
     dislikes: 0
   }).then(() => {
     document.getElementById('pubTitle').value = '';
+    document.getElementById('pubSubtitle').value = '';
     document.getElementById('pubTag').value = '';
     document.getElementById('cImage').value = '';
     document.getElementById('cFile').value = '';
@@ -661,8 +667,9 @@ window.openEditModal = () => {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return;
 
   document.getElementById('editTitle').value = f.title;
+  document.getElementById('editSubtitle').value = f.subtitle || '';
   document.getElementById('editTag').value = f.tag || '';
-  
+
   document.getElementById('eImage').value = '';
   document.getElementById('eFile').value = '';
   document.getElementById('eImageStatus').innerHTML = f.imageUrl ? `Current: <a href="${f.imageUrl}" target="_blank">View Image</a>` : 'None';
@@ -686,11 +693,12 @@ window.saveEdit = async () => {
   const contentText = editQuill.getText().trim();
   const imgFile = document.getElementById("eImage").files[0];
   const attFile = document.getElementById("eFile").files[0];
-  
+
   if (!contentText) { editQuill.focus(); return; }
 
   const updates = {
     title: document.getElementById('editTitle').value.trim() || f.title,
+    subtitle: document.getElementById('editSubtitle').value.trim(),
     tag: document.getElementById('editTag').value.trim(),
     richText: true,
     contentHtml,

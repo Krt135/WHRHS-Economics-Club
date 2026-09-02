@@ -91,12 +91,13 @@ function renderBulletin() {
     const tags = Array.isArray(item.tags) ? item.tags : [];
     const commentCount = item.commentCount || 0;
     return `
-    <div class="bulletin-card" onclick="goToPost('${esc(item.originalId || item.discussionId)}', '${item.type}')">
+    <div class="bulletin-card" style="border-left: 4px solid var(--gold, #c5a059); padding-left: 15px;" onclick="goToPost('${esc(item.originalId || item.discussionId)}', '${item.type}')">
       <div class="bc-pin-label">
         <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         PINNED BY EXEC BOARD · ${rel(item.pinnedAt)}
       </div>
       <div class="bc-title">${esc(item.title)}</div>
+      ${item.subtitle ? `<div class="bc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 2px; margin-bottom: 6px;">${esc(item.subtitle)}</div>` : ""}
       <div class="bc-body">${esc(plainTextExcerpt(item.body || "", 200))}</div>
       ${tags.length ? `<div class="bc-tags">${tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join("")}</div>` : ""}
       <div class="bc-meta">

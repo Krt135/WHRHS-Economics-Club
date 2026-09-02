@@ -6,8 +6,6 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 
-// Inline font-stack lookup — used only when rendering legacy posts that have a
-// saved fontFamily field. Quill handles fonts for all new posts via CSS classes.
 const LEGACY_FONT_STACKS = {
   'Arial': 'Arial, sans-serif',
   'Times New Roman': '\"Times New Roman\", serif',
@@ -28,9 +26,6 @@ const auth = getAuth(app);
 
 
 // ── QUILL SETUP ──
-// Identical config to weekly-feature.js — CSS classes and picker labels
-// are defined globally in style.css so no page-level styles are needed.
-
 const Font = Quill.import('formats/font');
 Font.whitelist = [
   'arial', 'times-new-roman', 'georgia',
@@ -68,7 +63,6 @@ const eQuill = new Quill('#eEditor', {
   placeholder: 'Edit your essay here…'
 });
 
-// Real-time word count while typing
 wQuill.on('text-change', () => {
   const text = wQuill.getText();
   document.getElementById('wWC').textContent =
@@ -212,13 +206,13 @@ window.togglePin = async (id, alreadyPinned) => {
 
     const commentCount = p.comments ? p.comments.length : 0;
     const name = getDisplayName();
-    // Bulletin previews always use plain text
     const bodyText = p.richText ? (p.contentText || '') : (p.content || '');
 
     await set(push(ref(db, "bulletin")), {
       originalId: id,
       type: 'perspective',
       title: p.title,
+      subtitle: p.subtitle || '',
       body: bodyText,
       author: p.author,
       authorId: p.authorId || null,
@@ -313,7 +307,6 @@ function renderList() {
     const iLiked = myLiked(p);
     const iDisliked = myDisliked(p);
 
-    // Excerpt: contentText for rich posts, content for legacy posts
     const rawText = p.richText ? (p.contentText || '') : (p.content || '');
     const excerpt = rawText.slice(0, 240) + (rawText.length > 240 ? '…' : '');
 
@@ -322,10 +315,14 @@ function renderList() {
         : "theme-member";
     const isPinned = pinnedIds.has(p.id);
 
-    return `
+return `
 <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
   <div class="pc-header">
-    <div class="pc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(p.title)}</div>
+    <div class="pc-title-group">
+      <div class="pc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(p.title)}</div>
+      ${p.subtitle ? `<div class="pc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 6px;">${esc(p.subtitle)}</div>` : ''}
+    </div>
+    
     ${p.featured ? `<span class="featured-badge">FEATURED</span>` : ''}
     ${isPinned ? `
     <div class="pinned-badge">
@@ -360,7 +357,6 @@ function renderList() {
 }
 
 
-// ── Legacy plain-text helpers — kept for backward-compat with old posts ──
 function applyInlineFormatting(s) {
   return s
     .replace(/\*\*(.+?)\*\*/g, '<em>$1</em>')
@@ -382,19 +378,15 @@ function parseContent(raw) {
     return `<p>${applyInlineFormatting(esc(para))}</p>`;
   }).join("");
 }
-// ── End legacy helpers ──
-
 
 function renderArticle() {
   const p = posts.find(x => x.id === currentPostId);
   if (!p) return window.showList();
 
-  // ── Body HTML ──
   const articleHtml = p.richText
     ? (p.contentHtml || '')
     : parseContent(p.content);
 
-  // ── Word count ──
   const rawText = p.richText ? (p.contentText || '') : (p.content || '');
   const wds = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
   const readMin = Math.max(1, Math.round(wds / 200));
@@ -461,13 +453,13 @@ function renderArticle() {
     }).join('')
     : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
 
-  // Font style only needed for legacy posts (richText posts have Quill classes on spans)
   const fontStyle = p.richText ? '' : `font-family:${getFontStack(p.fontFamily)}`;
 
   document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
   document.getElementById('articleBody').innerHTML = `
     <div class="article-eyebrow">PERSPECTIVES${p.tags.length ? ' · ' + p.tags[0].toUpperCase() : ''}</div>
     <div class="article-title">${esc(p.title)}</div>
+    ${p.subtitle ? `<div class="article-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 1.1rem; margin-top: -10px; margin-bottom: 15px;">${esc(p.subtitle)}</div>` : ''}
     <div class="article-meta">
       <span class="author-chip" style="display:flex;align-items:center;gap:6px">
         ${profileAvatarHtml(p.authorId, "span", "author-av", "", esc(p.authorInitials || "?"), { role: p.authorRole || "member" })}
@@ -510,6 +502,7 @@ window.publishPost = () => {
   if (!currentUser) return alert("Please log in to post.");
 
   const title = document.getElementById('wTitle').value.trim();
+  const subtitle = document.getElementById('wSubtitle') ? document.getElementById('wSubtitle').value.trim() : '';
   const tag = document.getElementById('wTags').value;
   const contentHtml = wQuill.root.innerHTML;
   const contentText = wQuill.getText().trim();
@@ -521,10 +514,10 @@ window.publishPost = () => {
   const tags = tag ? [tag] : [];
 
   set(push(ref(db, 'perspectives')), {
-    title, tags,
+    title, subtitle, tags,
     richText: true,
-    contentHtml,          // Quill HTML — used for article rendering
-    contentText,          // Plain text — used for excerpts, word count, search
+    contentHtml,
+    contentText,
     author: name,
     authorInitials: name.substring(0, 2).toUpperCase(),
     authorId: currentUser.uid,
@@ -543,6 +536,7 @@ window.publishPost = () => {
   pendingDocName = null;
   document.getElementById('wDocPreview').textContent = '';
   document.getElementById('wTitle').value = '';
+  if (document.getElementById('wSubtitle')) document.getElementById('wSubtitle').value = '';
   document.getElementById('wTags').value = '';
   document.getElementById('wImgPreview').textContent = '';
   wQuill.setContents([]);
@@ -625,6 +619,7 @@ window.openEditModal = () => {
   const p = posts.find(x => x.id === currentPostId); if (!p) return;
 
   document.getElementById('eTitle').value = p.title;
+  if (document.getElementById('eSubtitle')) document.getElementById('eSubtitle').value = p.subtitle || '';
   document.getElementById('eTags').value  = p.tags[0] || '';
 
   if (p.richText) {
@@ -640,7 +635,6 @@ window.openEditModal = () => {
   document.getElementById('eImgPreview').textContent = p.image ? '📎 Current image attached' : '';
   editImgData = null;
 
-  // Document Edit Setup
   editDocData = null;
   editDocName = null;
   const eDocPreview = document.getElementById('eDocPreview');
@@ -661,6 +655,7 @@ window.saveEdit = () => {
 
   const updatedData = {
     title:       document.getElementById('eTitle').value.trim() || p.title,
+    subtitle:    document.getElementById('eSubtitle') ? document.getElementById('eSubtitle').value.trim() : (p.subtitle || ''),
     tags:        document.getElementById('eTags').value ? [document.getElementById('eTags').value] : [],
     richText:    true,
     contentHtml,
