@@ -56,19 +56,57 @@ const QUILL_TOOLBAR = [
     ]
   }],
   [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
-  ['link'],
+  ['link', 'image'],
   ['clean']
 ];
 
+// Inline Image Handler for Firebase Storage
+function quillImageHandler() {
+  const input = document.createElement('input');
+  input.setAttribute('type', 'file');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const editor = this.quill;
+    const range = editor.getSelection(true);
+
+    try {
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(imgRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      editor.insertEmbed(range.index, 'image', downloadURL);
+      editor.setSelection(range.index + 1);
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      alert("Failed to upload image. Please try again.");
+    }
+  };
+}
+
 const pubQuill = new Quill('#pubEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Write your essay here…'
 });
 
 const editQuill = new Quill('#editEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Edit your essay here…'
 });
 
@@ -118,6 +156,111 @@ const urlParams = new URLSearchParams(window.location.search);
 const articleSlug = urlParams.get("article");
 let activeTag = 'all';
 let pinnedIds = new Set();
+
+// Cover image state (single file)
+let pubCoverFile = null;      // File, or null
+let editCoverFile = null;     // File, existing url string, or null
+let editCoverRemoved = false; // true if the user removed the existing cover during edit
+
+// Attachment state (multiple files)
+let pubDocs = [];   // array of File
+let editDocs = [];  // array of File or existing {name, url}
+
+window.handleCoverFile = (input, type) => {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (type === 'pub') {
+    pubCoverFile = file;
+  } else {
+    editCoverFile = file;
+    editCoverRemoved = false;
+  }
+
+  input.value = '';
+  window.renderCoverPreview(type);
+};
+
+window.renderCoverPreview = (type) => {
+  const containerId = type === 'pub' ? 'pubImgPreviewContainer' : 'eImgPreviewContainer';
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const coverValue = type === 'pub' ? pubCoverFile : editCoverFile;
+
+  container.innerHTML = '';
+
+  if (!coverValue) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const src = coverValue instanceof File ? URL.createObjectURL(coverValue) : coverValue;
+  container.style.display = 'block';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = "position:relative; width:160px; max-width:100%;";
+  wrap.innerHTML = `
+    <img src="${src}" style="width:100%; display:block; border-radius:8px; border:1px solid #d9c9a3;" alt="Cover preview">
+    <button type="button" onclick="window.removeCoverImage('${type}')"
+      style="position:absolute; top:-8px; right:-8px; background:#ff4d4d; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; padding:0;">✕</button>
+  `;
+  container.appendChild(wrap);
+};
+
+window.removeCoverImage = (type) => {
+  if (type === 'pub') {
+    pubCoverFile = null;
+  } else {
+    editCoverFile = null;
+    editCoverRemoved = true;
+  }
+  window.renderCoverPreview(type);
+};
+
+window.handleMultipleFiles = (input, type, category) => {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  if (type === 'pub' && category === 'doc') pubDocs.push(...files);
+  if (type === 'edit' && category === 'doc') editDocs.push(...files);
+
+  input.value = '';
+  window.renderPreviews(type, category);
+};
+
+window.renderPreviews = (type, category) => {
+  let array = [];
+  let containerId = '';
+
+  if (type === 'pub' && category === 'doc') { array = pubDocs; containerId = 'pubDocPreviewContainer'; }
+  if (type === 'edit' && category === 'doc') { array = editDocs; containerId = 'eDocPreviewContainer'; }
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!array.length) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.style.display = 'flex';
+  container.innerHTML = array.map((item, index) => {
+    const name = item instanceof File ? item.name : (item.name || 'File');
+    return `
+      <div style="display:flex; align-items:center; gap:6px; padding:6px 10px; background:#f3ede0; border:1px solid #d9c9a3; border-radius:20px; font-size:12px; color:#5a4a32;">
+        <span>📄 ${name}</span>
+        <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')"
+          style="background:none; border:none; cursor:pointer; color:#a04040; font-weight:bold; padding:0; line-height:1;">✕</button>
+      </div>`;
+  }).join('');
+};
+
+window.removeFile = (index, type, category) => {
+  if (type === 'pub' && category === 'doc') pubDocs.splice(index, 1);
+  if (type === 'edit' && category === 'doc') editDocs.splice(index, 1);
+  window.renderPreviews(type, category);
+};
 
 function getDisplayName(user) {
   if (userProfile && userProfile.displayName) return userProfile.displayName;
@@ -379,6 +522,11 @@ function renderArticle() {
 
   // Fixed specific variable scopes referencing the 'f' object rather than 'l'
   const imgHtml = f.imageUrl ? `<img src="${f.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const docsHtml = (f.documents && f.documents.length)
+    ? `<div style="margin: 16px 0; display:flex; flex-direction:column; gap:8px;">
+        ${f.documents.map(doc => `<a href="${doc.url}" download="${escHtml(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${escHtml(doc.name || 'Attachment')}</a>`).join('')}
+      </div>`
+    : '';
   const fileHtml = f.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${f.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${f.fileName || 'Attachment'}</a></div>` : '';
 
   const topActions = document.getElementById('articleTopActions');
@@ -465,6 +613,7 @@ function renderArticle() {
     ${f.tag ? `<div class="article-tags"><span class="tag-pill">${escHtml(f.tag)}</span></div>` : ''}
     <div class="article-divider"></div>
     ${imgHtml}
+    ${docsHtml}
     ${fileHtml}
     <div class="article-content" style="${fontStyle}">${articleHtml}</div>
     <div class="reaction-bar">
@@ -528,14 +677,14 @@ window.publishFeature = async () => {
   const tag = document.getElementById('pubTag').value.trim();
   const contentHtml = pubQuill.root.innerHTML;
   const contentText = pubQuill.getText().trim();
-  const imgFile = document.getElementById("cImage").files[0];
-  const attFile = document.getElementById("cFile").files[0];
 
-  const imageUrl = await uploadFileToStorage(imgFile, 'weekly_images');
-  const fileUrl = await uploadFileToStorage(attFile, 'weekly_files');
-  const fileName = attFile ? attFile.name : null;
+  const imageUrl = await uploadFileToStorage(pubCoverFile, 'weekly_images');
 
-  
+  const documents = [];
+  for (const file of pubDocs) {
+    const url = await uploadFileToStorage(file, 'weekly_files');
+    documents.push({ name: file.name, url });
+  }
 
   if (!title) { document.getElementById('pubTitle').focus(); return; }
   if (!contentText) { pubQuill.focus(); return; }
@@ -548,8 +697,7 @@ window.publishFeature = async () => {
     contentHtml,
     contentText,
     imageUrl,
-    fileUrl,
-    fileName,
+    documents,
     author: name,
     authorInitials: name.substring(0, 2).toUpperCase(),
     authorId: currentUser.uid,
@@ -561,8 +709,10 @@ window.publishFeature = async () => {
     document.getElementById('pubTitle').value = '';
     document.getElementById('pubSubtitle').value = '';
     document.getElementById('pubTag').value = '';
-    document.getElementById('cImage').value = '';
-    document.getElementById('cFile').value = '';
+    pubCoverFile = null;
+    pubDocs = [];
+    window.renderCoverPreview('pub');
+    window.renderPreviews('pub', 'doc');
     pubQuill.setContents([]);
     document.getElementById('wordCount').textContent = '0 words';
     window.closeModal('publishModal');
@@ -670,10 +820,12 @@ window.openEditModal = () => {
   document.getElementById('editSubtitle').value = f.subtitle || '';
   document.getElementById('editTag').value = f.tag || '';
 
-  document.getElementById('eImage').value = '';
-  document.getElementById('eFile').value = '';
-  document.getElementById('eImageStatus').innerHTML = f.imageUrl ? `Current: <a href="${f.imageUrl}" target="_blank">View Image</a>` : 'None';
-  document.getElementById('eFileStatus').innerHTML = f.fileUrl ? `Current: <a href="${f.fileUrl}" target="_blank">${f.fileName || 'View File'}</a>` : 'None';
+  editCoverFile = f.imageUrl || null;
+  editCoverRemoved = false;
+  editDocs = f.documents ? [...f.documents] : (f.fileUrl ? [{ name: f.fileName || 'Attachment', url: f.fileUrl }] : []);
+
+  window.renderCoverPreview('edit');
+  window.renderPreviews('edit', 'doc');
 
   if (f.richText) {
     editQuill.clipboard.dangerouslyPasteHTML(f.contentHtml || '');
@@ -691,8 +843,6 @@ window.saveEdit = async () => {
 
   const contentHtml = editQuill.root.innerHTML;
   const contentText = editQuill.getText().trim();
-  const imgFile = document.getElementById("eImage").files[0];
-  const attFile = document.getElementById("eFile").files[0];
 
   if (!contentText) { editQuill.focus(); return; }
 
@@ -705,13 +855,35 @@ window.saveEdit = async () => {
     contentText
   };
 
-  if (imgFile) updates.imageUrl = await uploadFileToStorage(imgFile, 'weekly_images');
-  if (attFile) {
-    updates.fileUrl = await uploadFileToStorage(attFile, 'weekly_files');
-    updates.fileName = attFile.name;
+  // Cover image: upload a new file, keep the existing one, or clear it if removed
+  if (editCoverFile instanceof File) {
+    updates.imageUrl = await uploadFileToStorage(editCoverFile, 'weekly_images');
+  } else if (editCoverRemoved) {
+    updates.imageUrl = null;
+  } else if (typeof editCoverFile === 'string') {
+    updates.imageUrl = editCoverFile;
   }
 
-  update(ref(db, `features/${currentFeatureId}`), updates).then(() => window.closeModal('editModal'));
+  // Documents: upload new files, keep existing ones
+  const finalDocs = [];
+  for (const item of editDocs) {
+    if (item instanceof File) {
+      const url = await uploadFileToStorage(item, 'weekly_files');
+      finalDocs.push({ name: item.name, url });
+    } else {
+      finalDocs.push(item);
+    }
+  }
+  updates.documents = finalDocs;
+  updates.fileUrl = null;
+  updates.fileName = null;
+
+  update(ref(db, `features/${currentFeatureId}`), updates).then(() => {
+    editCoverFile = null;
+    editCoverRemoved = false;
+    editDocs = [];
+    window.closeModal('editModal');
+  });
 };
 
 window.deleteFeature = async () => {

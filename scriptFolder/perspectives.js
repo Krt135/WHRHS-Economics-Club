@@ -5,6 +5,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 
 const LEGACY_FONT_STACKS = {
   'Arial': 'Arial, sans-serif',
@@ -23,6 +24,7 @@ function getFontStack(name) {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app); // Initialize Storage
 
 
 // ── QUILL SETUP ──
@@ -37,6 +39,7 @@ const QuillSize = Quill.import('attributors/style/size');
 QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
 Quill.register(QuillSize, true);
 
+// Add 'image' to the toolbar array
 const QUILL_TOOLBAR = [
   ['bold', 'italic', 'underline'],
   [{
@@ -47,19 +50,58 @@ const QUILL_TOOLBAR = [
     ]
   }],
   [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
-  ['link'],
+  ['link', 'image'], // ADDED IMAGE HERE
   ['clean']
 ];
 
+// Inline Image Handler for Firebase Storage
+function quillImageHandler() {
+  const input = document.createElement('input');
+  input.setAttribute('type', 'file');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Get the editor instance that triggered this
+    const editor = this.quill;
+    const range = editor.getSelection(true);
+
+    try {
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(imgRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      editor.insertEmbed(range.index, 'image', downloadURL);
+      editor.setSelection(range.index + 1);
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      alert("Failed to upload image. Please try again.");
+    }
+  };
+}
+
 const wQuill = new Quill('#wEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Write your essay here…'
 });
 
 const eQuill = new Quill('#eEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Edit your essay here…'
 });
 
@@ -108,6 +150,7 @@ let pendingDocName = null;
 let editImgData = null;
 let editDocData = null;
 let editDocName = null;
+let coverFileRemoved = false;
 let pinnedIds = new Set();
 
 function getDisplayName() {
@@ -146,15 +189,113 @@ document.querySelectorAll('.modal-overlay').forEach(o =>
   o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
 );
 
-window.previewImg = (input, previewId, dataKey) => {
-  const file = input.files[0]; if (!file) return;
-  const r = new FileReader();
-  r.onload = e => {
-    if (dataKey === 'wImgData') pendingImgData = e.target.result;
-    else editImgData = e.target.result;
-    document.getElementById(previewId).textContent = '📎 ' + file.name;
-  };
-  r.readAsDataURL(file);
+let writeCoverFile = null;     // single File, or null
+let editCoverFile = null;      // single File, existing url string, or null
+let editCoverRemoved = false;  // true if the user removed the existing cover during edit
+let writeDocs = [];
+let editDocs = [];
+let removedExistingDocs = [];   // Track removed docs from existing posts
+
+window.handleCoverFile = (input, type) => {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (type === 'w') {
+    writeCoverFile = file;
+  } else {
+    editCoverFile = file;
+    editCoverRemoved = false;
+  }
+
+  input.value = '';
+  window.renderCoverPreview(type);
+};
+
+window.renderCoverPreview = (type) => {
+  const containerId = type === 'w' ? 'wImgPreviewContainer' : 'eImgPreviewContainer';
+  const container = document.getElementById(containerId);
+  const coverValue = type === 'w' ? writeCoverFile : editCoverFile;
+
+  container.innerHTML = '';
+
+  if (!coverValue) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const src = coverValue instanceof File ? URL.createObjectURL(coverValue) : coverValue;
+  container.style.display = 'block';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = "position:relative; width:160px; max-width:100%;";
+  wrap.innerHTML = `
+    <img src="${src}" style="width:100%; display:block; border-radius:8px; border:1px solid #f0d5b0;" alt="Cover preview">
+    <button type="button" onclick="window.removeCoverImage('${type}')"
+      style="position:absolute; top:-8px; right:-8px; background:#ff4d4d; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; padding:0;">✕</button>
+  `;
+  container.appendChild(wrap);
+};
+
+window.removeCoverImage = (type) => {
+  if (type === 'w') {
+    writeCoverFile = null;
+  } else {
+    editCoverFile = null;
+    editCoverRemoved = true;
+  }
+  window.renderCoverPreview(type);
+};
+
+window.handleMultipleFiles = (input, type, category) => {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  if (type === 'w' && category === 'doc') writeDocs.push(...files);
+  if (type === 'e' && category === 'doc') editDocs.push(...files);
+
+  input.value = '';
+  window.renderPreviews(type, category);
+};
+
+window.renderPreviews = (type, category) => {
+  let array = [];
+  let containerId = '';
+  
+  if (type === 'w' && category === 'doc') { array = writeDocs; containerId = 'wDocPreviewContainer'; }
+  if (type === 'e' && category === 'doc') { array = editDocs; containerId = 'eDocPreviewContainer'; }
+  
+  const container = document.getElementById(containerId);
+  container.innerHTML = ''; 
+  
+  if (array.length > 0) {
+    container.style.display = 'flex';
+    array.forEach((file, index) => {
+      const pill = document.createElement('div');
+      pill.style.cssText = "display: flex; align-items: center; padding: 4px 10px; background: #fff5e6; border: 1px solid #f0d5b0; border-radius: 20px; font-size: 12px; color: #b38036;";
+      
+      // Handle both new File objects and existing URL objects
+      const fileName = file.name || file.fileName || 'Attached File';
+      
+      pill.innerHTML = `
+        <span style="margin-right: 8px;">📎 ${fileName}</span>
+        <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')" 
+          style="background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; padding: 0;">✕</button>
+      `;
+      container.appendChild(pill);
+    });
+  } else {
+    container.style.display = 'none';
+  }
+};
+
+window.removeFile = (index, type, category) => {
+  let removedItem;
+  if (type === 'w' && category === 'doc') writeDocs.splice(index, 1);
+  if (type === 'e' && category === 'doc') {
+    removedItem = editDocs.splice(index, 1)[0];
+    if (removedItem.url) removedExistingDocs.push(removedItem);
+  }
+  window.renderPreviews(type, category);
 };
 
 window.previewDoc = (input, previewId, dataKey) => {
@@ -315,7 +456,7 @@ function renderList() {
         : "theme-member";
     const isPinned = pinnedIds.has(p.id);
 
-return `
+    return `
 <div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
   <div class="pc-header">
     <div class="pc-title-group">
@@ -471,6 +612,9 @@ function renderArticle() {
     ${p.tags.length ? `<div class="article-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="article-divider"></div>
     ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
+    ${(p.documents && p.documents.length) ? `<div class="article-docs" style="margin:20px 0; display:flex; flex-direction:column; gap:8px;">
+      ${p.documents.map(doc => `<a href="${doc.url}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold; width:fit-content;">📥 ${esc(doc.name || 'File')}</a>`).join('')}
+    </div>` : ''}
     ${p.documentData ? `<div class="article-doc" style="margin:20px 0;"><a href="${p.documentData}" download="${p.documentName || 'attachment'}" style="padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold;">📥 Download ${esc(p.documentName || 'File')}</a></div>` : ''}
     <div class="article-content" style="${fontStyle}">${articleHtml}</div>
     <div class="reaction-bar">
@@ -498,50 +642,68 @@ function renderArticle() {
 
 
 // 7. ── DATABASE MUTATIONS ──
-window.publishPost = () => {
-  if (!currentUser) return alert("Please log in to post.");
-
+window.publishPost = async () => {
   const title = document.getElementById('wTitle').value.trim();
   const subtitle = document.getElementById('wSubtitle') ? document.getElementById('wSubtitle').value.trim() : '';
-  const tag = document.getElementById('wTags').value;
+  const tags = document.getElementById('wTags').value ? [document.getElementById('wTags').value] : [];
   const contentHtml = wQuill.root.innerHTML;
-  const contentText = wQuill.getText().trim();
+  const contentText = wQuill.getText();
+  
+  if (!title) return alert("Title required.");
+  if (!contentText.trim()) return alert("Content required.");
 
-  if (!title) { document.getElementById('wTitle').focus(); return; }
-  if (!contentText) { wQuill.focus(); return; }
+  try {
+    let coverUrl = '';
+    if (writeCoverFile) {
+      const fileRef = storageRef(storage, `post_covers/${Date.now()}_${writeCoverFile.name}`);
+      await uploadBytes(fileRef, writeCoverFile);
+      coverUrl = await getDownloadURL(fileRef);
+    }
 
-  const name = getDisplayName();
-  const tags = tag ? [tag] : [];
+    const uploadedDocs = [];
+    for (const file of writeDocs) {
+      const fileRef = storageRef(storage, `post_docs/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      uploadedDocs.push({ name: file.name, url });
+    }
 
-  set(push(ref(db, 'perspectives')), {
-    title, subtitle, tags,
-    richText: true,
-    contentHtml,
-    contentText,
-    author: name,
-    authorInitials: name.substring(0, 2).toUpperCase(),
-    authorId: currentUser.uid,
-    authorRole: userRole,
-    image: pendingImgData || null,
-    documentData: pendingDocData || null,
-    documentName: pendingDocName || null,
-    postedAt: Date.now(),
-    likes: 0,
-    dislikes: 0,
-    featured: false
-  });
+    const displayName = getDisplayName();
 
-  pendingImgData = null;
-  pendingDocData = null;
-  pendingDocName = null;
-  document.getElementById('wDocPreview').textContent = '';
-  document.getElementById('wTitle').value = '';
-  if (document.getElementById('wSubtitle')) document.getElementById('wSubtitle').value = '';
-  document.getElementById('wTags').value = '';
-  document.getElementById('wImgPreview').textContent = '';
-  wQuill.setContents([]);
-  document.getElementById('wWC').textContent = '0 words';
-  window.closeModal('writeModal');
+    const newPostData = {
+      title,
+      subtitle,
+      tags,
+      contentHtml,
+      contentText,
+      richText: true,
+      image: coverUrl,
+      documents: uploadedDocs,
+      author: displayName,
+      authorId: auth.currentUser.uid,
+      authorInitials: displayName.substring(0, 2).toUpperCase(),
+      authorRole: userRole,
+      postedAt: Date.now(),
+      likes: 0,
+      dislikes: 0
+    };
+
+    await push(ref(db, 'perspectives'), newPostData);
+    
+    // Reset Modal
+    wQuill.setContents([]);
+    document.getElementById('wTitle').value = '';
+    if (document.getElementById('wSubtitle')) document.getElementById('wSubtitle').value = '';
+    writeCoverFile = null;
+    writeDocs = [];
+    window.renderCoverPreview('w');
+    window.renderPreviews('w', 'doc');
+    window.closeModal('writeModal');
+    
+  } catch (error) {
+    console.error("Error publishing post:", error);
+    alert("Failed to publish post.");
+  }
 };
 
 
@@ -632,44 +794,81 @@ window.openEditModal = () => {
   document.getElementById('eWC').textContent =
     (rawText.trim() ? rawText.trim().split(/\s+/).length : 0) + ' words';
     
-  document.getElementById('eImgPreview').textContent = p.image ? '📎 Current image attached' : '';
-  editImgData = null;
+  // Load the existing cover image and documents into edit state
+  editCoverFile = p.image || null;
+  editCoverRemoved = false;
+  editDocs = p.documents ? [...p.documents] : [];
+  removedExistingDocs = [];
 
-  editDocData = null;
-  editDocName = null;
-  const eDocPreview = document.getElementById('eDocPreview');
-  if (eDocPreview) {
-    eDocPreview.textContent = p.documentName ? '📎 ' + p.documentName : '';
-  }
+  // Render the previews inside the edit modal
+  window.renderCoverPreview('e');
+  window.renderPreviews('e', 'doc');
 
   window.openModal('editModal');
 };
 
 
-window.saveEdit = () => {
+window.saveEdit = async () => {
   const p = posts.find(x => x.id === currentPostId); if (!p) return;
-
-  const contentHtml = eQuill.root.innerHTML;
-  const contentText = eQuill.getText().trim();
-  if (!contentText) { eQuill.focus(); return; }
-
-  const updatedData = {
-    title:       document.getElementById('eTitle').value.trim() || p.title,
-    subtitle:    document.getElementById('eSubtitle') ? document.getElementById('eSubtitle').value.trim() : (p.subtitle || ''),
-    tags:        document.getElementById('eTags').value ? [document.getElementById('eTags').value] : [],
-    richText:    true,
-    contentHtml,
-    contentText
-  };
   
-  if (editImgData) updatedData.image = editImgData;
-  if (editDocData) {
-    updatedData.documentData = editDocData;
-    updatedData.documentName = editDocName;
-  }
+  const title = document.getElementById('eTitle').value.trim();
+  const subtitle = document.getElementById('eSubtitle') ? document.getElementById('eSubtitle').value.trim() : '';
+  const tags = document.getElementById('eTags').value ? [document.getElementById('eTags').value] : [];
+  const contentHtml = eQuill.root.innerHTML;
+  const contentText = eQuill.getText();
+  
+  if (!title) return alert("Title required.");
+  if (!contentText.trim()) return alert("Content required.");
 
-  update(ref(db, `perspectives/${currentPostId}`), updatedData)
-    .then(() => window.closeModal('editModal'));
+  try {
+    // Process the cover image: upload a new file, keep the existing URL, or clear it if removed
+    let coverUrl = '';
+    if (editCoverFile instanceof File) {
+      const fileRef = storageRef(storage, `post_covers/${Date.now()}_${editCoverFile.name}`);
+      await uploadBytes(fileRef, editCoverFile);
+      coverUrl = await getDownloadURL(fileRef);
+    } else if (editCoverRemoved) {
+      coverUrl = '';
+    } else if (typeof editCoverFile === 'string') {
+      coverUrl = editCoverFile; // unchanged existing cover
+    }
+
+    // Process edit documents: upload new ones, keep existing ones
+    const finalDocs = [];
+    for (const item of editDocs) {
+      if (item instanceof File) {
+        const fileRef = storageRef(storage, `post_docs/${Date.now()}_${item.name}`);
+        await uploadBytes(fileRef, item);
+        const url = await getDownloadURL(fileRef);
+        finalDocs.push({ name: item.name, url });
+      } else {
+        finalDocs.push(item);
+      }
+    }
+
+    const updatedData = {
+      title,
+      subtitle,
+      tags,
+      contentHtml,
+      contentText,
+      richText: true,
+      image: coverUrl,
+      documents: finalDocs
+    };
+
+    await update(ref(db, `perspectives/${currentPostId}`), updatedData);
+    
+    // Clear state and close modal
+    editCoverFile = null;
+    editCoverRemoved = false;
+    editDocs = [];
+    window.closeModal('editModal');
+    
+  } catch (error) {
+    console.error("Error updating post:", error);
+    alert("Failed to update post.");
+  }
 };
 
 

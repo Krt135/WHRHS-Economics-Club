@@ -41,19 +41,57 @@ const QUILL_TOOLBAR = [
     ]
   }],
   [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
-  ['link'],
+  ['link', 'image'],
   ['clean']
 ];
 
+// Inline Image Handler for Firebase Storage
+function quillImageHandler() {
+  const input = document.createElement('input');
+  input.setAttribute('type', 'file');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const editor = this.quill;
+    const range = editor.getSelection(true);
+
+    try {
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(imgRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      editor.insertEmbed(range.index, 'image', downloadURL);
+      editor.setSelection(range.index + 1);
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      alert("Failed to upload image. Please try again.");
+    }
+  };
+}
+
 const cQuill = new Quill('#cEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Write your lesson here in simple, accessible language…'
 });
 
 const eQuill = new Quill('#eEditor', {
   theme: 'snow',
-  modules: { toolbar: QUILL_TOOLBAR },
+  modules: {
+    toolbar: {
+      container: QUILL_TOOLBAR,
+      handlers: { image: quillImageHandler }
+    }
+  },
   placeholder: 'Edit your lesson content…'
 });
 
@@ -126,6 +164,111 @@ let levelFilter = "all";
 let sortMode = "newest";
 let quizState = {};
 let qbQuestions = [];
+
+// Cover image state (single file)
+let createCoverFile = null;   // File, or null
+let editCoverFile = null;     // File, existing url string, or null
+let editCoverRemoved = false; // true if the user removed the existing cover during edit
+
+// Attachment state (multiple files)
+let createDocs = [];  // array of File
+let editDocs = [];    // array of File or existing {name, url}
+
+function handleCoverFile(input, type) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (type === 'c') {
+    createCoverFile = file;
+  } else {
+    editCoverFile = file;
+    editCoverRemoved = false;
+  }
+
+  input.value = '';
+  renderCoverPreview(type);
+}
+
+function renderCoverPreview(type) {
+  const containerId = type === 'c' ? 'cImgPreviewContainer' : 'eImgPreviewContainer';
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const coverValue = type === 'c' ? createCoverFile : editCoverFile;
+
+  container.innerHTML = '';
+
+  if (!coverValue) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const src = coverValue instanceof File ? URL.createObjectURL(coverValue) : coverValue;
+  container.style.display = 'block';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = "position:relative; width:160px; max-width:100%;";
+  wrap.innerHTML = `
+    <img src="${src}" style="width:100%; display:block; border-radius:8px; border:1px solid #d9c9a3;" alt="Cover preview">
+    <button type="button" onclick="window.removeCoverImage('${type}')"
+      style="position:absolute; top:-8px; right:-8px; background:#ff4d4d; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; padding:0;">✕</button>
+  `;
+  container.appendChild(wrap);
+}
+
+function removeCoverImage(type) {
+  if (type === 'c') {
+    createCoverFile = null;
+  } else {
+    editCoverFile = null;
+    editCoverRemoved = true;
+  }
+  renderCoverPreview(type);
+}
+
+function handleMultipleFiles(input, type, category) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  if (type === 'c' && category === 'doc') createDocs.push(...files);
+  if (type === 'e' && category === 'doc') editDocs.push(...files);
+
+  input.value = '';
+  renderPreviews(type, category);
+}
+
+function renderPreviews(type, category) {
+  let array = [];
+  let containerId = '';
+
+  if (type === 'c' && category === 'doc') { array = createDocs; containerId = 'cDocPreviewContainer'; }
+  if (type === 'e' && category === 'doc') { array = editDocs; containerId = 'eDocPreviewContainer'; }
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!array.length) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.style.display = 'flex';
+  container.innerHTML = array.map((item, index) => {
+    const name = item instanceof File ? item.name : (item.name || 'File');
+    return `
+      <div style="display:flex; align-items:center; gap:6px; padding:6px 10px; background:#f3ede0; border:1px solid #d9c9a3; border-radius:20px; font-size:12px; color:#5a4a32;">
+        <span>📄 ${name}</span>
+        <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')"
+          style="background:none; border:none; cursor:pointer; color:#a04040; font-weight:bold; padding:0; line-height:1;">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function removeFile(index, type, category) {
+  if (type === 'c' && category === 'doc') createDocs.splice(index, 1);
+  if (type === 'e' && category === 'doc') editDocs.splice(index, 1);
+  renderPreviews(type, category);
+}
 
 // ─────────────────────────────────────────────
 //  FIREBASE LISTENER
@@ -263,6 +406,11 @@ function renderLesson() {
   const iDisliked = myDisliked(l);
 
   const imgHtml = l.imageUrl ? `<img src="${l.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const docsHtml = (l.documents && l.documents.length)
+    ? `<div style="margin: 16px 0; display:flex; flex-direction:column; gap:8px;">
+        ${l.documents.map(doc => `<a href="${doc.url}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${esc(doc.name || 'Attachment')}</a>`).join('')}
+      </div>`
+    : '';
   const fileHtml = l.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${l.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${l.fileName || 'Attachment'}</a></div>` : '';
 
   const qs = Array.isArray(l.quiz) ? l.quiz : [];
@@ -365,6 +513,7 @@ document.getElementById("lessonBody").innerHTML = `
     ${concepts.length ? `<div class="key-concepts"><div class="kc-title">KEY CONCEPTS IN THIS LESSON</div><ul class="kc-list">${concepts.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
     <div class="lesson-divider"></div>
     ${imgHtml}
+    ${docsHtml}
     ${fileHtml}
     <div class="lesson-content">${lessonHtml}</div>
     ${quizHtml}
@@ -405,12 +554,15 @@ async function publishLesson() {
   const concepts = document.getElementById("cConcepts").value.split("\n").map(s => s.trim()).filter(Boolean);
   const validQuiz = qbQuestions.filter(q => q.q && q.opts.filter(Boolean).length >= 2);
 
-  const imgFile = document.getElementById("cImage").files[0];
-  const attFile = document.getElementById("cFile").files[0];
+  const imgFile = createCoverFile;
 
   const imageUrl = await uploadFileToStorage(imgFile, 'academy_images');
-  const fileUrl = await uploadFileToStorage(attFile, 'academy_files');
-  const fileName = attFile ? attFile.name : null;
+
+  const documents = [];
+  for (const file of createDocs) {
+    const url = await uploadFileToStorage(file, 'academy_files');
+    documents.push({ name: file.name, url });
+  }
 
   const newRef = push(ref(db, "lessons"));
   await set(newRef, {
@@ -425,8 +577,7 @@ async function publishLesson() {
     contentText,      
     quiz: validQuiz,
     imageUrl,
-    fileUrl,
-    fileName,
+    documents,
     author: name, authorInitials: initials, authorId: currentUser.uid,
     postedAt: Date.now(), likes: 0, dislikes: 0
   });
@@ -434,8 +585,10 @@ async function publishLesson() {
   ["cTitle", "cDesc", "cIcon", "cConcepts"].forEach(id => document.getElementById(id).value = "");
   cQuill.setContents([]);
   document.getElementById("cWC").textContent = "0 words";
-  document.getElementById("cImage").value = "";
-  document.getElementById("cFile").value = "";
+  createCoverFile = null;
+  createDocs = [];
+  renderCoverPreview('c');
+  renderPreviews('c', 'doc');
   qbQuestions = []; renderQuizBuilder(); closeModal("createModal");
 }
 
@@ -451,10 +604,12 @@ function openEditModal() {
   document.getElementById("eIcon").value = l.icon || "";
   document.getElementById("eDesc").value = l.desc || "";
   document.getElementById("eConcepts").value = (Array.isArray(l.concepts) ? l.concepts : []).join("\n");
-  document.getElementById("eImage").value = "";
-  document.getElementById("eFile").value = "";
-  document.getElementById("eImageStatus").innerHTML = l.imageUrl ? `Current: <a href="${l.imageUrl}" target="_blank">View Image</a>` : 'None';
-  document.getElementById("eFileStatus").innerHTML = l.fileUrl ? `Current: <a href="${l.fileUrl}" target="_blank">${l.fileName || 'View File'}</a>` : 'None';
+  editCoverFile = l.imageUrl || null;
+  editCoverRemoved = false;
+  editDocs = l.documents ? [...l.documents] : (l.fileUrl ? [{ name: l.fileName || 'Attachment', url: l.fileUrl }] : []);
+
+  renderCoverPreview('e');
+  renderPreviews('e', 'doc');
 
   if (l.richText) {
     eQuill.clipboard.dangerouslyPasteHTML(l.contentHtml || '');
@@ -488,16 +643,35 @@ async function saveEdit() {
     contentText
   };
 
-  const imgFile = document.getElementById("eImage").files[0];
-  const attFile = document.getElementById("eFile").files[0];
+  const imgFile = editCoverFile instanceof File ? editCoverFile : null;
 
-  if (imgFile) updates.imageUrl = await uploadFileToStorage(imgFile, 'academy_images');
-  if (attFile) {
-    updates.fileUrl = await uploadFileToStorage(attFile, 'academy_files');
-    updates.fileName = attFile.name;
+  // Cover image: upload a new file, keep the existing one, or clear it if removed
+  if (imgFile) {
+    updates.imageUrl = await uploadFileToStorage(imgFile, 'academy_images');
+  } else if (editCoverRemoved) {
+    updates.imageUrl = null;
+  } else if (typeof editCoverFile === 'string') {
+    updates.imageUrl = editCoverFile;
   }
 
+  // Documents: upload new files, keep existing ones
+  const finalDocs = [];
+  for (const item of editDocs) {
+    if (item instanceof File) {
+      const url = await uploadFileToStorage(item, 'academy_files');
+      finalDocs.push({ name: item.name, url });
+    } else {
+      finalDocs.push(item);
+    }
+  }
+  updates.documents = finalDocs;
+  updates.fileUrl = null;
+  updates.fileName = null;
+
   await update(ref(db, `lessons/${currentId}`), updates);
+  editCoverFile = null;
+  editCoverRemoved = false;
+  editDocs = [];
   closeModal("editModal");
 }
 
@@ -636,6 +810,8 @@ Object.assign(window, {
   publishLesson, openEditModal, saveEdit, deleteLesson,
   reactLesson, postComment, likeComment, deleteComment,
   answerQuiz, nextQuiz, addQuizQuestion, renderQuizBuilder,
+  handleCoverFile, renderCoverPreview, removeCoverImage,
+  handleMultipleFiles, renderPreviews, removeFile,
 });
 
 window.setSortMode = (val) => { sortMode = val; renderList(); };

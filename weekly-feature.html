@@ -120,12 +120,30 @@
 
       <div class="form-group">
         <label class="form-label">Cover Image (Optional)</label>
-        <input class="form-input" id="cImage" type="file" accept="image/*" style="font-size: 13px;">
+        <div onclick="document.getElementById('cImage').click()"
+          style="cursor:pointer; padding:10px 14px; border:1px dashed #c9b896; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:8px; color:#8a7355; width:fit-content;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path
+              d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          Attach cover image
+        </div>
+        <input type="file" id="cImage" style="display:none;" accept="image/*" onchange="window.handleCoverFile(this, 'pub')">
+        <div id="pubImgPreviewContainer" style="display:none; margin-top:10px;"></div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Attachment (Optional)</label>
-        <input class="form-input" id="cFile" type="file" style="font-size: 13px;">
+        <label class="form-label">Attachments (Optional)</label>
+        <div onclick="document.getElementById('cFile').click()"
+          style="cursor:pointer; padding:10px 14px; border:1px dashed #c9b896; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:8px; color:#8a7355; width:fit-content;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path
+              d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          Attach files (ZIP, PDF, DOCX)
+        </div>
+        <input type="file" id="cFile" multiple style="display:none;" onchange="window.handleMultipleFiles(this, 'pub', 'doc')">
+        <div id="pubDocPreviewContainer" style="display:none; flex-wrap:wrap; gap:8px; margin-top:10px;"></div>
       </div>
 
       <div class="form-group">
@@ -168,15 +186,31 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Update Cover Image</label>
-        <div id="eImageStatus" style="margin-bottom:8px;font-size:13px;color:var(--text-muted)"></div>
-        <input class="form-input" id="eImage" type="file" accept="image/*" style="font-size: 13px;">
+        <label class="form-label">Cover Image</label>
+        <div onclick="document.getElementById('eImage').click()"
+          style="cursor:pointer; padding:10px 14px; border:1px dashed #c9b896; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:8px; color:#8a7355; width:fit-content;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path
+              d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          Replace cover image
+        </div>
+        <input type="file" id="eImage" style="display:none;" accept="image/*" onchange="window.handleCoverFile(this, 'edit')">
+        <div id="eImgPreviewContainer" style="display:none; margin-top:10px;"></div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Update Attachment</label>
-        <div id="eFileStatus" style="margin-bottom:8px;font-size:13px;color:var(--text-muted)"></div>
-        <input class="form-input" id="eFile" type="file" style="font-size: 13px;">
+        <label class="form-label">Attachments</label>
+        <div onclick="document.getElementById('eFile').click()"
+          style="cursor:pointer; padding:10px 14px; border:1px dashed #c9b896; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:8px; color:#8a7355; width:fit-content;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path
+              d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          Attach new files
+        </div>
+        <input type="file" id="eFile" multiple style="display:none;" onchange="window.handleMultipleFiles(this, 'edit', 'doc')">
+        <div id="eDocPreviewContainer" style="display:none; flex-wrap:wrap; gap:8px; margin-top:10px;"></div>
       </div>
 
       <div class="form-group">
