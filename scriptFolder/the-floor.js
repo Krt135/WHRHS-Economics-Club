@@ -342,19 +342,19 @@ function renderDiscussions() {
     <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
     Pinned to Bulletin
   </div>` : ''}
-      <div class="disc-body">${esc(d.body)}</div>
-      <div class="disc-meta">
-        <span class="author">
-          ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
-          ${esc(d.author)}
-        </span>
-        <span>·</span>
-        <span>${rel(d.postedAt)}</span>
-        <span>·</span>
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        ${commentCount}
-      </div>
-    </div>`;
+  <div class="disc-body">${renderWithLinks(d.body, esc)}</div>
+  <div class="disc-meta">
+    <span class="author">
+      ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
+      ${esc(d.author)}
+    </span>
+    <span>·</span>
+    <span>${rel(d.postedAt)}</span>
+    <span>·</span>
+    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    ${commentCount}
+  </div>
+</div>`;
   }).join("");
 }
 
@@ -900,6 +900,11 @@ function previewFile(input) {
   };
   if (file) reader.readAsDataURL(file);
 }
+
+function insertLink() {
+  insertLinkAtCursor(document.getElementById("discContent"));
+}
+
 
 // ─────────────────────────────────────────────
 //  EXPOSE TO GLOBAL
