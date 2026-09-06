@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  the-floor.js — Fully Integrated & Secure
+//  the-floor.js — with @mention system
 // ─────────────────────────────────────────────
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -12,28 +12,26 @@ import {
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
-import { renderWithLinks, insertLinkAtCursor } from './link-format.js';
-
+import { renderWithLinks, insertLinkAtCursor } from './floor-link-format.js';
 
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const db  = getDatabase(app);
 const auth = getAuth(app);
 
 // ─────────────────────────────────────────────
 //  STATE & AUTH TRACKING
 // ─────────────────────────────────────────────
 
-let currentUser = null;
-let userRole = "public";
-let userProfile = null;
-let discussions = {};
-let polls = {};
-let activeTag = "all";
+let currentUser      = null;
+let userRole         = "public";
+let userProfile      = null;
+let discussions      = {};
+let polls            = {};
+let activeTag        = "all";
 let attachedImageData = null;
-let isEditMode = false;
-let pinnedIds = new Set();
+let isEditMode       = false;
+let pinnedIds        = new Set();
 
-// Check for deep links from Bulletin (Check both potential keys to be safe)
 let currentDiscId = sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
 
 onAuthStateChanged(auth, async (user) => {
@@ -46,35 +44,231 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     currentUser = null;
-    userRole = "public";
+    userRole    = "public";
     userProfile = null;
   }
 
   const pollBtn = document.getElementById("openPollModalBtn");
-  if (pollBtn) {
-    pollBtn.style.display = (userRole === "admin") ? "block" : "none";
-  }
+  if (pollBtn) pollBtn.style.display = (userRole === "admin") ? "block" : "none";
 
-  // Initial render based on state
-  if (currentDiscId) {
-    showDiscussion(currentDiscId);
-  } else {
-    renderDiscussions();
-  }
+  if (currentDiscId) showDiscussion(currentDiscId);
+  else renderDiscussions();
   renderPolls();
 });
+
+
+// ─────────────────────────────────────────────
+//  @MENTION — USER LIST
+// ─────────────────────────────────────────────
+
+let allUsers = []; // { uid, displayName, email, initials }
+
+// Load all registered users for the dropdown. Fire-and-forget on module load.
+async function loadAllUsers() {
+  try {
+    const snap = await get(ref(db, 'users'));
+    if (!snap.exists()) return;
+    allUsers = Object.entries(snap.val())
+      .map(([uid, u]) => ({
+        uid,
+        displayName: u.displayName || u.email?.split('@')[0] || '',
+        email:       u.email || '',
+        initials:    (u.displayName || u.email || 'U').substring(0, 2).toUpperCase()
+      }))
+      .filter(u => u.displayName && u.email);
+  } catch (e) {
+    console.warn('Could not load users for @mentions:', e);
+  }
+}
+loadAllUsers();
+
+// The "mention key" is the displayName with spaces removed — what gets typed after @.
+// e.g. displayName "John Smith" → mention key "JohnSmith" → typed as @JohnSmith
+function mentionKey(displayName) {
+  return displayName.replace(/\s+/g, '');
+}
+
+// Extract all @mention keys from a body of text.
+function extractMentions(text) {
+  return [...new Set((text.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
+}
+
+// Write mention records to Firebase. A Cloud Function watches /mentions/{id}
+// and sends the email — same onValueCreated pattern as your existing functions.
+async function notifyMentions(text, contextLabel) {
+  const keys = extractMentions(text);
+  for (const key of keys) {
+    const user = allUsers.find(
+      u => mentionKey(u.displayName).toLowerCase() === key.toLowerCase()
+    );
+    if (!user) continue;
+    if (currentUser && user.uid === currentUser.uid) continue; // don't notify yourself
+    await set(push(ref(db, 'mentions')), {
+      mentionedUid:   user.uid,
+      mentionedEmail: user.email,
+      mentionedName:  user.displayName,
+      mentionedBy:    getDisplayName(),
+      context:        contextLabel,
+      url:            'https://whrhs-economics-club.vercel.app/the-floor.html',
+      createdAt:      Date.now()
+    });
+  }
+}
+
+
+// ─────────────────────────────────────────────
+//  @MENTION — DROPDOWN UI
+// ─────────────────────────────────────────────
+
+// Tracks the active mention being typed
+let mentionState = { active: false, textarea: null, startIdx: 0, query: '' };
+
+function handleMentionInput(e) {
+  const ta = e.target;
+  const cursor = ta.selectionStart;
+  const beforeCursor = ta.value.slice(0, cursor);
+  // Match the last @ and any word characters following it, right before the cursor
+  const match = beforeCursor.match(/@(\w*)$/);
+
+  if (match) {
+    mentionState = {
+      active:   true,
+      textarea: ta,
+      startIdx: cursor - match[0].length,
+      query:    match[1].toLowerCase()
+    };
+    showMentionDropdown(ta, mentionState.query);
+  } else {
+    hideMentionDropdown();
+  }
+}
+
+function handleMentionKeydown(e) {
+  if (!mentionState.active) return;
+  const dropdown = document.getElementById('mention-dropdown');
+  if (!dropdown || dropdown.style.display === 'none') return;
+
+  const items = [...dropdown.querySelectorAll('.mention-item')];
+  const focusedIdx = items.findIndex(i => i.classList.contains('focused'));
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = focusedIdx < items.length - 1 ? focusedIdx + 1 : 0;
+    items.forEach((i, idx) => i.classList.toggle('focused', idx === next));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = focusedIdx > 0 ? focusedIdx - 1 : items.length - 1;
+    items.forEach((i, idx) => i.classList.toggle('focused', idx === prev));
+  } else if (e.key === 'Enter') {
+    const focused = dropdown.querySelector('.mention-item.focused');
+    if (focused) { e.preventDefault(); insertMention(focused.dataset.key); }
+  } else if (e.key === 'Escape') {
+    hideMentionDropdown();
+  }
+}
+
+function showMentionDropdown(ta, query) {
+  const dropdown = document.getElementById('mention-dropdown');
+  if (!dropdown) return;
+
+  // Filter users whose mention key contains the query
+  const matches = allUsers
+    .filter(u => mentionKey(u.displayName).toLowerCase().includes(query))
+    .slice(0, 8);
+
+  if (!matches.length) { hideMentionDropdown(); return; }
+
+  // Position: below the textarea, or above if not enough room
+  const rect    = ta.getBoundingClientRect();
+  const dropH   = Math.min(matches.length * 52, 240);
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const top = spaceBelow > dropH + 8 ? rect.bottom + 4 : rect.top - dropH - 4;
+
+  dropdown.style.cssText = `
+    display: block;
+    position: fixed;
+    left: ${rect.left}px;
+    top: ${top}px;
+    width: ${Math.max(rect.width, 220)}px;
+  `;
+
+  dropdown.innerHTML = matches.map((u, i) => `
+    <div class="mention-item ${i === 0 ? 'focused' : ''}"
+         data-key="${mentionKey(u.displayName)}">
+      <div class="mention-av">${u.initials}</div>
+      <div>
+        <div class="mention-name">${u.displayName}</div>
+        <div class="mention-handle">@${mentionKey(u.displayName)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  dropdown.querySelectorAll('.mention-item').forEach(item => {
+    // mousedown (not click) so it fires before the textarea loses focus
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      insertMention(item.dataset.key);
+    });
+    item.addEventListener('mouseover', () => {
+      dropdown.querySelectorAll('.mention-item').forEach(i => i.classList.remove('focused'));
+      item.classList.add('focused');
+    });
+  });
+}
+
+function hideMentionDropdown() {
+  const dropdown = document.getElementById('mention-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  mentionState.active = false;
+}
+
+// Insert the chosen @mention into the textarea at the right position
+function insertMention(key) {
+  const ta = mentionState.textarea;
+  if (!ta) return;
+  const before = ta.value.slice(0, mentionState.startIdx);
+  const after  = ta.value.slice(ta.selectionStart);
+  ta.value = `${before}@${key} ${after}`;
+  const pos = mentionState.startIdx + key.length + 2;
+  ta.selectionStart = ta.selectionEnd = pos;
+  hideMentionDropdown();
+  ta.focus();
+}
+
+// Attach input + keydown listeners to textareas that don't already have them.
+// Called after renderDiscussionView() so comment/reply inputs are in the DOM.
+function attachMentionListeners() {
+  const targets = [
+    document.getElementById('cmtInput'),
+    ...document.querySelectorAll('[id^="reply-input-"]')
+  ].filter(Boolean);
+
+  targets.forEach(el => {
+    if (el._mentionAttached) return;
+    el.addEventListener('input', handleMentionInput);
+    el.addEventListener('keydown', handleMentionKeydown);
+    el._mentionAttached = true;
+  });
+}
+
+// Attach to the post textarea (always in DOM) and set up global close-on-click
+const discContentTA = document.getElementById('discContent');
+if (discContentTA) {
+  discContentTA.addEventListener('input', handleMentionInput);
+  discContentTA.addEventListener('keydown', handleMentionKeydown);
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#mention-dropdown')) hideMentionDropdown();
+});
+
 
 // ─────────────────────────────────────────────
 //  UTILITIES
 // ─────────────────────────────────────────────
 
 function getDisplayName() {
-  if (userProfile && userProfile.displayName) {
-    return userProfile.displayName;
-  }
-  if (currentUser && currentUser.email) {
-    return currentUser.email.split("@")[0];
-  }
+  if (userProfile && userProfile.displayName) return userProfile.displayName;
+  if (currentUser && currentUser.email) return currentUser.email.split("@")[0];
   return "Member";
 }
 
@@ -86,10 +280,8 @@ function getDisplayName() {
 onValue(ref(db, "discussions"), snapshot => {
   discussions = snapshot.val() || {};
 
-  // CHECK FOR REDIRECT FROM BULLETIN
   if (currentDiscId) {
     if (discussions[currentDiscId]) {
-      // Clear session storage so it doesn't trap the user on refresh
       sessionStorage.removeItem("openFloorPost");
       sessionStorage.removeItem("openDiscussion");
       showDiscussion(currentDiscId);
@@ -100,10 +292,12 @@ onValue(ref(db, "discussions"), snapshot => {
     }
   } else {
     get(ref(db, 'bulletin')).then(snap => {
-    const data = snap.val() || {};
-    pinnedIds = new Set(Object.values(data).map(v => v.originalId || v.discussionId).filter(Boolean));
-    renderDiscussions();
-});
+      const data = snap.val() || {};
+      pinnedIds = new Set(
+        Object.values(data).map(v => v.originalId || v.discussionId).filter(Boolean)
+      );
+      renderDiscussions();
+    });
   }
 });
 
@@ -111,6 +305,7 @@ onValue(ref(db, "polls"), snapshot => {
   polls = snapshot.val() || {};
   renderPolls();
 });
+
 
 // ─────────────────────────────────────────────
 //  RENDER — DISCUSSION LIST
@@ -124,8 +319,6 @@ function renderDiscussions() {
     .map(([key, val]) => ({ ...val, _key: key }))
     .sort((a, b) => b.postedAt - a.postedAt);
 
-
-
   if (!items.length) {
     list.innerHTML = `<div class="empty-state"><p class="empty-text">No discussions yet.</p></div>`;
     return;
@@ -135,15 +328,12 @@ function renderDiscussions() {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
 
     let cardTheme = "theme-member";
-    if (currentUser && d.authorId === currentUser.uid) {
-      cardTheme = "theme-me";
-    } else if (d.authorRole === "admin") {
-      cardTheme = "theme-exec";
-    }
+    if (currentUser && d.authorId === currentUser.uid) cardTheme = "theme-me";
+    else if (d.authorRole === "admin") cardTheme = "theme-exec";
 
     const isPinned = pinnedIds.has(d._key);
 
-return `
+    return `
 <div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
   ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
   <div class="disc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(d.title)}</div>
@@ -152,7 +342,7 @@ return `
     <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
     Pinned to Bulletin
   </div>` : ''}
-      <div class="disc-body">${renderWithLinks(d.body, esc)}</div>
+      <div class="disc-body">${esc(d.body)}</div>
       <div class="disc-meta">
         <span class="author">
           ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
@@ -168,9 +358,6 @@ return `
   }).join("");
 }
 
-// ─────────────────────────────────────────────
-//  RENDER — SINGLE DISCUSSION VIEW
-// ─────────────────────────────────────────────
 
 // ─────────────────────────────────────────────
 //  RENDER — SINGLE DISCUSSION VIEW
@@ -178,59 +365,58 @@ return `
 
 function renderDiscussionView() {
   const d = discussions[currentDiscId];
-
-  if (!d) {
-    showList();
-    return;
-  }
+  if (!d) { showList(); return; }
 
   const commentEntries = d.comments
     ? Object.entries(d.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
     : [];
 
-  const canEdit   = currentUser && d.authorId === currentUser.uid; // only own posts
-  const canDelete = currentUser && (d.authorId === currentUser.uid || userRole === 'admin'); // own + admin
-  const isAdmin = userRole === "admin";
+  const canEdit   = currentUser && d.authorId === currentUser.uid;
+  const canDelete = currentUser && (d.authorId === currentUser.uid || userRole === 'admin');
+  const isAdmin   = userRole === "admin";
 
   get(ref(db, "bulletin")).then(snap => {
-    const bulletinData = snap.val() || {};
-    const alreadyPinned = Object.values(bulletinData).some(b => b.discussionId === currentDiscId || b.originalId === currentDiscId);
-
+    const bulletinData  = snap.val() || {};
+    const alreadyPinned = Object.values(bulletinData).some(
+      b => b.discussionId === currentDiscId || b.originalId === currentDiscId
+    );
     const topActions = document.getElementById("discTopActions");
     if (topActions) {
-  topActions.innerHTML = `
-    ${canEdit ? `
-      <button class="topbar-btn btn-edit" onclick="window.openEditModal()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
-      </button>` : ""}
-    ${canDelete ? `
-      <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
-      </button>` : ""}
-    ${isAdmin ? `
-      <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
-        <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-        ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
-      </button>` : ""}`;
-}
+      topActions.innerHTML = `
+        ${canEdit ? `
+          <button class="topbar-btn btn-edit" onclick="window.openEditModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
+          </button>` : ""}
+        ${canDelete ? `
+          <button class="topbar-btn btn-del-tb" onclick="window.deleteDiscussion()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Delete
+          </button>` : ""}
+        ${isAdmin ? `
+          <button class="topbar-btn btn-pin-tb ${alreadyPinned ? "pinned" : ""}" onclick="window.togglePin('${currentDiscId}', ${alreadyPinned})">
+            <svg width="13" height="13" fill="${alreadyPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            ${alreadyPinned ? "Unpin" : "Pin to Bulletin"}
+          </button>` : ""}`;
+    }
   });
 
   let postTheme = "theme-member";
-  if (currentUser && d.authorId === currentUser.uid) { postTheme = "theme-me"; }
-  else if (d.authorRole === "admin") { postTheme = "theme-exec"; }
+  if (currentUser && d.authorId === currentUser.uid) postTheme = "theme-me";
+  else if (d.authorRole === "admin") postTheme = "theme-exec";
 
   const commentsHtml = commentEntries.map(c => {
     const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === "admin");
-    let cmtTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me" : (c.authorRole === "admin" ? "theme-exec" : "theme-member");
+    let cmtTheme = (currentUser && c.authorId === currentUser.uid) ? "theme-me"
+                 : (c.authorRole === "admin" ? "theme-exec" : "theme-member");
 
-    // --- NEW: Handle Nested Replies ---
-    const replies = c.replies ? Object.entries(c.replies).map(([rk, rv]) => ({ ...rv, _key: rk })).sort((a, b) => a.postedAt - b.postedAt) : [];
+    const replies = c.replies
+      ? Object.entries(c.replies).map(([rk, rv]) => ({ ...rv, _key: rk })).sort((a, b) => a.postedAt - b.postedAt)
+      : [];
 
     const repliesHtml = replies.map(r => {
       const canDeleteReply = currentUser && (r.authorId === currentUser.uid || userRole === "admin");
       return `
         <div class="reply-item" style="display:flex; gap:8px; margin-top:12px;">
-          ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
+          ${profileAvatarHtml(r.authorId, "span", "author-av", "", esc(r.initials || "?"), { stopPropagation: true, role: r.authorRole || "member" })}
           <div class="comment-bubble" style="flex:1;">
             <div class="comment-hdr">
               <span class="comment-author">${esc(r.author)}</span>
@@ -239,48 +425,38 @@ function renderDiscussionView() {
             <div class="comment-text">${esc(r.text)}</div>
             ${canDeleteReply ? `
               <div class="comment-acts">
-                <button class="cmt-act cmt-del" onclick="deleteReply('${currentDiscId}','${c._key}','${r._key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="3 6 5 6 21 6"></polyline>
-  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-  <line x1="10" y1="11" x2="10" y2="17"></line>
-  <line x1="14" y1="11" x2="14" y2="17"></line>
-</svg>Delete</button>
+                <button class="cmt-act cmt-del" onclick="deleteReply('${currentDiscId}','${c._key}','${r._key}')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Delete
+                </button>
               </div>` : ""}
           </div>
-        </div>
-      `;
+        </div>`;
     }).join("");
 
     return `
     <div class="comment-item ${cmtTheme}">
-      ${profileAvatarHtml(d.authorId, "span", "author-av", "", esc(d.authorInitials || "?"), { stopPropagation: true, role: d.authorRole || "member" })}
+      ${profileAvatarHtml(c.authorId, "span", "author-av", "", esc(c.initials || "?"), { stopPropagation: true, role: c.authorRole || "member" })}
       <div class="comment-bubble">
         <div class="comment-hdr">
           <span class="comment-author">${esc(c.author)}</span>
           <span class="comment-time">${rel(c.postedAt)}</span>
         </div>
         <div class="comment-text">${esc(c.text)}</div>
-        
         <div class="comment-acts">
-          <button class="cmt-act" onclick="window.toggleReplyBox('${c._key}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="9 17 4 12 9 7"></polyline>
-  <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
-</svg>Reply</button>
-          ${canDeleteComment ? `<button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="3 6 5 6 21 6"></polyline>
-  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-  <line x1="10" y1="11" x2="10" y2="17"></line>
-  <line x1="14" y1="11" x2="14" y2="17"></line>
-</svg>
-Delete</button>` : ""}
+          <button class="cmt-act" onclick="window.toggleReplyBox('${c._key}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>Reply
+          </button>
+          ${canDeleteComment ? `
+          <button class="cmt-act cmt-del" onclick="deleteComment('${currentDiscId}','${c._key}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>Delete
+          </button>` : ""}
         </div>
-
         ${replies.length > 0 ? `<div style="margin-left:8px; padding-left:12px; border-left:2px solid #e5e7eb;">${repliesHtml}</div>` : ""}
-
         <div id="reply-box-${c._key}" style="display:none; margin-top:12px; margin-left:8px; padding-left:12px; border-left:2px solid #e5e7eb;">
           <div style="display:flex; gap:8px;">
-            <input type="text" id="reply-input-${c._key}" class="new-comment-input" placeholder="Write a reply..." style="min-height:36px; height:36px;">
+            <input type="text" id="reply-input-${c._key}" class="new-comment-input"
+              placeholder="Write a reply… type @ to mention someone"
+              style="min-height:36px; height:36px;">
             <button class="btn-post-cmt" onclick="window.postReply('${c._key}')">Post</button>
           </div>
         </div>
@@ -297,16 +473,20 @@ Delete</button>` : ""}
       ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
       <div class="disc-view-body">${renderWithLinks(d.body, esc)}</div>
     </div>
-    
     <div class="comments-area">
       <div class="comments-title">${commentEntries.length} Comments</div>
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:16px">
-        <textarea class="new-comment-input" id="cmtInput" placeholder="Join the discussion..."></textarea>
+        <textarea class="new-comment-input" id="cmtInput"
+          placeholder="Join the discussion… type @ to mention someone"></textarea>
         <button class="btn-post-cmt" onclick="window.postComment()">Post</button>
       </div>
     </div>`;
+
+  // Attach @mention listeners to the newly rendered comment/reply inputs
+  attachMentionListeners();
 }
+
 
 // ─────────────────────────────────────────────
 //  PIN / UNPIN
@@ -322,25 +502,24 @@ async function togglePin(discId, alreadyPinned) {
     const d = discussions[discId];
     if (!d) return;
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
-
     const name = getDisplayName();
-
     await set(push(ref(db, "bulletin")), {
-      discussionId: discId, // Included for backwards compatibility 
-      originalId: discId, // The new standard
-      type: "floor", // Tells bulletin.js it's a floor post
-      body: d.body || "",
-      author: d.author,
-      authorId: d.authorId || null,
+      discussionId:   discId,
+      originalId:     discId,
+      type:           "floor",
+      body:           d.body || "",
+      author:         d.author,
+      authorId:       d.authorId || null,
       authorInitials: d.authorInitials || "?",
-      postedAt: d.postedAt,
+      postedAt:       d.postedAt,
       commentCount,
-      pinnedAt: Date.now(),
-      pinnedBy: name
+      pinnedAt:       Date.now(),
+      pinnedBy:       name
     });
   }
   renderDiscussionView();
 }
+
 
 // ─────────────────────────────────────────────
 //  PUBLISH DISCUSSION
@@ -356,21 +535,24 @@ async function publishDiscussion() {
   const body = document.getElementById("discContent").value.trim();
   if (!body) return;
 
-  const name = getDisplayName();
-
+  const name   = getDisplayName();
   const newRef = push(ref(db, "discussions"));
   await set(newRef, {
     body,
-    author: name,
-    authorId: currentUser.uid,
-    authorRole: userRole,
+    author:         name,
+    authorId:       currentUser.uid,
+    authorRole:     userRole,
     authorInitials: name.substring(0, 2).toUpperCase(),
-    image: attachedImageData || null,
-    postedAt: Date.now()
+    image:          attachedImageData || null,
+    postedAt:       Date.now()
   });
+
+  // Notify anyone @mentioned in the post
+  await notifyMentions(body, 'a discussion post');
 
   closeModal("discussModal");
 }
+
 
 // ─────────────────────────────────────────────
 //  PUBLISH POLL
@@ -378,15 +560,11 @@ async function publishDiscussion() {
 
 async function publishPoll() {
   if (!currentUser) return alert("Please log in to post a poll.");
+  if (userRole !== "admin") { alert("Only Exec Board members can post polls."); return; }
 
-  if (userRole !== "admin") {
-    alert("Only Exec Board members can post polls.");
-    return;
-  }
-
-  const question = document.getElementById("pollQuestion").value.trim();
+  const question     = document.getElementById("pollQuestion").value.trim();
   const optionInputs = document.querySelectorAll("#pollOptionInputs .form-input");
-  const options = Array.from(optionInputs)
+  const options      = Array.from(optionInputs)
     .map(input => input.value.trim())
     .filter(label => label !== "")
     .map(label => ({ label, votes: 0 }));
@@ -395,17 +573,14 @@ async function publishPoll() {
   if (options.length < 2) return alert("Please provide at least two valid options.");
 
   const name = getDisplayName();
-
   try {
     await set(push(ref(db, "polls")), {
-      question,
-      options,
-      author: name,
+      question, options,
+      author:         name,
       authorInitials: name.substring(0, 2).toUpperCase(),
-      authorId: currentUser.uid,
-      postedAt: Date.now()
+      authorId:       currentUser.uid,
+      postedAt:       Date.now()
     });
-
     document.getElementById("pollQuestion").value = "";
     optionInputs.forEach(input => input.value = "");
     closeModal("pollModal");
@@ -416,13 +591,14 @@ async function publishPoll() {
   }
 }
 
+
 // ─────────────────────────────────────────────
-//  POLL OPTIONS (add / remove rows in modal)
+//  POLL OPTIONS (add / remove rows)
 // ─────────────────────────────────────────────
 
 function addPollOption() {
   const container = document.getElementById("pollOptionInputs");
-  const newRow = document.createElement("div");
+  const newRow    = document.createElement("div");
   newRow.className = "poll-opt-row";
   newRow.innerHTML = `
     <input class="form-input" type="text" placeholder="New Option">
@@ -432,12 +608,10 @@ function addPollOption() {
 
 function removeOpt(btn) {
   const container = document.getElementById("pollOptionInputs");
-  if (container.children.length > 2) {
-    btn.parentElement.remove();
-  } else {
-    alert("Polls must have at least two options.");
-  }
+  if (container.children.length > 2) btn.parentElement.remove();
+  else alert("Polls must have at least two options.");
 }
+
 
 // ─────────────────────────────────────────────
 //  EDIT / DELETE DISCUSSION
@@ -447,32 +621,23 @@ function openEditModal() {
   const d = discussions[currentDiscId];
   if (!d) return;
   isEditMode = true;
-
   document.getElementById("discContent").value = d.body;
-
   const modalTitle = document.querySelector("#discussModal .modal-title");
   if (modalTitle) modalTitle.innerText = "Edit Discussion";
-
   const btn = document.getElementById("mainSubmitBtn");
   if (btn) btn.innerText = "Save Changes";
-
   openModal("discussModal");
 }
 
 async function saveEditDiscussion() {
   const body = document.getElementById("discContent").value.trim();
   if (!body) return;
-
   try {
-    await update(ref(db, `discussions/${currentDiscId}`), {
-      body, lastEdited: Date.now()
-    });
-
+    await update(ref(db, `discussions/${currentDiscId}`), { body, lastEdited: Date.now() });
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await update(ref(db, `bulletin/${entry[0]}`), { body });
-
     closeModal("discussModal");
     alert("Changes saved successfully!");
   } catch (error) {
@@ -481,20 +646,20 @@ async function saveEditDiscussion() {
   }
 }
 
-
 async function deleteDiscussion() {
-    if (confirm("Delete this discussion?")) {
-        const snap = await get(ref(db, "bulletin"));
-        const data = snap.val() || {};
-        const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
-        if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
-        await softDelete('discussions', currentDiscId);
-        showList();
-    }
+  if (confirm("Delete this discussion?")) {
+    const snap = await get(ref(db, "bulletin"));
+    const data = snap.val() || {};
+    const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
+    if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
+    await softDelete('discussions', currentDiscId);
+    showList();
+  }
 }
 
+
 // ─────────────────────────────────────────────
-//  DELETE POLL (admin only)
+//  DELETE POLL
 // ─────────────────────────────────────────────
 
 async function deletePoll(pollKey) {
@@ -509,6 +674,7 @@ async function deletePoll(pollKey) {
   }
 }
 
+
 // ─────────────────────────────────────────────
 //  COMMENTS
 // ─────────────────────────────────────────────
@@ -518,21 +684,28 @@ async function postComment() {
   const inp = document.getElementById("cmtInput");
   if (!inp.value.trim()) return;
 
+  const text = inp.value.trim();
   const name = getDisplayName();
 
   await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
-    author: name,
-    authorId: currentUser.uid,
+    author:     name,
+    authorId:   currentUser.uid,
     authorRole: userRole,
-    initials: name.substring(0, 2).toUpperCase(),
-    text: inp.value.trim(),
-    postedAt: Date.now()
+    initials:   name.substring(0, 2).toUpperCase(),
+    text,
+    postedAt:   Date.now()
   });
   inp.value = "";
 
+  // Notify anyone @mentioned in the comment
+  await notifyMentions(text, 'a comment');
+
+  // Update bulletin comment count if pinned
   const snap = await get(ref(db, "bulletin"));
   const bulletinData = snap.val() || {};
-  const entry = Object.entries(bulletinData).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
+  const entry = Object.entries(bulletinData).find(
+    ([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId
+  );
   if (entry) {
     const d = discussions[currentDiscId];
     const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
@@ -546,6 +719,7 @@ async function deleteComment(discKey, cmtKey) {
   }
 }
 
+
 // ─────────────────────────────────────────────
 //  NESTED REPLIES
 // ─────────────────────────────────────────────
@@ -554,6 +728,8 @@ function toggleReplyBox(cmtId) {
   const box = document.getElementById(`reply-box-${cmtId}`);
   if (box) {
     box.style.display = box.style.display === "none" ? "block" : "none";
+    // If just shown, attach @mention listener to the input
+    if (box.style.display === "block") attachMentionListeners();
   }
 }
 
@@ -562,19 +738,21 @@ async function postReply(cmtId) {
   const inp = document.getElementById(`reply-input-${cmtId}`);
   if (!inp.value.trim()) return;
 
+  const text = inp.value.trim();
   const name = getDisplayName();
 
-  // Push the reply into a sub-folder of the specific comment
   await set(push(ref(db, `discussions/${currentDiscId}/comments/${cmtId}/replies`)), {
-    author: name,
-    authorId: currentUser.uid,
+    author:     name,
+    authorId:   currentUser.uid,
     authorRole: userRole,
-    initials: name.substring(0, 2).toUpperCase(),
-    text: inp.value.trim(),
-    postedAt: Date.now()
+    initials:   name.substring(0, 2).toUpperCase(),
+    text,
+    postedAt:   Date.now()
   });
-
   inp.value = "";
+
+  // Notify anyone @mentioned in the reply
+  await notifyMentions(text, 'a reply');
 }
 
 async function deleteReply(discId, cmtId, replyId) {
@@ -582,6 +760,7 @@ async function deleteReply(discId, cmtId, replyId) {
     await remove(ref(db, `discussions/${discId}/comments/${cmtId}/replies/${replyId}`));
   }
 }
+
 
 // ─────────────────────────────────────────────
 //  POLLS RENDER
@@ -603,27 +782,22 @@ function renderPolls() {
   const isAdmin = userRole === "admin";
 
   list.innerHTML = items.map(p => {
-    const options = Array.isArray(p.options) ? p.options : [];
-
-    const userVotes = p.userVotes || {};
+    const options    = Array.isArray(p.options) ? p.options : [];
+    const userVotes  = p.userVotes || {};
     const voteEntries = Object.values(userVotes);
-    const totalVotes = voteEntries.length;
-
+    const totalVotes  = voteEntries.length;
     const myVoteIndex = currentUser ? userVotes[currentUser.uid] : null;
-    const hasVoted = myVoteIndex !== undefined && myVoteIndex !== null;
+    const hasVoted    = myVoteIndex !== undefined && myVoteIndex !== null;
 
     const optionsHtml = options.map((o, i) => {
       const optionVotes = voteEntries.filter(v => v === i).length;
       const pct = totalVotes ? Math.round(optionVotes / totalVotes * 100) : 0;
       const isMyChoice = myVoteIndex === i;
-
       return `
         <div class="poll-option ${isMyChoice ? 'voted' : ''}" onclick="window.votePoll('${p._key}',${i})">
           <div class="poll-bar" style="width:${hasVoted ? pct : 0}%"></div>
           <div class="poll-option-content">
-            <div class="poll-option-label">
-              ${isMyChoice ? '<strong>✓ </strong>' : ''}${esc(o.label)}
-            </div>
+            <div class="poll-option-label">${isMyChoice ? '<strong>✓ </strong>' : ''}${esc(o.label)}</div>
             ${hasVoted ? `<span class="poll-pct">${pct}% (${optionVotes})</span>` : ""}
           </div>
         </div>`;
@@ -638,9 +812,7 @@ function renderPolls() {
       <div class="poll-card" style="position:relative;">
         ${deleteBtnHtml}
         <div class="poll-title" style="padding-right:24px;">${esc(p.question)}</div>
-        <div class="poll-options-container">
-          ${optionsHtml}
-        </div>
+        <div class="poll-options-container">${optionsHtml}</div>
         <div class="poll-footer" style="font-size:12px; color:#6b7280; margin-top:8px;">
           ${totalVotes} vote${totalVotes !== 1 ? 's' : ''} ${hasVoted ? '· You can click to change your vote' : ''}
         </div>
@@ -649,22 +821,15 @@ function renderPolls() {
 }
 
 async function votePoll(pollKey, optIndex) {
-  if (!currentUser) {
-    alert("Please log in to vote.");
-    return;
-  }
-
-  const uid = currentUser.uid;
-  const userVoteRef = ref(db, `polls/${pollKey}/userVotes/${uid}`);
-
+  if (!currentUser) { alert("Please log in to vote."); return; }
   try {
-    await set(userVoteRef, optIndex);
-    console.log("Vote updated successfully!");
+    await set(ref(db, `polls/${pollKey}/userVotes/${currentUser.uid}`), optIndex);
     renderPolls();
   } catch (error) {
     console.error("Error voting:", error);
   }
 }
+
 
 // ─────────────────────────────────────────────
 //  UI HELPERS
@@ -677,18 +842,16 @@ function esc(s) {
 function rel(ts) {
   if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 60)    return "just now";
+  if (s < 3600)  return Math.floor(s / 60) + " min ago";
   if (s < 86400) return Math.floor(s / 3600) + " hours ago";
   return Math.floor(s / 86400) + " days ago";
 }
 
 function showList() {
   currentDiscId = null;
-  // Make sure these IDs match what is in your HTML (e.g. id="viewList" and id="viewDiscussion")
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
-
   if (vList) vList.classList.add("active");
   if (vDisc) vDisc.classList.remove("active");
   renderDiscussions();
@@ -698,7 +861,6 @@ function showDiscussion(key) {
   currentDiscId = key;
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
-
   if (vList) vList.classList.remove("active");
   if (vDisc) vDisc.classList.add("active");
   renderDiscussionView();
@@ -708,7 +870,7 @@ function switchTab(tab) {
   document.getElementById("tabDiscussions").classList.toggle("active", tab === "discussions");
   document.getElementById("tabPolls").classList.toggle("active", tab === "polls");
   document.getElementById("panelDiscussions").style.display = tab === "discussions" ? "" : "none";
-  document.getElementById("panelPolls").style.display = tab === "polls" ? "" : "none";
+  document.getElementById("panelPolls").style.display       = tab === "polls"        ? "" : "none";
   const filterBar = document.getElementById("filterBar");
   if (filterBar) filterBar.style.display = tab === "discussions" ? "" : "none";
 }
@@ -730,17 +892,13 @@ function closeModal(id) {
 }
 
 function previewFile(input) {
-  const file = input.files[0];
+  const file   = input.files[0];
   const reader = new FileReader();
   reader.onload = e => {
     attachedImageData = e.target.result;
     document.getElementById("attachPreview").textContent = "📎 " + file.name;
   };
   if (file) reader.readAsDataURL(file);
-}
-
-function insertLink() {
-  insertLinkAtCursor(document.getElementById("discContent"));
 }
 
 // ─────────────────────────────────────────────

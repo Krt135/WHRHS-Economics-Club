@@ -3,11 +3,29 @@ import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/fi
 import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from "./config.js";
 
-const app = initializeApp(firebaseConfig);
+const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getDatabase(app);
+const db   = getDatabase(app);
 
-/** Firebase Auth UIDs are alphanumeric; reject other query values for safe paths. */
+
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+
+function esc(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function rel(ts) {
+  if (!ts) return "just now";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)    return "just now";
+  if (s < 3600)  return Math.floor(s / 60)   + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
+  return Math.floor(s / 86400) + " days ago";
+}
+
+/** Firebase Auth UIDs are alphanumeric; reject anything else. */
 function parseProfileUidParam() {
   const raw = new URLSearchParams(window.location.search).get("uid");
   if (!raw) return null;
@@ -39,14 +57,145 @@ function showProfileApp() {
   document.getElementById("profile-app-body").hidden = false;
 }
 
+
+// ─────────────────────────────────────────────
+//  ACTIVITY TAB
+// ─────────────────────────────────────────────
+
+// Badge colour per post type
+const ACTIVITY_TYPE = {
+  discussion:  { label: 'The Floor',     color: '#0f1f3d', sessionKey: 'openFloorPost',   page: 'the-floor.html'      },
+  perspective: { label: 'Perspectives',  color: '#7c3aed', sessionKey: 'openPerspective', page: 'perspectives.html'   },
+  feature:     { label: 'Weekly Feature',color: '#c9a84c', sessionKey: 'openFeature',     page: 'weekly-feature.html' },
+  lesson:      { label: 'Academy',       color: '#16a34a', sessionKey: null,              page: 'the-academy.html'    },
+};
+
+// Navigate to a post from the activity list.
+// Called from inline onclick in rendered HTML so must be on window.
+window.navigateToActivity = function(type, id) {
+  const cfg = ACTIVITY_TYPE[type];
+  if (!cfg) return;
+  if (cfg.sessionKey) sessionStorage.setItem(cfg.sessionKey, id);
+  window.location.href = cfg.page;
+};
+
+function renderActivityList(items) {
+  if (!items.length) {
+    return '<p class="activity-empty">No posts yet.</p>';
+  }
+
+  return items.map(item => {
+    const cfg = ACTIVITY_TYPE[item.type];
+    return `
+      <div class="activity-item" onclick="navigateToActivity('${item.type}','${item.id}')">
+        <div class="activity-item-top">
+          <span class="activity-badge" style="background:${cfg.color}">${esc(cfg.label)}</span>
+          <span class="activity-time">${rel(item.postedAt)}</span>
+        </div>
+        <div class="activity-title">${esc(item.title)}</div>
+        ${item.excerpt ? `<div class="activity-excerpt">${esc(item.excerpt)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function loadActivity(uid) {
+  const el = document.getElementById('activity-list');
+  if (!el) return;
+
+  el.innerHTML = '<p class="activity-loading">Loading activity…</p>';
+
+  try {
+    // Fetch all four paths concurrently
+    const [discSnap, perspSnap, featSnap, lessonSnap] = await Promise.all([
+      get(ref(db, 'discussions')),
+      get(ref(db, 'perspectives')),
+      get(ref(db, 'features')),
+      get(ref(db, 'lessons')),
+    ]);
+
+    const items = [];
+
+    // ── The Floor discussions ──
+    if (discSnap.exists()) {
+      Object.entries(discSnap.val()).forEach(([key, d]) => {
+        if (d.authorId !== uid || d.deleted) return;
+        // Discussions have no title field — use the first line of body as the title
+        const body = d.body || '';
+        items.push({
+          id: key, type: 'discussion',
+          title:   body.slice(0, 80) + (body.length > 80 ? '…' : ''),
+          excerpt: body.length > 80 ? body.slice(80, 160) + (body.length > 160 ? '…' : '') : '',
+          postedAt: d.postedAt || 0,
+        });
+      });
+    }
+
+    // ── Perspectives essays ──
+    if (perspSnap.exists()) {
+      Object.entries(perspSnap.val()).forEach(([key, p]) => {
+        if (p.authorId !== uid || p.deleted) return;
+        const raw = p.richText ? (p.contentText || '') : (p.content || '');
+        items.push({
+          id: key, type: 'perspective',
+          title:   p.title || '(untitled)',
+          excerpt: raw.slice(0, 120) + (raw.length > 120 ? '…' : ''),
+          postedAt: p.postedAt || 0,
+        });
+      });
+    }
+
+    // ── Weekly Feature articles ──
+    if (featSnap.exists()) {
+      Object.entries(featSnap.val()).forEach(([key, f]) => {
+        if (f.authorId !== uid || f.deleted) return;
+        const raw = f.richText ? (f.contentText || '') : (f.content || '');
+        items.push({
+          id: key, type: 'feature',
+          title:   f.title || '(untitled)',
+          excerpt: raw.slice(0, 120) + (raw.length > 120 ? '…' : ''),
+          postedAt: f.postedAt || 0,
+        });
+      });
+    }
+
+    // ── Academy lessons ──
+    if (lessonSnap.exists()) {
+      Object.entries(lessonSnap.val()).forEach(([key, l]) => {
+        if (l.authorId !== uid || l.deleted) return;
+        // Use the short description as excerpt if available, else plain-text content
+        const raw = l.richText ? (l.contentText || '') : (l.content || '');
+        items.push({
+          id: key, type: 'lesson',
+          title:   l.title || '(untitled)',
+          excerpt: l.desc || raw.slice(0, 120) + (raw.length > 120 ? '…' : ''),
+          postedAt: l.postedAt || 0,
+        });
+      });
+    }
+
+    // Sort newest first, cap at 10
+    items.sort((a, b) => b.postedAt - a.postedAt);
+    el.innerHTML = renderActivityList(items.slice(0, 10));
+
+  } catch (err) {
+    console.error('Activity load error:', err);
+    el.innerHTML = '<p class="activity-empty">Could not load activity.</p>';
+  }
+}
+
+
+// ─────────────────────────────────────────────
+//  OWN PROFILE
+// ─────────────────────────────────────────────
+
 function wireOwnProfile(user, data) {
-  const displayNameEl = document.getElementById("field-display-name");
-  const primaryEmailEl = document.getElementById("field-primary-email");
+  const displayNameEl    = document.getElementById("field-display-name");
+  const primaryEmailEl   = document.getElementById("field-primary-email");
   const secondaryEmailEl = document.getElementById("field-secondary-email");
-  const bioEl = document.getElementById("field-bio");
-  const phoneEl = document.getElementById("field-phone");
-  const roleBadge = document.getElementById("role-badge");
-  const mainEl = document.getElementById("profile-main");
+  const bioEl            = document.getElementById("field-bio");
+  const phoneEl          = document.getElementById("field-phone");
+  const roleBadge        = document.getElementById("role-badge");
+  const mainEl           = document.getElementById("profile-main");
 
   mainEl.classList.remove("profile-main--viewing-member");
   showProfileApp();
@@ -61,25 +210,27 @@ function wireOwnProfile(user, data) {
   document.getElementById("field-group-secondary-email").hidden = false;
   document.getElementById("field-group-member-phone").hidden = true;
   document.getElementById("profile-card-notifications").hidden = false;
+
   const actionsEl = document.getElementById("profile-actions");
   actionsEl.hidden = false;
   actionsEl.removeAttribute("aria-hidden");
-  actionsEl.querySelectorAll("button").forEach((b) => b.removeAttribute("tabindex"));
+  actionsEl.querySelectorAll("button").forEach(b => b.removeAttribute("tabindex"));
 
   document.getElementById("label-primary-email").textContent = "Primary Email (Login)";
   document.getElementById("hint-primary-email").hidden = false;
 
-  [displayNameEl, bioEl, secondaryEmailEl].forEach((el) => {
+  [displayNameEl, bioEl, secondaryEmailEl].forEach(el => {
     el.removeAttribute("readonly");
     el.removeAttribute("aria-readonly");
   });
   phoneEl.removeAttribute("readonly");
 
-  displayNameEl.value = data.displayName || user.email || "";
-  primaryEmailEl.value = user.email || "";
+  displayNameEl.value    = data.displayName || user.email || "";
+  primaryEmailEl.value   = user.email || "";
   secondaryEmailEl.value = data.secondaryEmail || "";
-  bioEl.value = data.bio || "";
-  phoneEl.value = data.phone || "";
+  bioEl.value            = data.bio || "";
+  phoneEl.value          = data.phone || "";
+
   document.getElementById("toggle-email-notif").checked = data.emailNotifications !== false;
   const phoneToggle = document.getElementById("toggle-phone-notif");
   if (phoneToggle) phoneToggle.checked = data.phoneNotifications === true;
@@ -94,16 +245,14 @@ function wireOwnProfile(user, data) {
     const btn = document.getElementById("btn-save");
     btn.disabled = true;
     btn.textContent = "Saving…";
-
     const updates = {
-      displayName: document.getElementById("field-display-name").value.trim(),
-      secondaryEmail: document.getElementById("field-secondary-email").value.trim(),
-      bio: document.getElementById("field-bio").value.trim(),
-      phone: document.getElementById("field-phone").value.trim(),
+      displayName:        document.getElementById("field-display-name").value.trim(),
+      secondaryEmail:     document.getElementById("field-secondary-email").value.trim(),
+      bio:                document.getElementById("field-bio").value.trim(),
+      phone:              document.getElementById("field-phone").value.trim(),
       emailNotifications: document.getElementById("toggle-email-notif").checked,
       phoneNotifications: document.getElementById("toggle-phone-notif")?.checked ?? false,
     };
-
     try {
       await update(ref(db, `users/${user.uid}`), updates);
       showToast("Changes saved successfully.", "success");
@@ -122,14 +271,19 @@ function wireOwnProfile(user, data) {
   };
 }
 
+
+// ─────────────────────────────────────────────
+//  MEMBER PROFILE
+// ─────────────────────────────────────────────
+
 function wireMemberProfile(data) {
-  const mainEl = document.getElementById("profile-main");
-  const displayNameEl = document.getElementById("field-display-name");
-  const bioEl = document.getElementById("field-bio");
-  const roleBadge = document.getElementById("role-badge");
-  const primaryEmailEl = document.getElementById("field-primary-email");
+  const mainEl           = document.getElementById("profile-main");
+  const displayNameEl    = document.getElementById("field-display-name");
+  const bioEl            = document.getElementById("field-bio");
+  const roleBadge        = document.getElementById("role-badge");
+  const primaryEmailEl   = document.getElementById("field-primary-email");
   const secondaryEmailEl = document.getElementById("field-secondary-email");
-  const phoneMemberEl = document.getElementById("field-member-phone");
+  const phoneMemberEl    = document.getElementById("field-member-phone");
 
   mainEl.classList.add("profile-main--viewing-member");
   showProfileApp();
@@ -139,12 +293,11 @@ function wireMemberProfile(data) {
   document.getElementById("profile-page-title").textContent = name;
   document.getElementById("profile-page-subtitle").innerHTML =
     'Club member profile. <a href="profile.html">Your profile &amp; settings</a>';
-
   document.getElementById("profile-account-card-title-text").textContent = "Profile";
 
-  const emailPrimary = (data.email || "").trim();
+  const emailPrimary   = (data.email         || "").trim();
   const emailSecondary = (data.secondaryEmail || "").trim();
-  const phone = (data.phone || "").trim();
+  const phone          = (data.phone          || "").trim();
 
   document.getElementById("field-group-primary-email").hidden = !emailPrimary;
   if (emailPrimary) {
@@ -181,7 +334,7 @@ function wireMemberProfile(data) {
   const actionsEl = document.getElementById("profile-actions");
   actionsEl.hidden = true;
   actionsEl.setAttribute("aria-hidden", "true");
-  actionsEl.querySelectorAll("button").forEach((b) => b.setAttribute("tabindex", "-1"));
+  actionsEl.querySelectorAll("button").forEach(b => b.setAttribute("tabindex", "-1"));
 
   displayNameEl.value = name;
   displayNameEl.readOnly = true;
@@ -194,9 +347,14 @@ function wireMemberProfile(data) {
 
   setRoleBadge(roleBadge, data);
 
-  document.getElementById("btn-save").onclick = null;
+  document.getElementById("btn-save").onclick    = null;
   document.getElementById("btn-signout").onclick = null;
 }
+
+
+// ─────────────────────────────────────────────
+//  AUTH ENTRY POINT
+// ─────────────────────────────────────────────
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -226,12 +384,14 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     wireMemberProfile(snap.val() || {});
+    loadActivity(viewUid);   // ← load activity for the member being viewed
     return;
   }
 
   const snap = await get(ref(db, `users/${user.uid}`));
   const data = snap.val() || {};
   wireOwnProfile(user, data);
+  loadActivity(user.uid);    // ← load activity for own profile
 });
 
 window._tefSignOut = () => signOut(auth).then(() => (window.location.href = "index.html"));
