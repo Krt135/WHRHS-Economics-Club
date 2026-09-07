@@ -365,6 +365,7 @@ window.togglePin = async (id, alreadyPinned) => {
       author: f.author,
       authorId: f.authorId || null,
       authorInitials: f.authorInitials || "?",
+      authorRole: f.authorRole || userRole,
       tags: f.tag ? [f.tag] : [],
       postedAt: f.postedAt,
       commentCount,
@@ -467,6 +468,7 @@ function renderList() {
       </div>` : ''}
       <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
       ${f.subtitle ? `<div class="fc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 8px;">${escHtml(f.subtitle)}</div>` : ''}
+      ${f.imageUrl ? `<img src="${f.imageUrl}" class="fc-image" alt="Cover image" loading="lazy">` : ''}
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">
@@ -761,7 +763,7 @@ window.reactFeature = (id, type) => {
 
   updates[`reactionsByUser/${uid}`] = alreadyToggled
     ? null
-    : { uid, name: userName, initials: userInitials, type: newType };
+    : { uid, name: userName, initials: userInitials, type: newType, role: userRole };
 
   update(postRef, updates).catch(err => console.error("Reaction error:", err));
 };

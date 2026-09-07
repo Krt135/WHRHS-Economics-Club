@@ -62,12 +62,17 @@ onAuthStateChanged(auth, async (user) => {
 // ─────────────────────────────────────────────
 
 let allUsers = []; // { uid, displayName, email, initials }
+let usersLoadPromise = null; // resolves once the first /users fetch settles
 
 // Load all registered users for the dropdown. Fire-and-forget on module load.
 async function loadAllUsers() {
   try {
+    console.log('[mentions] loadAllUsers: fetching /users …');
     const snap = await get(ref(db, 'users'));
-    if (!snap.exists()) return;
+    if (!snap.exists()) {
+      console.warn('[mentions] loadAllUsers: /users snapshot is empty');
+      return;
+    }
     allUsers = Object.entries(snap.val())
       .map(([uid, u]) => ({
         uid,
@@ -76,11 +81,15 @@ async function loadAllUsers() {
         initials:    (u.displayName || u.email || 'U').substring(0, 2).toUpperCase()
       }))
       .filter(u => u.displayName && u.email);
+    console.log(
+      `[mentions] loadAllUsers: loaded ${allUsers.length} users →`,
+      allUsers.map(u => mentionKey(u.displayName))
+    );
   } catch (e) {
-    console.warn('Could not load users for @mentions:', e);
+    console.warn('[mentions] loadAllUsers: FAILED to load users for @mentions:', e);
   }
 }
-loadAllUsers();
+usersLoadPromise = loadAllUsers();
 
 // The "mention key" is the displayName with spaces removed — what gets typed after @.
 // e.g. displayName "John Smith" → mention key "JohnSmith" → typed as @JohnSmith
@@ -90,28 +99,77 @@ function mentionKey(displayName) {
 
 // Extract all @mention keys from a body of text.
 function extractMentions(text) {
-  return [...new Set((text.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
+  const keys = [...new Set((text.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
+  console.log('[mentions] extractMentions: text =', JSON.stringify(text), '→ keys =', keys);
+  return keys;
 }
 
-// Write mention records to Firebase. A Cloud Function watches /mentions/{id}
-// and sends the email — same onValueCreated pattern as your existing functions.
+// Write mention records to Firebase. A Cloud Function (onNewMention) watches
+// /mentions/{id} and sends the email — same onValueCreated pattern as the
+// other functions in this Firebase project.
 async function notifyMentions(text, contextLabel) {
-  const keys = extractMentions(text);
-  for (const key of keys) {
-    const user = allUsers.find(
-      u => mentionKey(u.displayName).toLowerCase() === key.toLowerCase()
-    );
-    if (!user) continue;
-    if (currentUser && user.uid === currentUser.uid) continue; // don't notify yourself
-    await set(push(ref(db, 'mentions')), {
-      mentionedUid:   user.uid,
-      mentionedEmail: user.email,
-      mentionedName:  user.displayName,
-      mentionedBy:    getDisplayName(),
-      context:        contextLabel,
-      url:            'https://whrhs-economics-club.vercel.app/the-floor.html',
-      createdAt:      Date.now()
-    });
+  try {
+    console.log(`[mentions] notifyMentions: START (context: "${contextLabel}")`);
+    const keys = extractMentions(text);
+    if (!keys.length) {
+      console.log('[mentions] notifyMentions: no @mentions in text — nothing to do');
+      return;
+    }
+
+    // allUsers loads asynchronously on page load. If the user submitted before
+    // that finished, allUsers is still empty and every lookup would miss — so
+    // wait for the in-flight load, then retry a direct fetch as a last resort.
+    if (!allUsers.length) {
+      console.warn('[mentions] notifyMentions: allUsers is EMPTY — awaiting in-flight /users load …');
+      try { await (usersLoadPromise || loadAllUsers()); } catch (_) {}
+      if (!allUsers.length) {
+        console.warn('[mentions] notifyMentions: still empty — forcing a fresh /users fetch …');
+        await loadAllUsers();
+      }
+    }
+    console.log(`[mentions] notifyMentions: matching ${keys.length} key(s) against ${allUsers.length} known user(s)`);
+
+    for (const key of keys) {
+      const user = allUsers.find(
+        u => mentionKey(u.displayName).toLowerCase() === key.toLowerCase()
+      );
+      if (!user) {
+        console.warn(`[mentions] notifyMentions: @${key} — no matching user (known keys: ${allUsers.map(u => mentionKey(u.displayName)).join(', ')})`);
+        continue;
+      }
+      if (currentUser && user.uid === currentUser.uid) {
+        console.log(`[mentions] notifyMentions: @${key} is the author — skipping self-notify`);
+        continue;
+      }
+
+      const record = {
+        mentionedUid:   user.uid,
+        mentionedEmail: user.email,
+        mentionedName:  user.displayName,
+        mentionedBy:    getDisplayName(),
+        context:        contextLabel,
+        url:            'https://whrhs-economics-club.vercel.app/the-floor.html',
+        createdAt:      Date.now()
+      };
+
+      try {
+        console.log(`[mentions] notifyMentions: writing /mentions record for @${key} …`, record);
+        const newRef = push(ref(db, 'mentions'));
+        await set(newRef, record);
+        console.log(`[mentions] notifyMentions: ✅ wrote /mentions/${newRef.key} for @${key} — onNewMention should now fire`);
+      } catch (err) {
+        console.error(
+          `[mentions] notifyMentions: ❌ write to /mentions FAILED for @${key} —`,
+          err && (err.code || err.message || err)
+        );
+        if (err && String(err.code || err).includes('PERMISSION_DENIED')) {
+          console.error('[mentions] notifyMentions: this is a security-rules problem. Add write access for authenticated users to /mentions in the Realtime Database rules.');
+        }
+      }
+    }
+    console.log('[mentions] notifyMentions: DONE');
+  } catch (e) {
+    console.error('[mentions] notifyMentions: unexpected error (post itself was unaffected):', e);
   }
 }
 
@@ -511,6 +569,7 @@ async function togglePin(discId, alreadyPinned) {
       author:         d.author,
       authorId:       d.authorId || null,
       authorInitials: d.authorInitials || "?",
+      authorRole:     d.authorRole || "member",
       postedAt:       d.postedAt,
       commentCount,
       pinnedAt:       Date.now(),
@@ -548,6 +607,7 @@ async function publishDiscussion() {
   });
 
   // Notify anyone @mentioned in the post
+  console.log('[mentions] publishDiscussion: discussion saved, invoking notifyMentions');
   await notifyMentions(body, 'a discussion post');
 
   closeModal("discussModal");
@@ -698,6 +758,7 @@ async function postComment() {
   inp.value = "";
 
   // Notify anyone @mentioned in the comment
+  console.log('[mentions] postComment: comment saved, invoking notifyMentions');
   await notifyMentions(text, 'a comment');
 
   // Update bulletin comment count if pinned
@@ -752,6 +813,7 @@ async function postReply(cmtId) {
   inp.value = "";
 
   // Notify anyone @mentioned in the reply
+  console.log('[mentions] postReply: reply saved, invoking notifyMentions');
   await notifyMentions(text, 'a reply');
 }
 

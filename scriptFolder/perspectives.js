@@ -751,6 +751,7 @@ window.postComment = (postId) => {
     author: name,
     initials: name.substring(0, 2).toUpperCase(),
     authorId: currentUser.uid,
+    authorRole: userRole,
     text: inp.value.trim(),
     postedAt: Date.now(),
     likes: 0,

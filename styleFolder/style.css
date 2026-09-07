@@ -43,6 +43,20 @@
     filter: brightness(1.07);
     box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.5);
   }
+
+  /* Role-based avatar initials — gold background (exec board) → black initials,
+     navy background (members) → white initials. Colors only, no layout changes. */
+  .profile-av-link[style*="background:#c9a84c"],
+  .author-av[style*="background:#c9a84c"],
+  .comment-av[style*="background:#c9a84c"],
+  .hp-av[style*="background:#c9a84c"],
+  .avatar-sm[style*="background:#c9a84c"] { color: #000 !important; }
+
+  .profile-av-link[style*="background:#0f1f3d"],
+  .author-av[style*="background:#0f1f3d"],
+  .comment-av[style*="background:#0f1f3d"],
+  .hp-av[style*="background:#0f1f3d"],
+  .avatar-sm[style*="background:#0f1f3d"] { color: #fff !important; }
   .user-name { font-size:13px; color:rgba(255,255,255,0.8); line-height:1.2; }
   .user-role { font-size:10px; color:rgba(255,255,255,0.4); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
   .logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.4); padding:4px; transition:color 0.15s; }

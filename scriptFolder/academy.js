@@ -140,8 +140,6 @@ function getDisplayName(user) {
 // ─────────────────────────────────────────────
 
 const ICONS = { macro: "📊", micro: "🏪", trade: "🌍", money: "💵", markets: "📈", policy: "🏛️" };
-const COLOURS = ["#0f1f3d", "#1a2e52", "#7c3aed", "#0369a1", "#065f46", "#92400e"];
-function avColour(name) { let h = 0; for (let c of (name || '')) h = (h * 31 + c.charCodeAt(0)) % COLOURS.length; return COLOURS[h]; }
 function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function rel(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -463,7 +461,7 @@ function renderLesson() {
       const canDeleteComment = currentUser && (c.authorId === currentUser.uid || userRole === 'admin');
       return `
         <div class="comment-item">
-          ${profileAvatarHtml(c.authorId, "div", "comment-av", `background:${avColour(c.author)}`, esc(c.initials || "?"))}
+          ${profileAvatarHtml(c.authorId, "div", "comment-av", "", esc(c.initials || "?"), { role: c.authorRole || "member" })}
           <div class="comment-bubble">
             <div class="comment-hdr">
               <span class="comment-author">${esc(c.author)}</span>
@@ -734,7 +732,7 @@ async function postComment() {
   const cmtRef = push(ref(db, `lessons/${currentId}/comments`));
   await set(cmtRef, {
     author: name, initials: name.substring(0, 2).toUpperCase(),
-    authorId: currentUser.uid, text: inp.value.trim(),
+    authorId: currentUser.uid, authorRole: userRole, text: inp.value.trim(),
     postedAt: Date.now(), likes: 0, liked: false
   });
   inp.value = "";
