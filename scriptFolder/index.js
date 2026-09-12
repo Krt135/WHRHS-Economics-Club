@@ -29,14 +29,16 @@ onValue(latestRef, (snapshot) => {
 
   const items = Object.entries(data)
     .map(([key, val]) => ({ ...val, _key: key }))
+    .filter(d => !d.deleted)
     .sort((a, b) => b.postedAt - a.postedAt);
 
   list.innerHTML = items.map(d => {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
+    const body = d.body || '';
     return `
     <div class="home-post-card" onclick="window.location.href='the-floor.html?post=${d._key}'">
       <div class="hp-content">
-        <p class="hp-body">${esc(d.body.substring(0, 120))}...</p>
+        <p class="hp-body">${esc(body.substring(0, 120))}...</p>
         
         <div class="hp-meta">
           <span class="hp-author">

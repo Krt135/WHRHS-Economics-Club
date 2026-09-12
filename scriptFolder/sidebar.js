@@ -123,6 +123,13 @@ class SpecialSidebar extends HTMLElement {
     The Bulletin
 </a>
 
+<a class="nav-item ${active === 'points' ? 'active' : ''}" href="points.html">
+    <span class="nav-icon">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 21h8" /><path d="M12 17v4" /><path d="M7 4h10v5a5 5 0 0 1-10 0V4z" /><path d="M7 5H4a2 2 0 0 0 2 4" /><path d="M17 5h3a2 2 0 0 1-2 4" /></svg>
+    </span>
+    Engagement Points
+</a>
+
 <div id="exec-section" style="display: none; margin-top: 14px;">
     <div class="nav-section-label">EXEC BOARD</div>
     <a class="nav-item ${active === 'admin' ? 'active' : ''}" href="admin.html">

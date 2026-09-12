@@ -200,6 +200,8 @@ function wireOwnProfile(user, data) {
   mainEl.classList.remove("profile-main--viewing-member");
   showProfileApp();
 
+  document.getElementById("profile-points-link").href = `points.html?uid=${encodeURIComponent(user.uid)}`;
+
   document.title = "Your Profile – The Economic Forum";
   document.getElementById("profile-page-title").textContent = "Your Profile";
   document.getElementById("profile-page-subtitle").textContent =
@@ -276,7 +278,7 @@ function wireOwnProfile(user, data) {
 //  MEMBER PROFILE
 // ─────────────────────────────────────────────
 
-function wireMemberProfile(data) {
+function wireMemberProfile(data, uid) {
   const mainEl           = document.getElementById("profile-main");
   const displayNameEl    = document.getElementById("field-display-name");
   const bioEl            = document.getElementById("field-bio");
@@ -287,6 +289,8 @@ function wireMemberProfile(data) {
 
   mainEl.classList.add("profile-main--viewing-member");
   showProfileApp();
+
+  document.getElementById("profile-points-link").href = `points.html?uid=${encodeURIComponent(uid)}`;
 
   const name = (data.displayName || "").trim() || "Member";
   document.title = `${name} – The Economic Forum`;
@@ -383,15 +387,21 @@ onAuthStateChanged(auth, async (user) => {
       document.title = "Profile unavailable – The Economic Forum";
       return;
     }
-    wireMemberProfile(snap.val() || {});
+    wireMemberProfile(snap.val() || {}, viewUid);
     loadActivity(viewUid);   // ← load activity for the member being viewed
     return;
   }
 
-  const snap = await get(ref(db, `users/${user.uid}`));
-  const data = snap.val() || {};
-  wireOwnProfile(user, data);
-  loadActivity(user.uid);    // ← load activity for own profile
+  try {
+    const snap = await get(ref(db, `users/${user.uid}`));
+    const data = snap.val() || {};
+    wireOwnProfile(user, data);
+    loadActivity(user.uid);    // ← load activity for own profile
+  } catch (e) {
+    console.error(e);
+    showProfileError();
+    document.title = "Profile unavailable – The Economic Forum";
+  }
 });
 
 window._tefSignOut = () => signOut(auth).then(() => (window.location.href = "index.html"));

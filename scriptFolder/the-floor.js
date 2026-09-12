@@ -42,6 +42,10 @@ onAuthStateChanged(auth, async (user) => {
       userProfile = snapshot.val();
       userRole = userProfile.role || "member";
     }
+    // Only fetch the /users roster (needed for @mention autocomplete) once we
+    // have a confirmed signed-in user — not unconditionally for every visitor,
+    // logged in or not, before auth state is even known.
+    if (!usersLoadPromise) usersLoadPromise = loadAllUsers();
   } else {
     currentUser = null;
     userRole    = "public";
@@ -62,9 +66,9 @@ onAuthStateChanged(auth, async (user) => {
 // ─────────────────────────────────────────────
 
 let allUsers = []; // { uid, displayName, email, initials }
-let usersLoadPromise = null; // resolves once the first /users fetch settles
+let usersLoadPromise = null; // resolves once the first /users fetch settles, kicked off from onAuthStateChanged below
 
-// Load all registered users for the dropdown. Fire-and-forget on module load.
+// Load all registered users for the dropdown.
 async function loadAllUsers() {
   try {
     console.log('[mentions] loadAllUsers: fetching /users …');
@@ -89,7 +93,6 @@ async function loadAllUsers() {
     console.warn('[mentions] loadAllUsers: FAILED to load users for @mentions:', e);
   }
 }
-usersLoadPromise = loadAllUsers();
 
 // The "mention key" is the displayName with spaces removed — what gets typed after @.
 // e.g. displayName "John Smith" → mention key "JohnSmith" → typed as @JohnSmith
@@ -252,11 +255,11 @@ function showMentionDropdown(ta, query) {
 
   dropdown.innerHTML = matches.map((u, i) => `
     <div class="mention-item ${i === 0 ? 'focused' : ''}"
-         data-key="${mentionKey(u.displayName)}">
-      <div class="mention-av">${u.initials}</div>
+         data-key="${esc(mentionKey(u.displayName))}">
+      <div class="mention-av">${esc(u.initials)}</div>
       <div>
-        <div class="mention-name">${u.displayName}</div>
-        <div class="mention-handle">@${mentionKey(u.displayName)}</div>
+        <div class="mention-name">${esc(u.displayName)}</div>
+        <div class="mention-handle">@${esc(mentionKey(u.displayName))}</div>
       </div>
     </div>
   `).join('');
@@ -768,8 +771,10 @@ async function postComment() {
     ([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId
   );
   if (entry) {
-    const d = discussions[currentDiscId];
-    const newCount = d && d.comments ? Object.keys(d.comments).length + 1 : 1;
+    // Recount straight from the source of truth instead of the local cache,
+    // which may already have been refreshed by the discussions listener by now.
+    const commentsSnap = await get(ref(db, `discussions/${currentDiscId}/comments`));
+    const newCount = commentsSnap.exists() ? Object.keys(commentsSnap.val()).length : 0;
     await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
   }
 }

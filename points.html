@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engagement Points — The Economic Forum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styleFolder/style.css">
+  <link rel="stylesheet" href="styleFolder/points.css">
+  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+
+  <script src="scriptFolder/footer.js" defer></script>
+  <script type="module" src="scriptFolder/sidebar.js" defer></script>
+  <script type="module" src="scriptFolder/points.js" defer></script>
+  <script type="module" src="scriptFolder/announcement.js"></script>
+</head>
+
+<body>
+
+  <tef-sidebar active-page="points"></tef-sidebar>
+
+  <main class="main">
+    <tef-announcement></tef-announcement>
+
+    <!-- ── LEADERBOARD VIEW ── -->
+    <div class="view active" id="viewLeaderboard">
+      <div class="page-header">
+        <h1>Engagement Points</h1>
+        <p class="subtitle">Earn recognition for your contributions to The Economic Forum.</p>
+        <div class="header-rule"></div>
+      </div>
+
+      <div class="list-content">
+        <div class="my-points-card" id="myPointsCard">
+          <div class="mpc-left">
+            <div class="mpc-label">YOUR ENGAGEMENT POINTS</div>
+            <div class="mpc-total" id="myTotalPoints">—</div>
+          </div>
+          <div class="mpc-actions">
+            <button class="btn-secondary" id="viewMyHistoryBtn">View My History</button>
+            <button class="btn-publish" id="requestPointsBtn">Request Points</button>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="link-btn" id="openRulesBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            View Rules &amp; Rubric
+          </button>
+        </div>
+
+        <div class="board-card">
+          <div class="board-title">🏆 Engagement Leaderboard</div>
+          <div class="board-sub">Current accumulated points. There is no weekly leaderboard, and points do not reset automatically.</div>
+          <div id="leaderboardList">
+            <div class="loading-state">Loading leaderboard…</div>
+          </div>
+        </div>
+      </div>
+      <tef-footer></tef-footer>
+    </div>
+
+    <!-- ── MEMBER DETAIL VIEW ── -->
+    <div class="view" id="viewMember">
+      <div class="member-topbar">
+        <button class="back-btn" id="backToLeaderboardBtn">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back to Leaderboard
+        </button>
+        <div class="topbar-actions" id="memberTopActions"></div>
+      </div>
+
+      <div class="member-body" id="memberBody">
+        <div class="loading-state">Loading…</div>
+      </div>
+      <tef-footer></tef-footer>
+    </div>
+
+  </main>
+
+  <!-- ── REQUEST POINTS MODAL ── -->
+  <div class="modal-overlay" id="requestModal">
+    <div class="modal">
+      <button class="modal-close" id="closeRequestModal">×</button>
+      <div class="modal-title">Request Points</div>
+      <div class="modal-subtitle">Submitting a request does not award points automatically — an admin will review it.</div>
+
+      <div class="form-group">
+        <label class="form-label">Activity</label>
+        <select class="form-input" id="reqActivity">
+          <option value="">Select an activity…</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Credit Level</label>
+        <select class="form-input" id="reqOption" disabled>
+          <option value="">Select an activity first…</option>
+        </select>
+        <div class="form-hint" id="reqOptionRequirements"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Date of Activity</label>
+        <input class="form-input" id="reqDate" type="date">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea reqDescriptionArea" id="reqDescription" placeholder="Briefly describe what you did…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Evidence (Optional)</label>
+        <div class="upload-btn" id="reqEvidenceTrigger">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          Attach a screenshot or file (image or PDF, max 8MB)
+        </div>
+        <input type="file" id="reqEvidenceFile" style="display:none;" accept="image/*,application/pdf">
+        <div id="reqEvidencePreview" class="evidence-preview" style="display:none;"></div>
+        <div class="form-hint" id="reqEvidenceError" style="display:none; color:var(--red);"></div>
+      </div>
+
+      <div class="form-hint" id="reqError" style="display:none; color:var(--red);"></div>
+      <button class="btn-full" id="submitRequestBtn">Submit Request</button>
+    </div>
+  </div>
+
+  <!-- ── RULES / RUBRIC MODAL ── -->
+  <div class="modal-overlay" id="rulesModal">
+    <div class="modal rules-modal">
+      <button class="modal-close" id="closeRulesModal">×</button>
+      <div class="modal-title">Engagement Point System — Rules &amp; Rubric</div>
+      <div class="rules-banner">
+        The Executive Board determines whether full or partial credit is awarded for every activity below.
+        Quality matters — completing an activity does not automatically guarantee full points.
+      </div>
+      <div id="rubricList"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+</body>
+
+</html>
