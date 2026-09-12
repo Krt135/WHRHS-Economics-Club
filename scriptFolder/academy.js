@@ -5,6 +5,7 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { validateImageFile, validateDocFile } from './upload-validation.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -18,6 +19,7 @@ async function uploadFileToStorage(file, folderPath) {
   await uploadBytes(sRef, file);
   return await getDownloadURL(sRef);
 }
+
 
 // ── QUILL SETUP ──
 const Font = Quill.import('formats/font');
@@ -176,6 +178,9 @@ function handleCoverFile(input, type) {
   const file = input.files[0];
   if (!file) return;
 
+  const error = validateImageFile(file);
+  if (error) { alert(error); input.value = ''; return; }
+
   if (type === 'c') {
     createCoverFile = file;
   } else {
@@ -226,6 +231,11 @@ function removeCoverImage(type) {
 function handleMultipleFiles(input, type, category) {
   const files = Array.from(input.files);
   if (!files.length) return;
+
+  for (const file of files) {
+    const error = validateDocFile(file);
+    if (error) { alert(error); input.value = ''; return; }
+  }
 
   if (type === 'c' && category === 'doc') createDocs.push(...files);
   if (type === 'e' && category === 'doc') editDocs.push(...files);
@@ -394,7 +404,7 @@ function renderLesson() {
   }
 
   const lessonHtml = l.richText
-    ? (l.contentHtml || '')
+    ? DOMPurify.sanitize(l.contentHtml || '')
     : parseContent(l.content || '');
 
   const rawText = l.richText ? (l.contentText || '') : (l.content || '');
@@ -403,13 +413,13 @@ function renderLesson() {
   const iLiked = myLiked(l);
   const iDisliked = myDisliked(l);
 
-  const imgHtml = l.imageUrl ? `<img src="${l.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const imgHtml = l.imageUrl ? `<img src="${esc(l.imageUrl)}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
   const docsHtml = (l.documents && l.documents.length)
     ? `<div style="margin: 16px 0; display:flex; flex-direction:column; gap:8px;">
-        ${l.documents.map(doc => `<a href="${doc.url}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${esc(doc.name || 'Attachment')}</a>`).join('')}
+        ${l.documents.map(doc => `<a href="${esc(doc.url)}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${esc(doc.name || 'Attachment')}</a>`).join('')}
       </div>`
     : '';
-  const fileHtml = l.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${l.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${l.fileName || 'Attachment'}</a></div>` : '';
+  const fileHtml = l.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${esc(l.fileUrl)}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${esc(l.fileName || 'Attachment')}</a></div>` : '';
 
   const qs = Array.isArray(l.quiz) ? l.quiz : [];
   let quizHtml = "";

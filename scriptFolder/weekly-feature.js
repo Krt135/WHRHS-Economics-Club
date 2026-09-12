@@ -6,6 +6,7 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { validateImageFile, validateDocFile } from './upload-validation.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -19,6 +20,7 @@ async function uploadFileToStorage(file, folderPath) {
   await uploadBytes(sRef, file);
   return await getDownloadURL(sRef);
 }
+
 
 const LEGACY_FONT_STACKS = {
   'Arial': 'Arial, sans-serif',
@@ -170,6 +172,9 @@ window.handleCoverFile = (input, type) => {
   const file = input.files[0];
   if (!file) return;
 
+  const error = validateImageFile(file);
+  if (error) { alert(error); input.value = ''; return; }
+
   if (type === 'pub') {
     pubCoverFile = file;
   } else {
@@ -220,6 +225,11 @@ window.removeCoverImage = (type) => {
 window.handleMultipleFiles = (input, type, category) => {
   const files = Array.from(input.files);
   if (!files.length) return;
+
+  for (const file of files) {
+    const error = validateDocFile(file);
+    if (error) { alert(error); input.value = ''; return; }
+  }
 
   if (type === 'pub' && category === 'doc') pubDocs.push(...files);
   if (type === 'edit' && category === 'doc') editDocs.push(...files);
@@ -468,7 +478,7 @@ function renderList() {
       </div>` : ''}
       <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
       ${f.subtitle ? `<div class="fc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 8px;">${escHtml(f.subtitle)}</div>` : ''}
-      ${f.imageUrl ? `<img src="${f.imageUrl}" class="fc-image" alt="Cover image" loading="lazy">` : ''}
+      ${f.imageUrl ? `<img src="${escHtml(f.imageUrl)}" class="fc-image" alt="Cover image" loading="lazy">` : ''}
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
       <div class="fc-meta">
         <span class="author-chip">
@@ -508,7 +518,7 @@ function renderArticle() {
   if (!f) return window.showList();
 
   const articleHtml = f.richText
-    ? (f.contentHtml || '')
+    ? DOMPurify.sanitize(f.contentHtml || '')
     : parseContent(f.content);
 
   const rawText = f.richText ? (f.contentText || '') : (f.content || '');
@@ -523,13 +533,13 @@ function renderArticle() {
   const isAdmin = userRole === 'admin';
 
   // Fixed specific variable scopes referencing the 'f' object rather than 'l'
-  const imgHtml = f.imageUrl ? `<img src="${f.imageUrl}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
+  const imgHtml = f.imageUrl ? `<img src="${escHtml(f.imageUrl)}" style="max-width:100%; border-radius:8px; margin: 16px 0;">` : '';
   const docsHtml = (f.documents && f.documents.length)
     ? `<div style="margin: 16px 0; display:flex; flex-direction:column; gap:8px;">
-        ${f.documents.map(doc => `<a href="${doc.url}" download="${escHtml(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${escHtml(doc.name || 'Attachment')}</a>`).join('')}
+        ${f.documents.map(doc => `<a href="${escHtml(doc.url)}" download="${escHtml(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; width:fit-content; padding: 12px; background: #f3f4f6; border-radius: 6px; font-weight:bold; color:var(--primary); text-decoration:none;">📎 ${escHtml(doc.name || 'Attachment')}</a>`).join('')}
       </div>`
     : '';
-  const fileHtml = f.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${f.fileUrl}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${f.fileName || 'Attachment'}</a></div>` : '';
+  const fileHtml = f.fileUrl ? `<div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px;"><a href="${escHtml(f.fileUrl)}" target="_blank" style="font-weight:bold; color:var(--primary); text-decoration:none;">📎 Download Attached File: ${escHtml(f.fileName || 'Attachment')}</a></div>` : '';
 
   const topActions = document.getElementById('articleTopActions');
   if (topActions) {
@@ -680,6 +690,9 @@ window.publishFeature = async () => {
   const contentHtml = pubQuill.root.innerHTML;
   const contentText = pubQuill.getText().trim();
 
+  if (!title) { document.getElementById('pubTitle').focus(); return; }
+  if (!contentText) { pubQuill.focus(); return; }
+
   const imageUrl = await uploadFileToStorage(pubCoverFile, 'weekly_images');
 
   const documents = [];
@@ -687,9 +700,6 @@ window.publishFeature = async () => {
     const url = await uploadFileToStorage(file, 'weekly_files');
     documents.push({ name: file.name, url });
   }
-
-  if (!title) { document.getElementById('pubTitle').focus(); return; }
-  if (!contentText) { pubQuill.focus(); return; }
 
   const name = getDisplayName(currentUser);
 

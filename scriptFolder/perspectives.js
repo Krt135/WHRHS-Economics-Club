@@ -5,7 +5,8 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { validateImageFile, validateDocFile } from './upload-validation.js';
 
 const LEGACY_FONT_STACKS = {
   'Arial': 'Arial, sans-serif',
@@ -25,6 +26,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 const storage = getStorage(app); // Initialize Storage
+
 
 
 // ── QUILL SETUP ──
@@ -200,6 +202,9 @@ window.handleCoverFile = (input, type) => {
   const file = input.files[0];
   if (!file) return;
 
+  const error = validateImageFile(file);
+  if (error) { alert(error); input.value = ''; return; }
+
   if (type === 'w') {
     writeCoverFile = file;
   } else {
@@ -249,6 +254,11 @@ window.removeCoverImage = (type) => {
 window.handleMultipleFiles = (input, type, category) => {
   const files = Array.from(input.files);
   if (!files.length) return;
+
+  for (const file of files) {
+    const error = validateDocFile(file);
+    if (error) { alert(error); input.value = ''; return; }
+  }
 
   if (type === 'w' && category === 'doc') writeDocs.push(...files);
   if (type === 'e' && category === 'doc') editDocs.push(...files);
@@ -525,7 +535,7 @@ function renderArticle() {
   if (!p) return window.showList();
 
   const articleHtml = p.richText
-    ? (p.contentHtml || '')
+    ? DOMPurify.sanitize(p.contentHtml || '')
     : parseContent(p.content);
 
   const rawText = p.richText ? (p.contentText || '') : (p.content || '');
@@ -611,11 +621,11 @@ function renderArticle() {
     </div>
     ${p.tags.length ? `<div class="article-tags">${p.tags.map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="article-divider"></div>
-    ${p.image ? `<img src="${p.image}" class="article-img" alt="">` : ''}
+    ${p.image ? `<img src="${esc(p.image)}" class="article-img" alt="">` : ''}
     ${(p.documents && p.documents.length) ? `<div class="article-docs" style="margin:20px 0; display:flex; flex-direction:column; gap:8px;">
-      ${p.documents.map(doc => `<a href="${doc.url}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold; width:fit-content;">📥 ${esc(doc.name || 'File')}</a>`).join('')}
+      ${p.documents.map(doc => `<a href="${esc(doc.url)}" download="${esc(doc.name || 'attachment')}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold; width:fit-content;">📥 ${esc(doc.name || 'File')}</a>`).join('')}
     </div>` : ''}
-    ${p.documentData ? `<div class="article-doc" style="margin:20px 0;"><a href="${p.documentData}" download="${p.documentName || 'attachment'}" style="padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold;">📥 Download ${esc(p.documentName || 'File')}</a></div>` : ''}
+    ${p.documentData ? `<div class="article-doc" style="margin:20px 0;"><a href="${esc(p.documentData)}" download="${esc(p.documentName || 'attachment')}" style="padding:10px 15px; background:var(--bg-card); border:1px solid var(--border); border-radius:5px; color:var(--text-main); text-decoration:none; font-weight:bold;">📥 Download ${esc(p.documentName || 'File')}</a></div>` : ''}
     <div class="article-content" style="${fontStyle}">${articleHtml}</div>
     <div class="reaction-bar">
       <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')">
@@ -859,13 +869,25 @@ window.saveEdit = async () => {
     };
 
     await update(ref(db, `perspectives/${currentPostId}`), updatedData);
-    
+
+    // Clean up attachments the user removed during this edit. Best-effort:
+    // the DB is already the source of truth and no longer references these,
+    // so a failed delete here just leaves an orphaned file, not a broken post.
+    for (const removed of removedExistingDocs) {
+      try {
+        await deleteObject(storageRef(storage, removed.url));
+      } catch (cleanupError) {
+        console.warn("Failed to delete removed attachment from storage:", removed.url, cleanupError);
+      }
+    }
+
     // Clear state and close modal
     editCoverFile = null;
     editCoverRemoved = false;
     editDocs = [];
+    removedExistingDocs = [];
     window.closeModal('editModal');
-    
+
   } catch (error) {
     console.error("Error updating post:", error);
     alert("Failed to update post.");

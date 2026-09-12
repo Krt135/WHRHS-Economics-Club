@@ -7,7 +7,11 @@ import { getDatabase, ref, onValue, remove, get } from "https://www.gstatic.com/
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
-import { plainTextExcerpt } from "./link-format.js";
+// Floor posts store links as [label](url) markdown (see floor-link-format.js);
+// weekly-feature/perspectives store plain contentText with no link markup at
+// all. Both are safely handled by the same stripper — the [label](url]
+// pattern simply never occurs in the latter's plain text.
+import { plainTextExcerpt } from "./floor-link-format.js";
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);

@@ -21,14 +21,17 @@
             </header>
 
             <div class="admin-tabs">
-                <button class="tab-btn active" onclick="switchTab('approvals')">
+                <button class="tab-btn active" onclick="switchTab('approvals', this)">
                     👤 APPROVALS (<span id="count-pending">0</span>)
                 </button>
-                <button class="tab-btn" onclick="switchTab('members')">
+                <button class="tab-btn" onclick="switchTab('members', this)">
                     👥 MEMBERS
                 </button>
-                <button class="tab-btn" onclick="switchTab('moderation')">
+                <button class="tab-btn" onclick="switchTab('moderation', this)">
                     📑 MODERATION
+                </button>
+                <button class="tab-btn" onclick="switchTab('points', this)">
+                    🏆 POINTS
                 </button>
             </div>
 
@@ -37,6 +40,124 @@
             </div>
         </section>
     </main>
+
+    <!-- ── ADD POINTS MODAL ── -->
+    <div class="modal-overlay" id="addPointsModal">
+        <div class="modal">
+            <button class="modal-close" id="closeAddPointsModal">×</button>
+            <div class="modal-title">Add Points</div>
+            <div class="modal-subtitle">Award engagement points directly to a member.</div>
+
+            <div class="form-group">
+                <label class="form-label">Member</label>
+                <select class="form-input" id="apMember"></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Activity</label>
+                <select class="form-input" id="apActivity"><option value="">Select an activity…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Credit Level</label>
+                <select class="form-input" id="apOption" disabled><option value="">Select an activity first…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Points</label>
+                <input class="form-input" id="apPoints" type="number" step="1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date of Activity</label>
+                <input class="form-input" id="apDate" type="date">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Note (Optional)</label>
+                <textarea class="form-textarea" id="apNote" placeholder="e.g. September 11 meeting"></textarea>
+            </div>
+
+            <div class="limit-warning" id="apLimitWarning" style="display:none;"></div>
+            <div class="form-hint" id="apError" style="display:none; color:var(--red);"></div>
+
+            <button class="btn-full" id="apConfirmBtn">Add Points</button>
+        </div>
+    </div>
+
+    <!-- ── REVOKE AWARD MODAL ── -->
+    <div class="modal-overlay" id="revokeModal">
+        <div class="modal">
+            <button class="modal-close" id="closeRevokeModal">×</button>
+            <div class="modal-title">Revoke Award</div>
+            <div class="modal-subtitle" id="revokeSummary"></div>
+
+            <div class="form-group">
+                <label class="form-label">Reason for Revocation</label>
+                <textarea class="form-textarea" id="revokeReason" placeholder="Why is this award being revoked?"></textarea>
+            </div>
+            <div class="form-hint" id="revokeError" style="display:none; color:var(--red);"></div>
+
+            <button class="btn-full" id="revokeConfirmBtn" style="background:var(--red);">Revoke Award</button>
+        </div>
+    </div>
+
+    <!-- ── CORRECT AWARD MODAL ── -->
+    <div class="modal-overlay" id="correctModal">
+        <div class="modal">
+            <button class="modal-close" id="closeCorrectModal">×</button>
+            <div class="modal-title">Correct Award</div>
+            <div class="modal-subtitle" id="correctSummary">The original award will be preserved and marked as corrected — nothing is deleted.</div>
+
+            <div class="form-group">
+                <label class="form-label">Corrected Activity</label>
+                <select class="form-input" id="ctActivity"><option value="">Select an activity…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Corrected Credit Level</label>
+                <select class="form-input" id="ctOption" disabled><option value="">Select an activity first…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Corrected Points</label>
+                <input class="form-input" id="ctPoints" type="number" step="1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reason for Correction</label>
+                <textarea class="form-textarea" id="ctReason" placeholder="What was wrong and why is it being corrected?"></textarea>
+            </div>
+            <div class="form-hint" id="correctError" style="display:none; color:var(--red);"></div>
+
+            <button class="btn-full" id="correctConfirmBtn">Save Correction</button>
+        </div>
+    </div>
+
+    <!-- ── APPROVE REQUEST MODAL ── -->
+    <div class="modal-overlay" id="approveModal">
+        <div class="modal">
+            <button class="modal-close" id="closeApproveModal">×</button>
+            <div class="modal-title">Approve Request</div>
+            <div class="modal-subtitle" id="approveSummary"></div>
+
+            <div class="form-group">
+                <label class="form-label">Activity</label>
+                <select class="form-input" id="apvActivity"><option value="">Select an activity…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Credit Level</label>
+                <select class="form-input" id="apvOption" disabled><option value="">Select an activity first…</option></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Points to Award</label>
+                <input class="form-input" id="apvPoints" type="number" step="1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Admin Note (Optional)</label>
+                <textarea class="form-textarea" id="apvNote" placeholder="Notes visible to the member"></textarea>
+            </div>
+
+            <div class="limit-warning" id="apvLimitWarning" style="display:none;"></div>
+            <div class="form-hint" id="approveError" style="display:none; color:var(--red);"></div>
+
+            <button class="btn-full" id="approveConfirmBtn">Approve &amp; Award Points</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="scriptFolder/admin.js"></script>
 </body>
