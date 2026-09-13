@@ -5,6 +5,22 @@ import { getDatabase, ref, get, push, remove, onValue } from "https://www.gstati
 const auth = getAuth(app);
 const db = getDatabase(app);
 
+// Announcement text is admin-authored but still user-supplied, and this banner
+// renders on every page of the site — so the same escaping the rest of the
+// codebase applies to post/comment content has to apply here too.
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Escaping alone doesn't make a URL safe in an href: `javascript:alert(1)`
+// contains no escapable character. Allow only real navigable schemes.
+function safeUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  return /^(https?:\/\/|mailto:|\/|#)/i.test(raw) ? esc(raw) : "";
+}
+
 const style = `
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -391,6 +407,11 @@ class TEFAnnouncement extends HTMLElement {
       `;
 
       this._bindAdminUI();
+      // Bound once here, not from _render(): #slides-wrap is a persistent
+      // element (_render only replaces its innerHTML), so re-binding per
+      // render stacked a listener and an orphaned interval on every
+      // announcement change, permanently accelerating the carousel.
+      this._bindClickCycle();
       this._listenToAnnouncements();
       this._checkAuth();
     } catch(err) {
@@ -398,15 +419,29 @@ class TEFAnnouncement extends HTMLElement {
     }
   }
 
+  _setAdminUI(isAdmin) {
+    this._isAdmin = isAdmin;
+    this.shadowRoot.getElementById('admin-bar').classList.toggle('visible', isAdmin);
+    this.shadowRoot.getElementById('delete-btn').style.display = isAdmin ? 'flex' : 'none';
+    if (!isAdmin) {
+      this.shadowRoot.getElementById('admin-compose').classList.remove('open');
+      this.shadowRoot.getElementById('admin-trigger').style.display = 'flex';
+    }
+  }
+
   _checkAuth() {
     onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
-      const snap = await get(ref(db, `users/${user.uid}`));
-      const data = snap.val();
-      if (data?.role === 'admin') {
-        this._isAdmin = true;
-        this.shadowRoot.getElementById('admin-bar').classList.add('visible');
-        this.shadowRoot.getElementById('delete-btn').style.display = 'flex';
+      // Must reset on sign-out too: leaving the admin bar visible meant the
+      // next person on a shared school laptop still saw post/delete controls.
+      if (!user) { this._setAdminUI(false); return; }
+      try {
+        const snap = await get(ref(db, `users/${user.uid}`));
+        const data = snap.val();
+        this._setAdminUI(data?.role === 'admin' && data?.status === 'approved');
+      } catch (err) {
+        // A rules denial here would otherwise be an unhandled rejection.
+        console.error("TEF Announcement: could not verify admin status:", err);
+        this._setAdminUI(false);
       }
     });
   }
@@ -445,19 +480,23 @@ class TEFAnnouncement extends HTMLElement {
       slide.className = 'slide' + (i === 0 ? ' active' : '');
       slide.dataset.index = i;
 
-      const badge = `<span class="slide-badge">${ann.type === 'urgent' ? '⚠ Urgent' : 'Info'}</span>`;
+      const isUrgent = ann.type === 'urgent';
+      const badge = `<span class="slide-badge">${isUrgent ? '⚠ Urgent' : 'Info'}</span>`;
 
-      // Truncate if over 80 chars
-      const fullText = ann.message;
+      // `|| ''` guards against a node with no message (a hand-edited record, or
+      // a schema change): .length on undefined would throw inside this forEach,
+      // inside the onValue callback, leaving the banner broken on every page.
+      const fullText = String(ann.message || '');
       const isTruncated = fullText.length > 80;
       const displayText = isTruncated ? fullText.substring(0, 80) + '…' : fullText;
       const text = `<span class="slide-text">
-        ${displayText}
-        ${isTruncated ? `<button class="read-more-btn" data-full="${fullText.replace(/"/g, '&quot;')}" data-type="${ann.type}">Read more</button>` : ''}
+        ${esc(displayText)}
+        ${isTruncated ? `<button class="read-more-btn" data-full="${esc(fullText)}" data-type="${isUrgent ? 'urgent' : 'info'}">Read more</button>` : ''}
       </span>`;
 
-      const link = ann.url
-        ? `<a class="slide-link" href="${ann.url}" target="_blank" rel="noopener">${ann.linkText || 'Learn more'} →</a>`
+      const href = safeUrl(ann.url);
+      const link = href
+        ? `<a class="slide-link" href="${href}" target="_blank" rel="noopener">${esc(ann.linkText || 'Learn more')} →</a>`
         : '';
 
       slide.innerHTML = badge + text + link;
@@ -473,7 +512,6 @@ class TEFAnnouncement extends HTMLElement {
     if (this._announcements.length > 1) {
       this._cycleTimer = setInterval(() => this._nextSlide(), 4500);
     }
-    this._bindClickCycle();
   }
 
   _nextSlide() {
@@ -532,6 +570,10 @@ class TEFAnnouncement extends HTMLElement {
     });
 
     postBtn.addEventListener('click', async () => {
+      // These handlers are bound for every visitor (the admin bar is only
+      // hidden with CSS), so re-check here rather than trusting that the
+      // button was unreachable. The database rules are the real boundary.
+      if (!this._isAdmin) return;
       const msg = this.shadowRoot.getElementById('compose-msg').value.trim();
       if (!msg) return;
 
@@ -551,6 +593,7 @@ class TEFAnnouncement extends HTMLElement {
     });
 
     deleteBtn.addEventListener('click', async () => {
+      if (!this._isAdmin) return;
       const ann = this._announcements[this._currentIndex];
       if (!ann) return;
       if (!confirm('Delete this announcement?')) return;
