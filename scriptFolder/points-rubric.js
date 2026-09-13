@@ -196,13 +196,15 @@ export function computeMemberTotal(awardsObj) {
 
 // usersObj: the raw `users` node (Firebase snapshot .val()) — { uid: { displayName, role, pointAwards, ... } }.
 // Returns [{ uid, name, role, total }], unsorted.
-// Anyone not explicitly 'pending' counts: a legacy row with no status field at
-// all is still a real member, and silently dropping them off the leaderboard
-// would be worse than showing them.
+// Must match the exact same "approved" test the rest of the app uses
+// (admin.js's Members tab, the Add Points member picker) — status === 'approved',
+// not merely "not pending". A looser test here was the cause of a real bug:
+// the leaderboard showed a different set of people than the admin panel's
+// Members list for the same underlying data.
 export function computeAllTotals(usersObj) {
   if (!usersObj || typeof usersObj !== 'object') return [];
   return Object.entries(usersObj)
-    .filter(([, u]) => u && typeof u === 'object' && u.status !== 'pending')
+    .filter(([, u]) => u && typeof u === 'object' && u.status === 'approved')
     .map(([uid, u]) => ({
       uid,
       name: memberDisplayName(u),

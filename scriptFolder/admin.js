@@ -97,6 +97,11 @@ function loadData() {
                 return;
             }
 
+            // Kept fresh here (not just while the Points tab is open) so the
+            // "Give Points" shortcut on the Members tab always has data to
+            // populate the modal with, regardless of which tab was visited first.
+            latestUsersObj = data;
+
             const userArray = Object.entries(data).map(([id, val]) => ({ id, ...val }));
             const pending = userArray.filter(u => u.status === 'pending');
             pendingCount.innerText = pending.length;
@@ -153,7 +158,7 @@ function renderApprovals(list, container) {
             <div class="member-info">
                 <div class="member-avatar">${esc(initialsFor(user))}</div>
                 <div>
-                    <div class="member-name">${esc(user.displayName) || '—'}</div>
+                    <div class="member-name">${esc(memberDisplayName(user))}</div>
                     <div class="member-email">${esc(user.email) || '—'}</div>
                 </div>
             </div>
@@ -186,6 +191,11 @@ function renderMembers(list, container) {
     const admins = list.filter(u => u.role === 'admin');
     const members = list.filter(u => u.role !== 'admin');
 
+    // Surface duplicate-account data (same email, two separate uid records)
+    // rather than silently rendering both as if they were unrelated members.
+    const emailCounts = {};
+    list.forEach(u => { if (u.email) emailCounts[u.email] = (emailCounts[u.email] || 0) + 1; });
+
     const renderGroup = (group, label) => {
         if (group.length === 0) return '';
         return `
@@ -208,11 +218,12 @@ function renderMembers(list, container) {
                                     "span",
                                     "profile-link-name",
                                     "cursor: pointer;",
-                                    esc(user.displayName) || '—',
+                                    esc(memberDisplayName(user)),
                                     { stopPropagation: true, role: user.role || 'member' }
                                 )}
                                 <span class="role-pill role-pill--${esc(user.role || 'member')}">${esc((user.role || 'member').toUpperCase())}</span>
                                 <button class="btn-edit-name" title="Edit name" data-edit-name-uid="${esc(user.id)}" data-edit-name-current="${esc(user.displayName || '')}">✏️</button>
+                                ${emailCounts[user.email] > 1 ? `<span class="dup-badge" title="Another approved member has this same email — likely a duplicate account. Check before removing either one.">⚠ duplicate email</span>` : ''}
                             </div>
                             <div class="member-email">${esc(user.email)}</div>
                             ${user.secondaryEmail ? `<div class="member-email member-secondary">${esc(user.secondaryEmail)}</div>` : ''}
@@ -220,6 +231,7 @@ function renderMembers(list, container) {
                         </div>
                     </div>
                     <div class="admin-actions">
+                        <button class="btn-approve give-points-btn" data-give-points-uid="${esc(user.id)}">🏆 Give Points</button>
                         ${user.role !== 'admin'
                             ? `<button class="btn-approve" onclick="promoteUser('${user.id}')">Promote</button>`
                             : `<button class="btn-deny" onclick="demoteUser('${user.id}')">Demote</button>`
@@ -257,6 +269,10 @@ function renderMembers(list, container) {
                     showToast('Failed to update name: ' + err.message, 'error');
                 });
         });
+    });
+
+    container.querySelectorAll('.give-points-btn').forEach(btn => {
+        btn.addEventListener('click', () => openAddPointsModal(btn.dataset.givePointsUid));
     });
 }
 
@@ -467,18 +483,38 @@ function renderPointsTab(usersObj, container) {
 
 function renderPointsTotals(usersObj, container) {
     const totals = rankLeaderboard(computeAllTotals(usersObj));
+
+    // Scoped to approved members only, matching the Members tab's duplicate
+    // check — a pending signup that happens to reuse an approved member's
+    // email isn't the same kind of problem and would just be noise here.
+    const emailCounts = {};
+    Object.values(usersObj).forEach(u => {
+        if (u && u.email && u.status === 'approved') emailCounts[u.email] = (emailCounts[u.email] || 0) + 1;
+    });
+
     container.innerHTML = `
-        <button class="btn-approve" id="openAddPointsBtn" style="margin-bottom:16px;">+ Add Points</button>
+        <button class="btn-approve" id="openAddPointsBtn" style="margin-bottom:16px;">+ Award Points</button>
         <div class="points-table-wrap">
             <table class="points-table">
-                <thead><tr><th>Rank</th><th>Member</th><th>Total Points</th></tr></thead>
+                <thead><tr><th>Rank</th><th>Member</th><th>Total Points</th><th></th></tr></thead>
                 <tbody>
-                    ${totals.length ? totals.map(t => `<tr><td>#${t.rank}</td><td>${esc(t.name)}</td><td>${t.total}</td></tr>`).join('') : '<tr><td colspan="3" class="empty-cell">No approved members.</td></tr>'}
+                    ${totals.length ? totals.map(t => {
+                        const email = usersObj[t.uid] && usersObj[t.uid].email;
+                        return `<tr>
+                            <td>#${t.rank}</td>
+                            <td>${esc(t.name)}${email && emailCounts[email] > 1 ? ` <span class="dup-badge" title="Another approved member has this same email — likely a duplicate account.">⚠ duplicate email</span>` : ''}</td>
+                            <td>${t.total}</td>
+                            <td><button class="btn-approve btn-sm" data-action="give-points" data-uid="${esc(t.uid)}">Give Points</button></td>
+                        </tr>`;
+                    }).join('') : '<tr><td colspan="4" class="empty-cell">No approved members.</td></tr>'}
                 </tbody>
             </table>
         </div>
     `;
-    document.getElementById('openAddPointsBtn').addEventListener('click', openAddPointsModal);
+    document.getElementById('openAddPointsBtn').addEventListener('click', () => openAddPointsModal());
+    container.querySelectorAll('[data-action="give-points"]').forEach(btn =>
+        btn.addEventListener('click', () => openAddPointsModal(btn.dataset.uid))
+    );
 }
 
 function renderPointsAwards(usersObj, container) {
@@ -557,13 +593,24 @@ function renderPointsRequests(usersObj, container) {
 
 // ── ADD POINTS ───────────────────────────────────────────────────────────
 
-function openAddPointsModal() {
+// preselectUid: when given (e.g. from a "Give Points" button on a specific
+// member's row), that member is chosen automatically instead of making the
+// admin find them again in the dropdown.
+function openAddPointsModal(preselectUid) {
     apAcknowledgedOverLimit = false;
     const memberSel = document.getElementById('apMember');
+    // Must match the exact same "approved" definition used everywhere else
+    // (the Members tab, the leaderboard) — otherwise this dropdown, the
+    // leaderboard, and the admin member list can each show a different set
+    // of people for the same underlying data.
     memberSel.innerHTML = Object.entries(latestUsersObj)
-        .filter(([, u]) => u && u.status !== 'pending')
+        .filter(([, u]) => u && u.status === 'approved')
         .sort((a, b) => memberDisplayName(a[1]).localeCompare(memberDisplayName(b[1])))
         .map(([uid, u]) => `<option value="${esc(uid)}">${esc(memberDisplayName(u))}</option>`).join('');
+
+    if (preselectUid && latestUsersObj[preselectUid]) {
+        memberSel.value = preselectUid;
+    }
 
     populateActivitySelectEl('apActivity');
     document.getElementById('apActivity').value = '';
