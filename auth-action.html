@@ -52,6 +52,15 @@
     const feedbackEl = document.getElementById("actionFeedback");
     const resetForm = document.getElementById("resetPasswordForm");
 
+    // Mirrors setAuthFeedback() in scriptFolder/auth.js, using the same
+    // .auth-feedback / .auth-feedback--success / --error classes from auth.css.
+    function setFeedback(message, type) {
+      if (!feedbackEl) return;
+      feedbackEl.hidden = !message;
+      feedbackEl.textContent = message;
+      feedbackEl.className = "auth-feedback" + (type ? ` auth-feedback--${type}` : "");
+    }
+
     if (mode === "verifyEmail" && oobCode) {
       subtitle.textContent = "Verifying your email...";
       applyActionCode(auth, oobCode)
@@ -114,5 +123,7 @@
       setFeedback("Invalid or missing action code.", "error");
     }
   </script>
+
+</body>
 
 </html>
