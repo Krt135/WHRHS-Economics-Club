@@ -359,6 +359,10 @@
     flex-direction: column;
     gap: 16px; /* Space between cards */
 }
+/* flex gap already spaces skeleton cards; the shared margin-bottom would double it up. */
+#latestFloorPosts .skeleton-card {
+    margin-bottom: 0;
+}
 
 .home-post-card {
     background-color: #fcf6e5; /* Beige/cream background */

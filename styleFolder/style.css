@@ -328,3 +328,64 @@ tef-sidebar {
     padding: 14px 24px;
   }
 }
+
+/* ═══════════════════════════════════════════════
+   LOADING STATES — shared across every page so a first-time visitor sees
+   something the instant the page paints, instead of a blank container for
+   the second or two it takes Firebase to respond. One pulse animation, used
+   in three shapes: a card-sized block (list pages), a small avatar circle
+   and text line (the sidebar footer while auth resolves), and a spinner+text
+   row (short, non-card lists like the leaderboard).
+═══════════════════════════════════════════════ */
+@keyframes tef-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.skeleton-card {
+  height: 90px;
+  border-radius: 3px;
+  margin-bottom: 14px;
+  background: var(--cream-dark);
+  animation: tef-pulse 1.4s ease-in-out infinite;
+}
+.skeleton-card:last-child { margin-bottom: 0; }
+
+.skeleton-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  animation: tef-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-line {
+  height: 10px;
+  width: 70px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.18);
+  animation: tef-pulse 1.4s ease-in-out infinite;
+}
+.skeleton-line + .skeleton-line { margin-top: 6px; width: 45px; height: 8px; }
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 14px;
+}
+.loading-spinner {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border: 2px solid rgba(15,31,61,0.15);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  animation: tef-spin 0.7s linear infinite;
+}
+@keyframes tef-spin { to { transform: rotate(360deg); } }

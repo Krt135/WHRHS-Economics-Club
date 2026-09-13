@@ -142,11 +142,16 @@ class SpecialSidebar extends HTMLElement {
 </nav>
 
             <div class="sidebar-footer" id="sidebar-footer-content">
-                <div class="user-info" onclick="handleLogout()" style="cursor:pointer">
-                    <div class="avatar" id="user-avatar">??</div>
+                <!-- Neutral loading placeholder while Firebase Auth resolves the
+                     current session (checkAccess() below replaces this innerHTML
+                     entirely once it knows the real state) - showing "Guest /
+                     Public" here first meant every logged-in user briefly saw
+                     themselves signed out before it flipped to their real name. -->
+                <div class="user-info" style="display:flex; align-items:center; gap:8px;">
+                    <div class="skeleton-avatar"></div>
                     <div>
-                        <div class="user-name" id="user-display-name">Guest</div>
-                        <div class="user-role" id="user-display-role">Public</div>
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line"></div>
                     </div>
                 </div>
             </div>
@@ -227,6 +232,20 @@ class SpecialSidebar extends HTMLElement {
                         </button>
                     </div>
                 `;
+                } else {
+                    // Authenticated, but no matching users/{uid} record (e.g. an
+                    // admin removed the account while this session was still
+                    // active). Must still replace the skeleton markup - leaving
+                    // it in place would pulse forever instead of resolving.
+                    footerContent.innerHTML = `
+                    <div class="user-info" onclick="auth.signOut()" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                        <div class="avatar" id="user-avatar">?</div>
+                        <div>
+                            <div class="user-name">Account issue</div>
+                            <div class="user-role">Click to sign out</div>
+                        </div>
+                    </div>
+                    `;
                 }
             } else {
                 // LOGGED OUT: Show Big Sign In Button
