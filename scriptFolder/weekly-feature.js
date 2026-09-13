@@ -36,31 +36,34 @@ function getFontStack(name) {
   return LEGACY_FONT_STACKS[name] || LEGACY_FONT_STACKS['Georgia'];
 }
 
-// ── QUILL SETUP ──
-const Font = Quill.import('formats/font');
-Font.whitelist = [
-  'arial', 'times-new-roman', 'georgia',
-  'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
-];
-Quill.register(Font, true);
+// ── QUILL SETUP (lazy) ──
+// Quill's JS/CSS are only needed by an Exec Board member actually composing
+// or editing a feature - not by every visitor who just reads published ones -
+// so neither is loaded until openPublishModal()/openEditModal() is called.
+// pubQuill/editQuill stay null until then; every function that uses them
+// (publishFeature, saveEdit, the text-change word-count handlers) is only
+// reachable from inside the modals those two gated functions open, so by the
+// time any of them run, initialization below has already completed.
+let pubQuill = null;
+let editQuill = null;
+let quillLoadPromise = null;
 
-const QuillSize = Quill.import('attributors/style/size');
-QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
-Quill.register(QuillSize, true);
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
 
-const QUILL_TOOLBAR = [
-  ['bold', 'italic', 'underline'],
-  [{
-    font: [
-      false,
-      'arial', 'times-new-roman', 'georgia',
-      'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
-    ]
-  }],
-  [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
-  ['link', 'image'],
-  ['clean']
-];
+function loadStylesheet(href) {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
 
 // Inline Image Handler for Firebase Storage
 function quillImageHandler() {
@@ -90,36 +93,90 @@ function quillImageHandler() {
   };
 }
 
-const pubQuill = new Quill('#pubEditor', {
-  theme: 'snow',
-  modules: {
-    toolbar: {
-      container: QUILL_TOOLBAR,
-      handlers: { image: quillImageHandler }
-    }
-  },
-  placeholder: 'Write your essay here…'
-});
+function initQuillEditors() {
+  const Font = Quill.import('formats/font');
+  Font.whitelist = [
+    'arial', 'times-new-roman', 'georgia',
+    'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+  ];
+  Quill.register(Font, true);
 
-const editQuill = new Quill('#editEditor', {
-  theme: 'snow',
-  modules: {
-    toolbar: {
-      container: QUILL_TOOLBAR,
-      handlers: { image: quillImageHandler }
-    }
-  },
-  placeholder: 'Edit your essay here…'
-});
+  const QuillSize = Quill.import('attributors/style/size');
+  QuillSize.whitelist = ['10px', '12px', '14px', '18px', '24px', '32px'];
+  Quill.register(QuillSize, true);
 
-pubQuill.on('text-change', () => {
-  document.getElementById('wordCount').textContent =
-    wordCount(pubQuill.getText()) + ' words';
-});
-editQuill.on('text-change', () => {
-  document.getElementById('editWordCount').textContent =
-    wordCount(editQuill.getText()) + ' words';
-});
+  const QUILL_TOOLBAR = [
+    ['bold', 'italic', 'underline'],
+    [{
+      font: [
+        false,
+        'arial', 'times-new-roman', 'georgia',
+        'courier-new', 'verdana', 'trebuchet-ms', 'palatino', 'garamond'
+      ]
+    }],
+    [{ size: ['10px', '12px', '14px', false, '18px', '24px', '32px'] }],
+    ['link', 'image'],
+    ['clean']
+  ];
+
+  pubQuill = new Quill('#pubEditor', {
+    theme: 'snow',
+    modules: {
+      toolbar: {
+        container: QUILL_TOOLBAR,
+        handlers: { image: quillImageHandler }
+      }
+    },
+    placeholder: 'Write your essay here…'
+  });
+
+  editQuill = new Quill('#editEditor', {
+    theme: 'snow',
+    modules: {
+      toolbar: {
+        container: QUILL_TOOLBAR,
+        handlers: { image: quillImageHandler }
+      }
+    },
+    placeholder: 'Edit your essay here…'
+  });
+
+  pubQuill.on('text-change', () => {
+    document.getElementById('wordCount').textContent =
+      wordCount(pubQuill.getText()) + ' words';
+  });
+  editQuill.on('text-change', () => {
+    document.getElementById('editWordCount').textContent =
+      wordCount(editQuill.getText()) + ' words';
+  });
+}
+
+// Idempotent: safe to call every time a modal opens. Returns the same
+// in-flight promise on a second call rather than injecting the script twice.
+function ensureQuillLoaded() {
+  if (pubQuill) return Promise.resolve();
+  if (quillLoadPromise) return quillLoadPromise;
+  loadStylesheet('https://cdn.quilljs.com/1.3.7/quill.snow.css');
+  quillLoadPromise = loadScript('https://cdn.quilljs.com/1.3.7/quill.min.js')
+    .then(initQuillEditors);
+  return quillLoadPromise;
+}
+
+window.openPublishModal = async (btn) => {
+  // Swap innerHTML, not textContent - the button has an SVG icon child that
+  // textContent's setter would silently delete.
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Loading editor…'; }
+  try {
+    await ensureQuillLoaded();
+    window.openModal('publishModal');
+  } catch (err) {
+    console.error(err);
+    alert('Could not load the editor. Please check your connection and try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+};
 
 // 2. ── AUTH STATE ──
 let currentUser = null;
@@ -825,8 +882,16 @@ window.deleteComment = (featureId, commentId) => {
     remove(ref(db, `features/${featureId}/comments/${commentId}`));
 };
 
-window.openEditModal = () => {
+window.openEditModal = async () => {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return;
+
+  try {
+    await ensureQuillLoaded();
+  } catch (err) {
+    console.error(err);
+    alert('Could not load the editor. Please check your connection and try again.');
+    return;
+  }
 
   document.getElementById('editTitle').value = f.title;
   document.getElementById('editSubtitle').value = f.subtitle || '';
