@@ -589,13 +589,21 @@ function renderPointsAwards(usersObj, container) {
             <table class="points-table">
                 <thead><tr><th>Member</th><th>Activity</th><th>Points</th><th>Date</th><th>Awarded By</th><th>Note</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                    ${rows.map(r => `
+                    ${rows.map(r => {
+                        // Prefer the CURRENT name of a member who still exists (so a rename
+                        // shows up immediately everywhere) and only fall back to the name
+                        // stored on the record at award time if that member/admin has since
+                        // been removed entirely - the one case that stored snapshot actually
+                        // protects against.
+                        const memberName = usersObj[r.uid] ? memberDisplayName(usersObj[r.uid]) : (r.memberName || 'Member');
+                        const awardedByName = usersObj[r.awardedByUid] ? memberDisplayName(usersObj[r.awardedByUid]) : (r.awardedByName || '—');
+                        return `
                         <tr class="${r.revoked ? 'row-revoked' : ''}">
-                            <td>${esc(r.memberName || memberDisplayName(usersObj[r.uid]))}</td>
+                            <td>${esc(memberName)}</td>
                             <td>${esc(formatOptionLabel(r.activity))}</td>
                             <td>${r.revoked ? '<s>' : ''}${r.points > 0 ? '+' : ''}${r.points}${r.revoked ? '</s>' : ''}</td>
                             <td>${esc(r.activityDate || '—')}</td>
-                            <td>${esc(r.awardedByName || '—')}</td>
+                            <td>${esc(awardedByName)}</td>
                             <td>${esc(r.note || '') || '—'}</td>
                             <td>${r.revoked ? `<span class="status-pill status-pill--revoked">Revoked</span>` : (r.correctionOf ? `<span class="status-pill status-pill--corrected">Correction</span>` : `<span class="status-pill status-pill--approved">Active</span>`)}</td>
                             <td>${!r.revoked ? `
@@ -603,7 +611,8 @@ function renderPointsAwards(usersObj, container) {
                                 <button class="btn-approve btn-sm" data-action="correct" data-uid="${esc(r.uid)}" data-award="${esc(r.awardId)}">Correct</button>
                             ` : ''}</td>
                         </tr>
-                    `).join('')}
+                    `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -617,7 +626,10 @@ function renderPointsRequests(usersObj, container) {
     const rows = [];
     Object.entries(usersObj).forEach(([uid, u]) => {
         Object.entries(u.pointRequests || {}).forEach(([reqId, r]) => {
-            if (r && r.status === 'pending') rows.push({ uid, reqId, ...r, memberName: r.memberName || memberDisplayName(u) });
+            // u is the live user for this uid (we're iterating usersObj directly),
+            // so always prefer their current name over whatever was snapshotted
+            // onto the request at submission time.
+            if (r && r.status === 'pending') rows.push({ uid, reqId, ...r, memberName: memberDisplayName(u) });
         });
     });
     rows.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
