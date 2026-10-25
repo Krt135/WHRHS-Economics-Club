@@ -109,7 +109,15 @@ function loadData() {
             if (currentTab === 'approvals') {
                 renderApprovals(pending, content);
             } else {
-                renderMembers(userArray.filter(u => u.status === 'approved'), content);
+                // A user's own sign-in gate only ever blocks the exact string
+                // "pending" (see auth.js) - anything else (a missing status
+                // field, a typo, a stray value from a manual edit) lets them
+                // sign in and use the site fully, while never matching either
+                // this strict 'approved' filter or the Approvals tab's strict
+                // 'pending' filter. Surface those accounts separately instead
+                // of letting them stay invisible to every admin view.
+                const unrecognized = userArray.filter(u => u.status !== 'approved' && u.status !== 'pending');
+                renderMembers(userArray.filter(u => u.status === 'approved'), content, unrecognized);
             }
         }, (error) => {
             console.error("Firebase Read Error:", error);
@@ -182,8 +190,13 @@ window.denyUser = (uid) => {
 
 // ── MEMBERS ──────────────────────────────────────────────────────────────────
 
-function renderMembers(list, container) {
-    if (list.length === 0) {
+// `unrecognized`: accounts whose status field is neither 'pending' nor
+// 'approved' — e.g. missing entirely, or some other value from a manual
+// edit. auth.js's sign-in gate only blocks the exact string "pending", so
+// these accounts can sign in and use the site fully while being invisible
+// to both this list and the Approvals tab. See the note above their group.
+function renderMembers(list, container, unrecognized = []) {
+    if (list.length === 0 && unrecognized.length === 0) {
         container.innerHTML = `<p class="empty-state">No approved members found.</p>`;
         return;
     }
@@ -219,7 +232,14 @@ function renderMembers(list, container) {
                                     "profile-link-name",
                                     "cursor: pointer;",
                                     esc(memberDisplayName(user)),
-                                    { stopPropagation: true, role: user.role || 'member' }
+                                    // No `role` here on purpose: passing it makes profileAvatarHtml
+                                    // paint a solid navy/gold BACKGROUND behind this name (that's
+                                    // meant for small circular avatar badges elsewhere, not a text
+                                    // link). Combined with admin.css forcing this link's text color
+                                    // to navy for readability-as-plain-text, a "member" (navy bg)
+                                    // rendered navy text on a navy background — invisible. The
+                                    // avatar circle two lines above this already shows the role color.
+                                    { stopPropagation: true }
                                 )}
                                 <span class="role-pill role-pill--${esc(user.role || 'member')}">${esc((user.role || 'member').toUpperCase())}</span>
                                 <button class="btn-edit-name" title="Edit name" data-edit-name-uid="${esc(user.id)}" data-edit-name-current="${esc(user.displayName || '')}">✏️</button>
@@ -243,15 +263,55 @@ function renderMembers(list, container) {
         `;
     };
 
+    const unrecognizedHtml = unrecognized.length === 0 ? '' : `
+        <div class="members-group-label" style="color:#dc2626;">⚠ NEEDS ATTENTION — UNRECOGNIZED STATUS (${unrecognized.length})</div>
+        <p class="empty-state" style="margin:0 0 12px; padding:12px 14px; text-align:left; font-style:normal; border:1px dashed #fecdd3; border-radius:6px;">
+            These accounts can sign in and use the site, but their <code>status</code> field is neither
+            <code>"pending"</code> nor <code>"approved"</code> — usually from a manual database edit — so they
+            never appear in Approvals or above. Click "Mark Approved" to fix one, or Remove it if it shouldn't exist.
+        </p>
+        ${unrecognized.map(user => `
+            <div class="admin-list-item">
+                <div class="member-info">
+                    <div class="member-avatar">${esc(initialsFor(user))}</div>
+                    <div>
+                        <div class="member-name">
+                            ${esc(memberDisplayName(user))}
+                            <span class="status-raw">status: ${user.status === undefined ? '(missing)' : esc(JSON.stringify(user.status))}</span>
+                        </div>
+                        <div class="member-email">${esc(user.email) || '—'}</div>
+                    </div>
+                </div>
+                <div class="admin-actions">
+                    <button class="btn-approve" data-action="fix-approve" data-uid="${esc(user.id)}">Mark Approved</button>
+                    <button class="btn-deny" onclick="removeUser('${esc(user.id)}')">Remove</button>
+                </div>
+            </div>
+        `).join('')}
+    `;
+
     container.innerHTML = `
         <div class="members-search-wrap">
             <input class="members-search" type="text" placeholder="Search members…" oninput="filterMembers(this.value)" />
         </div>
+        ${unrecognizedHtml}
         <div id="members-list">
             ${renderGroup(admins, 'EXEC BOARD')}
             ${renderGroup(members, 'MEMBERS')}
         </div>
     `;
+
+    container.querySelectorAll('[data-action="fix-approve"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!confirm('Mark this account as approved? This grants full member access using the same status the normal Approve flow sets.')) return;
+            update(ref(db, `users/${btn.dataset.uid}`), { status: 'approved' })
+                .then(() => showToast('Status corrected to "approved".', 'success'))
+                .catch(err => {
+                    console.error(err);
+                    showToast('Failed to update status: ' + err.message, 'error');
+                });
+        });
+    });
 
     container.querySelectorAll('.btn-edit-name').forEach(btn => {
         btn.addEventListener('click', () => {

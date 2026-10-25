@@ -432,7 +432,7 @@ function renderLesson() {
         <div class="quiz-done-icon">${icon}</div>
         <div class="quiz-done-title">${pct === 100 ? "Perfect!" : pct >= 70 ? "Well done!" : "Keep studying!"}</div>
         <div class="quiz-done-score">${score} / ${qs.length} correct · ${pct}%</div>
-        <button class="quiz-retry" onclick="quizState={};renderLesson()">Try Again</button>
+        <button class="quiz-retry" onclick="retryQuiz()">Try Again</button>
       </div></div></div>`;
     } else {
       const q = qs[qi], answered = quizState.answered || false, chosen = quizState.chosen;
@@ -784,6 +784,11 @@ function nextQuiz() {
   renderLesson();
 }
 
+function retryQuiz() {
+  quizState = {};
+  renderLesson();
+}
+
 // ─────────────────────────────────────────────
 //  QUIZ BUILDER
 // ─────────────────────────────────────────────
@@ -817,7 +822,7 @@ Object.assign(window, {
   setTopicFilter, setLevelFilter,
   publishLesson, openEditModal, saveEdit, deleteLesson,
   reactLesson, postComment, likeComment, deleteComment,
-  answerQuiz, nextQuiz, addQuizQuestion, renderQuizBuilder,
+  answerQuiz, nextQuiz, retryQuiz, addQuizQuestion, renderQuizBuilder,
   handleCoverFile, renderCoverPreview, removeCoverImage,
   handleMultipleFiles, renderPreviews, removeFile,
 });

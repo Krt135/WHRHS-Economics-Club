@@ -1,5 +1,5 @@
 // ── WEEKLY QUESTION BANK ──
-// Questions rotate by ISO week number so a new set appears every Monday.
+// Questions rotate weekly so a new set appears every Monday.
 const allWeeks = [
   // Week A
   [
@@ -141,15 +141,23 @@ let current = 0;
 let score = 0;
 let answered = false;
 
-function getWeekNumber(d) {
-  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+// Continuous count of weeks since a fixed Monday, rather than the ISO week
+// number within the year. The within-year number restarts at 1 each January,
+// so at a year boundary two consecutive weeks could land on the same index
+// (with 4 sets, week 53 and the following week 1 both mapped to 1) and the
+// same quiz ran two weeks running. A running count advances by exactly one
+// per week with no discontinuity.
+const WEEK_ANCHOR_UTC = Date.UTC(2024, 0, 1); // a Monday
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+function getWeekIndex(d, setCount) {
+  const today = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const weeks = Math.floor((today - WEEK_ANCHOR_UTC) / MS_PER_WEEK);
+  return ((weeks % setCount) + setCount) % setCount; // stays non-negative before the anchor
 }
 
 function initQuiz() {
-  const weekIndex = getWeekNumber(new Date()) % allWeeks.length;
+  const weekIndex = getWeekIndex(new Date(), allWeeks.length);
   questions = allWeeks[weekIndex];
   current = 0;
   score = 0;
