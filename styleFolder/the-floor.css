@@ -38,6 +38,8 @@
 
 /* POSTS LIST */
 .posts-list { display:flex; flex-direction:column; gap:12px; }
+/* flex gap already spaces skeleton cards; the shared margin-bottom would double it up (shared by the-floor.html and bulletin.html, both of which load this stylesheet). */
+.posts-list .skeleton-card { margin-bottom:0; }
 
 /* DISCUSSION CARD */
 .disc-card { background:var(--gold-bg); border:1px solid #e8ddb8; border-radius:2px; padding:22px 24px; cursor:pointer; transition:border-color 0.15s; }

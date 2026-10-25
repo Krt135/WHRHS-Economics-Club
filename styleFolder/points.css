@@ -86,7 +86,7 @@
 /* EMPTY / LOADING */
 .empty-state { padding:40px; text-align:center; border:1.5px dashed #ccc; border-radius:2px; background:#fff; }
 .empty-text { font-family:'Playfair Display',serif; font-style:italic; font-size:15px; color:#9ca3af; }
-.loading-state { padding:30px; text-align:center; font-style:italic; color:var(--text-muted); }
+/* .loading-state now lives in the shared styleFolder/style.css (with a spinner). */
 
 /* ── MODALS (shared pattern) ── */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; align-items:center; justify-content:center; }

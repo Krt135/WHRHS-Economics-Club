@@ -25,12 +25,22 @@ function rel(ts) {
 onValue(latestRef, (snapshot) => {
   const data = snapshot.val();
   const list = document.getElementById("latestFloorPosts");
-  if (!list || !data) return;
+  if (!list) return;
 
-  const items = Object.entries(data)
-    .map(([key, val]) => ({ ...val, _key: key }))
-    .filter(d => !d.deleted)
-    .sort((a, b) => b.postedAt - a.postedAt);
+  // Previously this bailed out entirely on !data, leaving the initial loading
+  // skeleton (see index.html) stuck on screen forever for a club with zero
+  // Floor posts, instead of ever showing a real empty state.
+  const items = data
+    ? Object.entries(data)
+        .map(([key, val]) => ({ ...val, _key: key }))
+        .filter(d => !d.deleted)
+        .sort((a, b) => b.postedAt - a.postedAt)
+    : [];
+
+  if (!items.length) {
+    list.innerHTML = `<p class="floor-empty">The Floor is quiet. Be the first to start a discussion.</p>`;
+    return;
+  }
 
   list.innerHTML = items.map(d => {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
