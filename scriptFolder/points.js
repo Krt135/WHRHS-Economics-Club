@@ -3,27 +3,22 @@
 // ─────────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getDatabase, ref, onValue, push, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from './profile-link.js';
-import { validateEvidenceFile } from './upload-validation.js';
 import {
   RUBRIC, getActivity, getOption, formatOptionLabel, memberDisplayName,
-  computeMemberTotal, computeAllTotals, rankLeaderboard, todayDateStr,
-  validateActivityDate, resolveSelection, MIN_ACTIVITY_DATE
+  computeMemberTotal, computeAllTotals, rankLeaderboard
 } from './points-rubric.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 let currentUser = null;
 let usersTree = {};
 let viewingUid = null;
 
-let pendingEvidenceFile = null;
 let toastTimer = null;
 
 function esc(s) {
@@ -60,7 +55,6 @@ let routeApplied = false;
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "auth.html"; return; }
   currentUser = user;
-  populateActivitySelect();
   renderRubricList();
   subscribeToUsers();
 });
@@ -189,8 +183,11 @@ function renderMemberDetail(uid) {
   const total = computeMemberTotal(u.pointAwards);
   const name = memberDisplayName(u);
 
-  topActions.innerHTML = isOwn ? `<button class="topbar-btn" id="memberRequestBtn">Request Points</button>` : '';
-  if (isOwn) document.getElementById('memberRequestBtn').addEventListener('click', openRequestModal);
+  // No topbar action here anymore — members can no longer submit point
+  // requests (only Exec Board members award points directly). Left empty
+  // rather than removed outright in case a future admin-only action needs
+  // this slot again.
+  topActions.innerHTML = '';
 
   const awards = Object.entries(u.pointAwards || {})
     .map(([id, a]) => ({ id, ...a }))
@@ -201,11 +198,18 @@ function renderMemberDetail(uid) {
     let statusHtml = '';
     if (a.revoked) statusHtml = `<span class="status-pill status-pill--revoked">Revoked</span>`;
     else if (a.correctionOf) statusHtml = `<span class="status-pill status-pill--corrected">Correction</span>`;
+    // Prefer the admin's CURRENT name if they still have an account, same as
+    // the admin panel's All Awards table - otherwise a rename never shows up
+    // on a member's own history, only falling back to the name stored on the
+    // award if that admin has since been removed entirely.
+    const awardedByName = usersTree[a.awardedByUid]
+      ? memberDisplayName(usersTree[a.awardedByUid])
+      : (a.awardedByName || '—');
     return `<tr>
       <td>${esc(label)}</td>
       <td>${a.revoked ? '<s>' : ''}${a.points > 0 ? '+' : ''}${a.points}${a.revoked ? '</s>' : ''}</td>
       <td>${esc(a.activityDate || '—')}</td>
-      <td>${esc(a.awardedByName || '—')}</td>
+      <td>${esc(awardedByName)}</td>
       <td class="hist-note">${esc(a.note || '') || '—'}${statusHtml ? ' ' + statusHtml : ''}${a.revoked && a.revocationReason ? `<div>Reason: ${esc(a.revocationReason)}</div>` : ''}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No point history yet.</td></tr>`;
@@ -259,138 +263,6 @@ function renderMemberDetail(uid) {
   `;
 }
 
-// ── REQUEST POINTS MODAL ─────────────────────────────────────────────────
-
-function populateActivitySelect() {
-  const sel = document.getElementById('reqActivity');
-  sel.innerHTML = '<option value="">Select an activity…</option>' +
-    RUBRIC.map(a => `<option value="${esc(a.key)}">${esc(a.label)}${a.weeklyLimit ? ` (max ${a.weeklyLimit}/week)` : ''}</option>`).join('');
-}
-
-function populateOptionSelect(activityKey) {
-  const sel = document.getElementById('reqOption');
-  const hint = document.getElementById('reqOptionRequirements');
-  if (!activityKey) {
-    sel.innerHTML = '<option value="">Select an activity first…</option>';
-    sel.disabled = true;
-    hint.textContent = '';
-    return;
-  }
-  const activity = getActivity(activityKey);
-  sel.disabled = false;
-  sel.innerHTML = '<option value="">Select a credit level…</option>' +
-    activity.options.map(o => `<option value="${esc(o.key)}">${esc(o.label)} (${o.points > 0 ? '+' : ''}${o.points} pts)</option>`).join('');
-  hint.textContent = '';
-}
-
-function openRequestModal() {
-  const dateEl = document.getElementById('reqDate');
-  dateEl.value = todayDateStr();
-  dateEl.max = todayDateStr();
-  dateEl.min = MIN_ACTIVITY_DATE;
-  document.getElementById('reqDescription').value = '';
-  document.getElementById('reqActivity').value = '';
-  populateOptionSelect(null);
-  clearEvidence();
-  document.getElementById('reqError').style.display = 'none';
-  openModal('requestModal');
-}
-
-function showFormError(el, msg) {
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function clearEvidence() {
-  pendingEvidenceFile = null;
-  document.getElementById('reqEvidenceFile').value = '';
-  document.getElementById('reqEvidencePreview').style.display = 'none';
-  document.getElementById('reqEvidencePreview').innerHTML = '';
-  document.getElementById('reqEvidenceError').style.display = 'none';
-}
-
-// Returns { url, name, storagePath } so the caller can clean the object up
-// again if the database write that was supposed to reference it fails.
-async function uploadEvidence(uid) {
-  if (!pendingEvidenceFile) return { url: null, name: null, storagePath: null };
-  const fileName = `${Date.now()}_${pendingEvidenceFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-  const storagePath = `point_evidence/${uid}/${fileName}`;
-  const sRef = storageRef(storage, storagePath);
-  await uploadBytes(sRef, pendingEvidenceFile);
-  const url = await getDownloadURL(sRef);
-  return { url, name: pendingEvidenceFile.name, storagePath };
-}
-
-async function submitRequest() {
-  const btn = document.getElementById('submitRequestBtn');
-  const errEl = document.getElementById('reqError');
-  errEl.style.display = 'none';
-
-  const activityKey = document.getElementById('reqActivity').value;
-  const optionKey = document.getElementById('reqOption').value;
-  const activityDate = document.getElementById('reqDate').value;
-  const description = document.getElementById('reqDescription').value.trim();
-
-  const selection = resolveSelection(activityKey, optionKey);
-  if (selection.error) return showFormError(errEl, selection.error);
-
-  const dateError = validateActivityDate(activityDate);
-  if (dateError) return showFormError(errEl, dateError);
-
-  if (!description) return showFormError(errEl, 'Please provide a short description.');
-  if (description.length > 2000) {
-    return showFormError(errEl, 'Please keep the description under 2000 characters.');
-  }
-
-  // Accidental double submissions (double-tap, a second tab, a back-button
-  // replay) would otherwise create two identical pending requests for an admin
-  // to untangle.
-  const myRequests = (usersTree[currentUser.uid] || {}).pointRequests || {};
-  const duplicate = Object.values(myRequests).some(r =>
-    r && r.status === 'pending' && r.activity === activityKey && r.activityDate === activityDate
-  );
-  if (duplicate) {
-    return showFormError(errEl, 'You already have a pending request for this activity on this date.');
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Submitting…';
-  let uploaded = { url: null, name: null, storagePath: null };
-  try {
-    uploaded = await uploadEvidence(currentUser.uid);
-    await set(push(ref(db, `users/${currentUser.uid}/pointRequests`)), {
-      memberId: currentUser.uid,
-      memberName: memberDisplayName(usersTree[currentUser.uid]) || currentUser.email,
-      activity: activityKey,
-      claimedOptionKey: optionKey,
-      activityDate,
-      description,
-      evidenceUrl: uploaded.url,
-      evidenceFileName: uploaded.name,
-      submittedAt: Date.now(),
-      status: 'pending'
-    });
-    closeModal('requestModal');
-    showToast('Request submitted. An admin will review it.', 'success');
-    // No manual refresh needed — the live subscription re-renders on its own.
-  } catch (err) {
-    console.error(err);
-    // The evidence file was uploaded but nothing references it now, so remove
-    // it instead of leaving an orphan sitting in Storage forever.
-    if (uploaded.storagePath) {
-      try {
-        await deleteObject(storageRef(storage, uploaded.storagePath));
-      } catch (cleanupError) {
-        console.warn('Could not clean up orphaned evidence upload:', cleanupError);
-      }
-    }
-    showFormError(errEl, 'Failed to submit request. Please check your connection and try again.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Submit Request';
-  }
-}
-
 // ── RULES / RUBRIC MODAL ─────────────────────────────────────────────────
 
 function renderRubricList() {
@@ -417,40 +289,9 @@ function renderRubricList() {
 
 function wireStaticControls() {
   document.getElementById('viewMyHistoryBtn').addEventListener('click', () => navigateToMember(currentUser.uid));
-  document.getElementById('requestPointsBtn').addEventListener('click', openRequestModal);
   document.getElementById('backToLeaderboardBtn').addEventListener('click', navigateToLeaderboard);
   document.getElementById('openRulesBtn').addEventListener('click', () => openModal('rulesModal'));
   document.getElementById('closeRulesModal').addEventListener('click', () => closeModal('rulesModal'));
-  document.getElementById('closeRequestModal').addEventListener('click', () => closeModal('requestModal'));
-  document.getElementById('submitRequestBtn').addEventListener('click', submitRequest);
-
-  document.getElementById('reqActivity').addEventListener('change', (e) => populateOptionSelect(e.target.value || null));
-  document.getElementById('reqOption').addEventListener('change', (e) => {
-    const found = e.target.value ? getOption(e.target.value) : null;
-    document.getElementById('reqOptionRequirements').textContent =
-      found && found.option.requirements.length ? 'Typically requires: ' + found.option.requirements.join('; ') : '';
-  });
-
-  document.getElementById('reqEvidenceTrigger').addEventListener('click', () => document.getElementById('reqEvidenceFile').click());
-  document.getElementById('reqEvidenceFile').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    const errEl = document.getElementById('reqEvidenceError');
-    if (!file) return;
-    const fileError = validateEvidenceFile(file);
-    if (fileError) {
-      errEl.textContent = fileError;
-      errEl.style.display = 'block';
-      e.target.value = '';
-      pendingEvidenceFile = null;
-      return;
-    }
-    errEl.style.display = 'none';
-    pendingEvidenceFile = file;
-    const preview = document.getElementById('reqEvidencePreview');
-    preview.style.display = 'flex';
-    preview.innerHTML = `<span>📎 ${esc(file.name)}</span> <button type="button" id="reqEvidenceRemove">Remove</button>`;
-    document.getElementById('reqEvidenceRemove').addEventListener('click', clearEvidence);
-  });
 
   document.querySelectorAll('.modal-overlay').forEach(o =>
     o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
