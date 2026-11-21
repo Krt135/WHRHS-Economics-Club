@@ -450,7 +450,12 @@ function renderList() {
   if (!el) return;
 
   if (!filtered.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
+    // Distinguish "no essays exist at all" from "your search/filter matched
+    // none of them" — showing the same "be the first to write one!" message
+    // for a filter with zero matches was misleading when essays do exist.
+    el.innerHTML = posts.length
+      ? `<div class="empty-state"><div class="empty-italic">No perspectives match your search or filter.</div><div class="empty-sub">Try a different topic or search term.</div></div>`
+      : `<div class="empty-state"><div class="empty-italic">Share your perspective.</div><div class="empty-sub">Write about any topic related to economics — even abstractly.</div></div>`;
     return;
   }
 

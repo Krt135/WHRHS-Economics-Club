@@ -9,12 +9,13 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+  <!-- Quill's JS/CSS are loaded lazily by weekly-feature.js, only when a
+       logged-in exec actually opens the Publish/Edit editor - it's not needed
+       to read published features, just to write or edit one. -->
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/weekly-feature.css">
   <link rel="icon" type="image/png" href="images/TEF-favicon.png">
 
-  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 
   <script src="scriptFolder/footer.js" defer></script>
@@ -40,7 +41,7 @@
 
       <div class="list-content">
         <div id="admin-only-controls" style="display: none;">
-          <button class="btn-publish" onclick="window.openModal('publishModal')">
+          <button class="btn-publish" id="openPublishModalBtn" onclick="window.openPublishModal(this)">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -57,7 +58,7 @@
             </svg>
           </span>
           <input class="search-input" id="searchInput" type="text"
-            placeholder="Search lessons by title, topic, or level..." oninput="window.renderList()">
+            placeholder="Search features by title, author, or topic..." oninput="window.renderList()">
         </div>
 
         <div class="filter-bar" id="filterBar">
@@ -71,7 +72,11 @@
           <button class="filter-tag" onclick="window.filterByTag(this,'Policy')">Policy</button>
         </div>
 
-        <div id="featuresList"></div>
+        <div id="featuresList">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
       </div>
       <tef-footer></tef-footer>
     </div>

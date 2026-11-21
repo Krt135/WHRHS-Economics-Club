@@ -355,7 +355,11 @@ function renderList() {
 
   const el = document.getElementById("lessonsList");
   if (!items.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-italic">Educational lessons coming soon.</div><div class="empty-sub">Exec members will publish simplified economics lessons here.</div></div>`;
+    // Same "nothing exists" message for a filter/search that matched zero
+    // lessons was misleading when lessons actually exist.
+    el.innerHTML = Object.keys(lessons).length
+      ? `<div class="empty-state"><div class="empty-italic">No lessons match your search or filters.</div><div class="empty-sub">Try a different topic, level, or search term.</div></div>`
+      : `<div class="empty-state"><div class="empty-italic">Educational lessons coming soon.</div><div class="empty-sub">Exec members will publish simplified economics lessons here.</div></div>`;
     return;
   }
   el.innerHTML = items.map(l => {
