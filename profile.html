@@ -10,7 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/profile.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+  <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js">
 
   <style>
     /* ── Activity tab items ── */
@@ -79,6 +82,8 @@
   <script type="module" src="scriptFolder/profile.js"></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script src="scriptFolder/footer.js" defer></script>
+  <script src="scriptFolder/page-loader.js" defer></script>
+  <script src="scriptFolder/ui-enhance.js" defer></script>
 </head>
 <body>
 
@@ -98,7 +103,7 @@
         <div class="page-header">
           <h1 id="profile-page-title">Your Profile</h1>
           <p id="profile-page-subtitle">Manage your account settings and notification preferences.</p>
-          <a id="profile-points-link" href="points.html" style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--gold);text-decoration:none;font-weight:600;margin-top:4px;">🏆 View Points Profile →</a>
+          <a id="profile-points-link" href="points.html" style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--gold-text);text-decoration:none;font-weight:600;margin-top:4px;">🏆 View Points Profile →</a>
         </div>
 
         <!-- Account Information -->

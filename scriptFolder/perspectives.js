@@ -7,6 +7,7 @@ import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 import { validateImageFile, validateDocFile } from './upload-validation.js';
+import { preserveInputs } from './preserve-inputs.js';
 
 const LEGACY_FONT_STACKS = {
   'Arial': 'Arial, sans-serif',
@@ -66,13 +67,15 @@ function quillImageHandler() {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
+    const invalid = validateImageFile(file);
+    if (invalid) { alert(invalid); return; }
 
     // Get the editor instance that triggered this
     const editor = this.quill;
     const range = editor.getSelection(true);
 
     try {
-      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
       const snapshot = await uploadBytes(imgRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -137,13 +140,33 @@ onAuthStateChanged(auth, async (user) => {
     userRole = "public";
     userProfile = null;
   }
-  if (currentPostId) renderArticle(); else renderList();
+  // Sign-in can finish before the posts load. Rendering a missing item fell back
+  // to the list and dropped the link, so leave that case to the data listener.
+  if (currentPostId) { if (posts.some(x => x.id === currentPostId)) renderArticle(); } else renderList();
 });
 
 
 // 3. ── GLOBAL STATE ──
 let posts = [];
-let currentPostId = sessionStorage.getItem("openPerspective") || null;
+// An essay can be opened by link (perspectives.html?essay=<id>) or handed over
+// via sessionStorage (Bulletin, profile activity).
+let currentPostId = new URLSearchParams(window.location.search).get("essay")
+  || sessionStorage.getItem("openPerspective") || null;
+
+// Keeps the address bar in step with the open essay so Back returns to the list.
+function syncEssayUrl(id, mode) {
+  if (mode === 'none') return;
+  const params = new URLSearchParams(window.location.search);
+  if ((params.get('essay') || null) === (id || null)) return;
+  const url = id ? `${window.location.pathname}?essay=${encodeURIComponent(id)}` : window.location.pathname;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](id ? { essay: id } : {}, '', url);
+}
+
+window.addEventListener('popstate', () => {
+  const id = new URLSearchParams(window.location.search).get('essay');
+  if (id && posts.find(p => p.id === id)) window.showArticle(id, { history: 'none' });
+  else window.showList({ history: 'none' });
+});
 let activeTag = 'all';
 let sortMode = 'newest';
 let pendingImgData = null;
@@ -166,15 +189,20 @@ function rel(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return Math.floor(s / 60) + " min ago";
-  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
-  return Math.floor(s / 86400) + " days ago";
+  const n = s < 86400 ? Math.floor(s / 3600) : Math.floor(s / 86400);
+  return `${n} ${s < 86400 ? 'hour' : 'day'}${n === 1 ? '' : 's'} ago`;
 }
+
+// Counts come from the per-user maps when present: the stored counters drift
+// when two people react at the same moment.
+function likeCount(p) { return p.userLikes ? Object.keys(p.userLikes).length : (p.likes || 0); }
+function dislikeCount(p) { return p.userDislikes ? Object.keys(p.userDislikes).length : (p.dislikes || 0); }
 
 function myLiked(p) { return !!(currentUser && p.userLikes && p.userLikes[currentUser.uid]); }
 function myDisliked(p) { return !!(currentUser && p.userDislikes && p.userDislikes[currentUser.uid]); }
 
 function esc(s) {
-  return (s || '')
+  return String(s == null ? '' : s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -184,7 +212,16 @@ function esc(s) {
 
 
 // 4. ── WINDOW BINDINGS ──
-window.openModal = (id) => { document.getElementById(id).classList.add('open'); };
+window.openModal = async (id) => {
+  if (id === 'writeModal') {
+    if (!auth.currentUser && typeof auth.authStateReady === 'function') await auth.authStateReady();
+    if (!auth.currentUser) {
+      if (confirm('You need to sign in to write an essay. Go to the sign-in page?')) window.location.href = 'auth.html';
+      return;
+    }
+  }
+  document.getElementById(id).classList.add('open');
+};
 window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
 window.renderList = renderList;
 document.querySelectorAll('.modal-overlay').forEach(o =>
@@ -287,7 +324,7 @@ window.renderPreviews = (type, category) => {
       const fileName = file.name || file.fileName || 'Attached File';
       
       pill.innerHTML = `
-        <span style="margin-right: 8px;">📎 ${fileName}</span>
+        <span style="margin-right: 8px;">📎 ${esc(fileName)}</span>
         <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')" 
           style="background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; padding: 0;">✕</button>
       `;
@@ -324,17 +361,21 @@ window.previewDoc = (input, previewId, dataKey) => {
   r.readAsDataURL(file);
 };
 
-window.showList = () => {
+window.showList = ({ history: historyMode = 'push' } = {}) => {
   document.getElementById('viewList').classList.add('active');
   document.getElementById('viewArticle').classList.remove('active');
   currentPostId = null;
+  syncEssayUrl(null, historyMode);
   renderList();
 };
-window.showArticle = (id) => {
+window.showArticle = (id, { history: historyMode = 'push' } = {}) => {
+  const switching = currentPostId !== id;
   currentPostId = id;
+  syncEssayUrl(id, historyMode);
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
+  if (switching) window.scrollTo(0, 0);
 };
 
 window.filterTag = (btn, tag) => {
@@ -346,6 +387,17 @@ window.filterTag = (btn, tag) => {
 window.sortPosts = (mode) => { sortMode = mode; renderList(); };
 
 window.togglePin = async (id, alreadyPinned) => {
+  try {
+    await togglePinWrite(id, alreadyPinned);
+    if (alreadyPinned) pinnedIds.delete(id); else pinnedIds.add(id);
+  } catch (err) {
+    console.error('Pin/unpin failed:', err);
+    alert('Could not update the Bulletin. Please try again.');
+  }
+  renderArticle();
+};
+
+async function togglePinWrite(id, alreadyPinned) {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
@@ -376,8 +428,19 @@ window.togglePin = async (id, alreadyPinned) => {
       pinnedBy: name
     });
   }
-  renderArticle();
-};
+}
+
+// The Bulletin keeps its own copy of a pinned essay's title and text: update
+// it on edit (fields) or remove it on delete (null).
+async function syncPinnedCopy(id, fields) {
+  try {
+    const snap = await get(ref(db, 'bulletin'));
+    const entries = Object.entries(snap.val() || {}).filter(([, v]) => v.originalId === id && v.type === 'perspective');
+    await Promise.all(entries.map(([key]) => fields ? update(ref(db, `bulletin/${key}`), fields) : remove(ref(db, `bulletin/${key}`))));
+  } catch (err) {
+    console.warn('Could not update the Bulletin copy of this essay:', err);
+  }
+}
 
 
 // 5. ── FIREBASE LISTENER ──
@@ -408,8 +471,10 @@ onValue(ref(db, 'perspectives'), (snapshot) => {
   if (currentPostId) {
     document.getElementById('viewList').classList.remove('active');
     document.getElementById('viewArticle').classList.add('active');
+    syncEssayUrl(currentPostId, 'replace');
     renderArticle();
   } else {
+    syncEssayUrl(null, 'replace');
     get(ref(db, 'bulletin')).then(snap => {
       const bData = snap.val() || {};
       pinnedIds = new Set(Object.values(bData).map(v => v.originalId).filter(Boolean));
@@ -436,14 +501,14 @@ function renderList() {
   let filtered = posts.filter(p => {
     const matchTag = activeTag === 'all' || (p.tags && p.tags.includes(activeTag));
     const matchSearch = !q ||
-      p.title.toLowerCase().includes(q) ||
-      p.author.toLowerCase().includes(q) ||
+      String(p.title || '').toLowerCase().includes(q) ||
+      String(p.author || '').toLowerCase().includes(q) ||
       (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
     return matchTag && matchSearch;
   });
 
   if (sortMode === 'oldest') filtered.sort((a, b) => a.postedAt - b.postedAt);
-  else if (sortMode === 'popular') filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  else if (sortMode === 'popular') filtered.sort((a, b) => likeCount(b) - likeCount(a));
   else filtered.sort((a, b) => b.postedAt - a.postedAt);
 
   const el = document.getElementById('postsList');
@@ -472,10 +537,11 @@ function renderList() {
     const isPinned = pinnedIds.has(p.id);
 
     return `
-<div class="persp-card ${cardTheme}" onclick="showArticle('${p.id}')">
+<div class="persp-card ${cardTheme}" role="link" tabindex="0" onclick="showArticle('${p.id}')">
+  <div class="section-label"><svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11H6a4 4 0 014-4V5a6 6 0 00-6 6v7h6v-7zm10 0h-4a4 4 0 014-4V5a6 6 0 00-6 6v7h6v-7z"/></svg>PERSPECTIVES</div>
   <div class="pc-header">
     <div class="pc-title-group">
-      <div class="pc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(p.title)}</div>
+      <div class="pc-title" style="${isPinned ? 'color:var(--accent-text)' : ''}">${esc(p.title)}</div>
       ${p.subtitle ? `<div class="pc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 6px;">${esc(p.subtitle)}</div>` : ''}
     </div>
     
@@ -501,11 +567,11 @@ function renderList() {
   <div class="pc-actions" onclick="event.stopPropagation()">
     <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')" title="Like">
       <svg width="14" height="14" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-      <span>${p.likes || 0}</span>
+      <span>${likeCount(p)}</span>
     </button>
     <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')" title="Dislike">
       <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-      <span>${p.dislikes || 0}</span>
+      <span>${dislikeCount(p)}</span>
     </button>
   </div>
 </div>`;
@@ -607,12 +673,13 @@ function renderArticle() {
           </div>
         </div>`;
     }).join('')
-    : '<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet. Share your thoughts!</p>';
+    : '<p style="font-style:italic;color:var(--text-muted);font-size:15px">No comments yet. Share your thoughts!</p>';
 
   const fontStyle = p.richText ? '' : `font-family:${getFontStack(p.fontFamily)}`;
 
   document.getElementById('articleBody').className = `article-body article-container ${mainTheme}`;
-  document.getElementById('articleBody').innerHTML = `
+  const articleBodyEl = document.getElementById('articleBody');
+  preserveInputs(articleBodyEl, () => { articleBodyEl.innerHTML = `
     <div class="article-eyebrow">PERSPECTIVES${p.tags.length ? ' · ' + p.tags[0].toUpperCase() : ''}</div>
     <div class="article-title">${esc(p.title)}</div>
     ${p.subtitle ? `<div class="article-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 1.1rem; margin-top: -10px; margin-bottom: 15px;">${esc(p.subtitle)}</div>` : ''}
@@ -635,11 +702,11 @@ function renderArticle() {
     <div class="reaction-bar">
       <button class="react-btn ${iLiked ? 'liked' : ''}" onclick="react('${p.id}','like')">
         <svg width="15" height="15" fill="${iLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-        ${p.likes || 0} likes
+        ${likeCount(p)} like${likeCount(p) === 1 ? '' : 's'}
       </button>
       <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="react('${p.id}','dislike')">
         <svg width="15" height="15" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-        ${p.dislikes || 0} dislikes
+        ${dislikeCount(p)} dislike${dislikeCount(p) === 1 ? '' : 's'}
       </button>
     </div>
     <div class="comments-area">
@@ -652,12 +719,30 @@ function renderArticle() {
         <textarea class="new-comment-input" id="cmtInput" placeholder="Add a comment..."></textarea>
         <button class="btn-post-comment" onclick="postComment('${p.id}')">Post</button>
       </div>
-    </div>`;
+    </div>`; });
 }
 
 
 // 7. ── DATABASE MUTATIONS ──
-window.publishPost = async () => {
+// Uploads can take seconds; a second click used to publish a duplicate.
+let essaySaving = false;
+async function runSaving(buttonSelector, busyLabel, task) {
+  if (essaySaving) return;
+  const btn = document.querySelector(buttonSelector);
+  const label = btn ? btn.innerHTML : '';
+  essaySaving = true;
+  if (btn) { btn.disabled = true; btn.textContent = busyLabel; }
+  try { await task(); }
+  finally {
+    essaySaving = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+  }
+}
+
+window.publishPost = () => runSaving('#writeModal .btn-full', 'Publishing…', publishPostTask);
+
+async function publishPostTask() {
+  if (!auth.currentUser) return alert("Please sign in to publish an essay.");
   const title = document.getElementById('wTitle').value.trim();
   const subtitle = document.getElementById('wSubtitle') ? document.getElementById('wSubtitle').value.trim() : '';
   const tags = document.getElementById('wTags').value ? [document.getElementById('wTags').value] : [];
@@ -709,17 +794,18 @@ window.publishPost = async () => {
     wQuill.setContents([]);
     document.getElementById('wTitle').value = '';
     if (document.getElementById('wSubtitle')) document.getElementById('wSubtitle').value = '';
+    document.getElementById('wTags').value = '';
     writeCoverFile = null;
     writeDocs = [];
     window.renderCoverPreview('w');
     window.renderPreviews('w', 'doc');
     window.closeModal('writeModal');
-    
+
   } catch (error) {
     console.error("Error publishing post:", error);
-    alert("Failed to publish post.");
+    alert("Failed to publish post. Please try again.");
   }
-};
+}
 
 
 window.react = (id, type) => {
@@ -729,8 +815,8 @@ window.react = (id, type) => {
   const uid = currentUser.uid;
   const wasLiked = !!(p.userLikes && p.userLikes[uid]);
   const wasDisliked = !!(p.userDislikes && p.userDislikes[uid]);
-  let likes = p.likes || 0;
-  let dislikes = p.dislikes || 0;
+  let likes = likeCount(p);
+  let dislikes = dislikeCount(p);
 
   const postRef = ref(db, `perspectives/${id}`);
   const updates = {};
@@ -757,22 +843,35 @@ window.react = (id, type) => {
 };
 
 
-window.postComment = (postId) => {
+let commentSaving = false;
+window.postComment = async (postId) => {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById('cmtInput');
-  if (!inp || !inp.value.trim()) return;
+  if (!inp || !inp.value.trim() || commentSaving) return;
   const name = getDisplayName();
-  set(push(ref(db, `perspectives/${postId}/comments`)), {
-    author: name,
-    initials: name.substring(0, 2).toUpperCase(),
-    authorId: currentUser.uid,
-    authorRole: userRole,
-    text: inp.value.trim(),
-    postedAt: Date.now(),
-    likes: 0,
-    liked: false
-  });
+  const text = inp.value.trim();
+  // Cleared before the write (which re-renders, keeping typed text); restored on failure.
   inp.value = '';
+  commentSaving = true;
+  try {
+    await set(push(ref(db, `perspectives/${postId}/comments`)), {
+      author: name,
+      initials: name.substring(0, 2).toUpperCase(),
+      authorId: currentUser.uid,
+      authorRole: userRole,
+      text,
+      postedAt: Date.now(),
+      likes: 0,
+      liked: false
+    });
+  } catch (err) {
+    console.error('Post comment failed:', err);
+    const box = document.getElementById('cmtInput');
+    if (box && !box.value) box.value = text;
+    alert('Your comment could not be posted. Please try again.');
+  } finally {
+    commentSaving = false;
+  }
 };
 
 
@@ -787,9 +886,14 @@ window.likeComment = async (postId, cmtId) => {
 };
 
 
-window.deleteComment = (postId, cmtId) => {
-  if (confirm("Delete this comment?"))
-    remove(ref(db, `perspectives/${postId}/comments/${cmtId}`));
+window.deleteComment = async (postId, cmtId) => {
+  if (!confirm("Delete this comment?")) return;
+  try {
+    await remove(ref(db, `perspectives/${postId}/comments/${cmtId}`));
+  } catch (err) {
+    console.error('Delete comment failed:', err);
+    alert('This comment could not be deleted. Please try again.');
+  }
 };
 
 
@@ -824,7 +928,9 @@ window.openEditModal = () => {
 };
 
 
-window.saveEdit = async () => {
+window.saveEdit = () => runSaving('#editModal .btn-full', 'Saving…', saveEditTask);
+
+async function saveEditTask() {
   const p = posts.find(x => x.id === currentPostId); if (!p) return;
   
   const title = document.getElementById('eTitle').value.trim();
@@ -873,7 +979,9 @@ window.saveEdit = async () => {
       documents: finalDocs
     };
 
-    await update(ref(db, `perspectives/${currentPostId}`), updatedData);
+    const id = currentPostId;
+    await update(ref(db, `perspectives/${id}`), updatedData);
+    await syncPinnedCopy(id, { title, subtitle, body: contentText, tags });
 
     // Clean up attachments the user removed during this edit. Best-effort:
     // the DB is already the source of truth and no longer references these,
@@ -895,15 +1003,22 @@ window.saveEdit = async () => {
 
   } catch (error) {
     console.error("Error updating post:", error);
-    alert("Failed to update post.");
+    alert("Failed to update post. Please try again.");
   }
-};
+}
 
 
 window.deletePost = async () => {
-  if (currentPostId) {
-    await softDelete('perspectives', currentPostId);
+  if (!currentPostId) return;
+  const id = currentPostId;
+  try {
+    // Unpin first, or the Bulletin keeps a card that leads nowhere.
+    await syncPinnedCopy(id, null);
+    await softDelete('perspectives', id);
     window.closeModal('confirmModal');
-    window.showList();
+    window.showList({ history: 'replace' });
+  } catch (err) {
+    console.error('Delete essay failed:', err);
+    alert('This essay could not be deleted. Please try again.');
   }
 };

@@ -3,13 +3,32 @@
   --navy: #0f1f3d; --navy-light: #1a2e52;
   --gold: #c9a84c; --gold-bg: #fdf8ee; --gold-light: #e2c47a;
   --cream: #f5f0e8; --cream-dark: #ede7d9;
-  --text-dark: #0f1f3d; --text-muted: #6b7280;
+  /* --text-muted darkened from #6b7280 (4.26:1 on cream, 3.92:1 on cream-dark) to pass AA (5.3:1 / 4.9:1) */
+  --text-dark: #0f1f3d; --text-muted: #5b6370;
   --sidebar-width: 275px; --border: #e5e7eb;
   --green: #16a34a; --green-bg: #f0fdf4; --green-border: #bbf7d0;
   --red: #dc2626; --red-bg: #fff1f2; --red-border: #fecdd3;
   --beginner: #16a34a; --beginner-bg: #dcfce7;
   --intermediate: #d97706; --intermediate-bg: #fef3c7;
   --advanced: #dc2626; --advanced-bg: #fee2e2; --blue: #3b84f7;
+
+  /* Text-safe variants for small coloured labels. The brights above stay for
+     borders/fills; these are for TEXT on their tinted backgrounds (AA, 4.5:1+). */
+  --beginner-text: #166534; --intermediate-text: #92400e; --advanced-text: #991b1b;
+
+  /* --gold on cream/white is only 2.0-2.3:1, so gold TEXT uses these instead.
+     --gold itself stays for decoration (rules, borders, fills, text on navy). */
+  --gold-text: #7f6118;     /* 5.1:1 on cream - any text size */
+  --gold-text-lg: #a08235;  /* 3.2:1 on cream - large display text only (>= 24px) */
+
+  /* Section identity: one accent per content section. Gold (Weekly Feature) is
+     the club's own colour; the other two are chosen to sit with navy + gold. */
+  --persp: #8a3550;  --persp-bg: #fbf3f5;   /* Perspectives - burgundy */
+  --learn: #2f6690;  --learn-bg: #f2f7fb;   /* The Academy  - steel blue */
+  --slate: #46587a;                          /* extra avatar tone */
+
+  /* A page sets these to adopt its section's accent; default is gold. */
+  --accent: var(--gold); --accent-text: var(--gold-text); --accent-bg: var(--gold-bg); --accent-ink: var(--navy);
 }
   body { font-family: 'Crimson Pro', Georgia, serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; display: flex; overflow-x: hidden; position: relative;}
 
@@ -21,7 +40,7 @@
   .logo-text .top { font-family:'Space Mono',monospace; font-size:20px; font-weight:700; color:#fff; letter-spacing:0.05em; }
   .logo-text .bot { font-family:'Space Mono',monospace; font-size:20px; font-weight:700; color:var(--gold); letter-spacing:0.05em; }
   .sidebar-nav { flex:1; padding:20px 0; overflow-y:auto; }
-  .nav-section-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; color:rgba(255,255,255,0.35); padding:0 16px 8px; margin-top:8px; }
+  .nav-section-label { font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.12em; color:rgba(255,255,255,0.6); padding:0 16px 8px; margin-top:8px; }
   .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; color:rgba(255,255,255,0.65); font-family:'Crimson Pro',serif; font-size:14px; cursor:pointer; transition:all 0.15s; border-left:2px solid transparent; text-decoration:none; }
   .nav-item:hover { color:#fff; background:rgba(255,255,255,0.05); }
   .nav-item.active { color:#fff; background:rgba(255,255,255,0.08); border-left-color:var(--gold); }
@@ -58,7 +77,7 @@
   .hp-av[style*="background:#0f1f3d"],
   .avatar-sm[style*="background:#0f1f3d"] { color: #fff !important; }
   .user-name { font-size:13px; color:rgba(255,255,255,0.8); line-height:1.2; }
-  .user-role { font-size:10px; color:rgba(255,255,255,0.4); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
+  .user-role { font-size:10px; color:rgba(255,255,255,0.6); font-family:'Space Mono',monospace; letter-spacing:0.05em; }
   .logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.4); padding:4px; transition:color 0.15s; }
   .logout-btn:hover { color:rgba(255,255,255,0.7); }
   .sidebar-signin-btn:hover {
@@ -389,3 +408,283 @@ tef-sidebar {
   animation: tef-spin 0.7s linear infinite;
 }
 @keyframes tef-spin { to { transform: rotate(360deg); } }
+
+/* Slim gold bar across the top of the viewport while a page's content
+   placeholders are still on screen. Created/removed by page-loader.js; it fades
+   in after 200ms so near-instant loads never flash it. */
+.tef-loadbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 10000;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(201,168,76,0.18);
+}
+.tef-loadbar:not(.done) { animation: tef-bar-in 0.2s ease 0.2s forwards; }
+.tef-loadbar.done { animation: none; opacity: 0; transition: opacity 0.3s ease; }
+.tef-loadbar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  transform: translateX(-100%);
+  animation: tef-bar-slide 1.2s ease-in-out infinite;
+}
+@keyframes tef-bar-in { to { opacity: 1; } }
+@keyframes tef-bar-slide { to { transform: translateX(250%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tef-loadbar-fill { animation: none; width: 100%; transform: none; opacity: 0.6; }
+  .skeleton-card, .skeleton-avatar, .skeleton-line { animation: none; }
+  .loading-spinner { animation-duration: 2s; }
+}
+
+/* ═══════════════════════════════════════════════
+   INTERACTION POLISH (global)
+   The base layer is deliberately low-specificity: any page rule that sets its
+   own transition or hover keeps winning, and this only fills the gaps.
+═══════════════════════════════════════════════ */
+a, button, input, select, textarea, summary, [role="button"], [role="link"] {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* Clickable content cards: gentle lift on hover, settle on press. [onclick] keeps
+   this off the purely informational cards on About Us that share a class name. */
+.persp-card[onclick], .lesson-card[onclick], .disc-card[onclick], .feature-card[onclick] {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+@media (hover: hover) {
+  body .persp-card[onclick]:hover, body .lesson-card[onclick]:hover,
+  body .disc-card[onclick]:hover, body .feature-card[onclick]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15,31,61,0.10);
+  }
+}
+body .persp-card[onclick]:active, body .lesson-card[onclick]:active,
+body .disc-card[onclick]:active, body .feature-card[onclick]:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(15,31,61,0.08);
+}
+
+/* Pressed + disabled feedback for every button. */
+button:not(:disabled):active, [role="button"]:active { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; }
+
+/* Keyboard focus. Navy is 14:1 on cream; light gold takes over on dark surfaces
+   (the sidebar, top bars, navy cards) where navy would vanish. The element-type
+   selectors out-rank the many page rules that say `outline: none` on inputs. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [role="button"]:focus-visible,
+[role="link"]:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+.sidebar :focus-visible, .mobile-topbar :focus-visible, .article-topbar :focus-visible,
+.lesson-topbar :focus-visible, .member-topbar :focus-visible, .announce-bar :focus-visible,
+.my-points-card :focus-visible, .ticker-wrap :focus-visible, .ql-toolbar :focus-visible {
+  outline-color: var(--gold-light);
+}
+.sidebar-nav :focus-visible { outline-offset: -2px; }  /* the nav scrolls; don't clip the ring */
+
+/* Section label: the small "WEEKLY FEATURE" / "PERSPECTIVES" tag on cards. */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent-text);
+  margin-bottom: 10px;
+}
+.section-label svg { flex-shrink: 0; }
+
+/* Avatar tones: a stable colour per person, picked from the palette by hashing
+   their name (see avatarToneClass in points.js). All are 4.5:1+ with white. */
+/* The a.profile-av-link variant is needed: that rule sets color: inherit and would
+   otherwise turn the initials dark. */
+.av-tone-0, a.profile-av-link.av-tone-0 { background: var(--navy);           color: #fff; }
+.av-tone-1, a.profile-av-link.av-tone-1 { background: var(--persp);          color: #fff; }
+.av-tone-2, a.profile-av-link.av-tone-2 { background: var(--learn);          color: #fff; }
+.av-tone-3, a.profile-av-link.av-tone-3 { background: var(--gold-text);      color: #fff; }
+.av-tone-4, a.profile-av-link.av-tone-4 { background: var(--beginner-text);  color: #fff; }
+.av-tone-5, a.profile-av-link.av-tone-5 { background: var(--slate);          color: #fff; }
+
+/* ═══════════════════════════════════════════════
+   ESSAY READING EXPERIENCE (Weekly Feature + Perspectives articles, Academy lessons)
+   The title and metadata get a wider column (900px); the running text is capped
+   at 650px, about 74 characters per line of Crimson Pro at 20px.
+   The :is() selectors out-rank each page's own .article-content / .lesson-content.
+═══════════════════════════════════════════════ */
+.main :is(.article-body, .lesson-body) { max-width: 900px; }   /* wider than the text, for the title + metadata */
+:is(.article-body .article-content, .lesson-body .lesson-content),
+:is(.article-body .reaction-bar, .lesson-body .lesson-reaction),
+:is(.article-body, .lesson-body) .comments-area,
+.lesson-body .key-concepts,
+.lesson-body .quiz-section { max-width: 650px; }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) {
+  font-size: 20px;
+  line-height: 1.75;
+  font-weight: 400;
+  color: #1f2937;
+  text-wrap: pretty;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) p { margin: 0 0 1.1em; }
+/* Quill saves a blank line as <p><br></p>; paragraph margins already provide the gap. */
+:is(.article-body .article-content, .lesson-body .lesson-content) p:has(> br:only-child) { margin: 0; line-height: 0.6; }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) h1,
+:is(.article-body .article-content, .lesson-body .lesson-content) h2,
+:is(.article-body .article-content, .lesson-body .lesson-content) h3,
+:is(.article-body .article-content, .lesson-body .lesson-content) h4 {
+  font-family: 'Playfair Display', serif;
+  color: var(--navy);
+  line-height: 1.25;
+  margin: 1.9em 0 0.6em;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) h1 { font-size: 1.7em; font-weight: 900; }
+:is(.article-body .article-content, .lesson-body .lesson-content) h2 { font-size: 1.4em; font-weight: 700; }
+:is(.article-body .article-content, .lesson-body .lesson-content) h3 { font-size: 1.2em; font-weight: 700; }
+:is(.article-body .article-content, .lesson-body .lesson-content) h4 { font-size: 1.05em; font-weight: 700; }
+:is(.article-body .article-content, .lesson-body .lesson-content) > :first-child { margin-top: 0; }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) ul,
+:is(.article-body .article-content, .lesson-body .lesson-content) ol { margin: 0 0 1.2em; padding-left: 1.5em; }
+:is(.article-body .article-content, .lesson-body .lesson-content) li { margin-bottom: 0.4em; padding-left: 0.2em; }
+:is(.article-body .article-content, .lesson-body .lesson-content) li::marker { color: var(--gold-text); }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) blockquote {
+  margin: 1.6em 0;
+  padding: 0.3em 0 0.3em 1.2em;
+  border-left: 3px solid var(--gold);
+  font-style: italic;
+  color: var(--navy-light);
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) blockquote p:last-child { margin-bottom: 0; }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) a {
+  color: var(--navy);
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) a:hover { color: var(--gold-text); }
+
+:is(.article-body .article-content, .lesson-body .lesson-content) pre,
+:is(.article-body .article-content, .lesson-body .lesson-content) code {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82em;
+  background: var(--cream-dark);
+  border-radius: 2px;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) code { padding: 0.1em 0.35em; }
+:is(.article-body .article-content, .lesson-body .lesson-content) pre { padding: 14px 16px; overflow-x: auto; margin: 1.4em 0; line-height: 1.55; }
+:is(.article-body .article-content, .lesson-body .lesson-content) pre code { padding: 0; background: none; }
+:is(.article-body .article-content, .lesson-body .lesson-content) img { max-width: 100%; height: auto; border-radius: 2px; }
+:is(.article-body .article-content, .lesson-body .lesson-content) hr { border: none; border-top: 1px solid var(--border); margin: 2.2em 0; }
+
+/* Works Cited / References: tagged by article-reader.js (headings are free text,
+   so CSS alone can't find them). Smaller type, hanging indent, tighter rhythm. */
+:is(.article-body .article-content, .lesson-body .lesson-content) .works-cited-heading {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+  border-top: 1px solid var(--border);
+  padding-top: 1.6em;
+  margin: 2.6em 0 1em;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) .works-cited-entry {
+  font-size: 0.88em;
+  line-height: 1.55;
+  color: var(--navy-light);
+  padding-left: 2em;
+  text-indent: -2em;
+  margin-bottom: 0.8em;
+}
+:is(.article-body .article-content, .lesson-body .lesson-content) ul.works-cited-entry,
+:is(.article-body .article-content, .lesson-body .lesson-content) ol.works-cited-entry { padding-left: 0; text-indent: 0; list-style: none; }
+:is(.article-body .article-content, .lesson-body .lesson-content) .works-cited-entry li {
+  list-style: none;
+  padding-left: 2em;
+  text-indent: -2em;
+  margin-bottom: 0.8em;
+}
+
+/* Thin reading-progress bar + back-to-top, created by article-reader.js. */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  height: 3px;
+  z-index: 210;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.reading-progress.is-visible { opacity: 1; }
+.reading-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent-text);
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+}
+.back-to-top {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15,31,61,0.25);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease, background-color 0.15s ease;
+  z-index: 150;
+}
+.back-to-top.is-visible { opacity: 1; visibility: visible; transform: none; }
+.back-to-top:hover { background: var(--navy-light); }
+
+@media (max-width: 900px) {
+  .reading-progress { left: 0; }
+  .back-to-top { right: 16px; bottom: 16px; }
+  :is(.article-body .article-content, .lesson-body .lesson-content) { font-size: 18px; line-height: 1.7; }
+}
+
+/* ═══════════════════════════════════════════════
+   REDUCED MOTION: switch off decorative animation and smooth scrolling.
+   The loading spinner is feedback, not decoration, so it keeps turning (slowly).
+═══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .loading-spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+  body .persp-card[onclick]:hover, body .lesson-card[onclick]:hover,
+  body .disc-card[onclick]:hover, body .feature-card[onclick]:hover { transform: none; }
+}

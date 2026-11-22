@@ -13,8 +13,10 @@
       padding: 52px 64px 80px;
       width: 100%;
       max-width: 780px;
-      margin-left: 14.0rem;
-      /*Come back to this later when fixing alignment issues*/
+      /* Centred in the space beside the sidebar. This used to be a fixed
+         margin-left: 14rem stacked on .page-wrapper's own sidebar offset, which
+         pushed the column past the right edge of the window below ~1280px wide. */
+      margin: 0 auto;
     }
  
     /* ── Page header ─────────────────────────────────────────────────── */
@@ -45,7 +47,7 @@
     }
 
     .page-header p a:hover {
-      color: var(--gold);
+      color: var(--gold-text);
     }
 
     /* ── View another member (read-only) — same boxed look as disabled primary email ── */
@@ -214,8 +216,8 @@
     }
  
     .role-badge.role--exec {
-      border-color: var(--gold);
-      color: var(--gold);
+      border-color:var(--accent);
+      color:var(--accent-text);
     }
  
     /* ── Toggle ──────────────────────────────────────────────────────── */
@@ -371,10 +373,9 @@
     }
  
     /* ── Responsive ──────────────────────────────────────────────────── */
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       .page-wrapper { margin-left: 0; width: 100%; }
       .profile-main {
-        margin-left: 0; /* was 14.0rem — left over from the sidebar-offset bug, doubled up with .page-wrapper's own offset and shoved the whole form off-screen on mobile */
         padding: 32px 20px 60px;
       }
       .card { padding: 24px 20px; }

@@ -133,37 +133,133 @@ function renderMyPointsCard() {
   document.getElementById('myTotalPoints').textContent = computeMemberTotal(u.pointAwards);
 }
 
+const LB_TOP_N = 10;
+let lbQuery = '';
+let lbShowAll = false;
+
+// A stable palette colour per person, derived from their name, so avatars in a
+// long list are easy to tell apart. Classes live in style.css (.av-tone-0..5).
+function avatarToneClass(name) {
+  const s = String(name || '?').trim().toLowerCase();
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return 'av-tone-' + (h % 6);
+}
+
+function rankLabel(rank) {
+  return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
+}
+
+function lbAvatar(r) {
+  // No `role` option on purpose: role-based colouring would give every member the
+  // same navy circle. Exec status is shown with an EXEC pill instead.
+  return profileAvatarHtml(
+    r.uid, 'span', `avatar-sm ${avatarToneClass(r.name)}`, '',
+    esc((r.name || '?').substring(0, 2).toUpperCase()), { stopPropagation: true }
+  );
+}
+
+function lbPills(r, isYou) {
+  return (isYou ? '<span class="lb-pill lb-pill--you">YOU</span>' : '') +
+         (r.role === 'admin' ? '<span class="lb-pill lb-pill--exec">EXEC</span>' : '');
+}
+
+function lbAriaLabel(r, isYou) {
+  return `${r.name}${isYou ? ' (you)' : ''}, rank ${r.rank}, ${r.total} points`;
+}
+
+function lbRowHtml(r, isYou) {
+  return `
+    <div class="lb-row ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
+         role="button" tabindex="0" aria-label="${esc(lbAriaLabel(r, isYou))}">
+      <div class="lb-rank ${r.rank <= 3 ? 'lb-rank--top' : ''}" aria-hidden="true">${rankLabel(r.rank)}</div>
+      <div class="lb-name-wrap">
+        ${lbAvatar(r)}
+        <span class="lb-name">${esc(r.name)}</span>
+        ${lbPills(r, isYou)}
+      </div>
+      <div class="lb-points">${r.total} pts</div>
+    </div>`;
+}
+
+// Top three as a podium. Visual order is 2nd | 1st | 3rd; the size class follows
+// list position (not rank) so a tie for first still renders three sensible cards.
+function podiumHtml(topThree) {
+  const order = [topThree[1], topThree[0], topThree[2]];
+  return `<div class="podium">${order.map(r => {
+    const pos = topThree.indexOf(r) + 1;
+    const isYou = r.uid === currentUser.uid;
+    return `
+      <div class="pod pod--${pos} ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
+           role="button" tabindex="0" aria-label="${esc(lbAriaLabel(r, isYou))}">
+        <div class="pod-medal" aria-hidden="true">${rankLabel(r.rank)}</div>
+        ${lbAvatar(r)}
+        <div class="pod-name">${esc(r.name)}</div>
+        <div class="pod-tags">${lbPills(r, isYou)}</div>
+        <div class="pod-points">${r.total} pts</div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
 function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
+  const countEl = document.getElementById('lbCount');
+  const toggleBtn = document.getElementById('lbToggle');
   const ranked = rankLeaderboard(computeAllTotals(usersTree));
 
   if (!ranked.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-text">No members yet.</div></div>`;
+    if (countEl) countEl.textContent = '';
+    if (toggleBtn) toggleBtn.hidden = true;
     return;
   }
 
-  el.innerHTML = ranked.map(r => {
-    const isYou = r.uid === currentUser.uid;
-    const label = `${r.name}${isYou ? ' (you)' : ''}, rank ${r.rank}, ${r.total} points`;
-    return `
-    <div class="lb-row ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
-         role="button" tabindex="0" aria-label="${esc(label)}">
-      <div class="lb-rank ${r.rank === 1 ? 'lb-rank--1' : ''}" aria-hidden="true">${r.rank === 1 ? '🏆' : '#' + r.rank}</div>
-      <div class="lb-name-wrap">
-        ${profileAvatarHtml(r.uid, "span", "avatar-sm", "", esc((r.name || '?').substring(0, 2).toUpperCase()), { stopPropagation: true, role: r.role })}
-        <span class="lb-name">${esc(r.name)}${isYou ? ' (You)' : ''}</span>
-      </div>
-      <div class="lb-points">${r.total} pts</div>
-    </div>`;
-  }).join('');
+  const q = lbQuery.trim().toLowerCase();
+  const searching = q.length > 0;
+  const matches = searching ? ranked.filter(r => (r.name || '').toLowerCase().includes(q)) : ranked;
 
-  el.querySelectorAll('.lb-row').forEach(row => {
-    const go = () => navigateToMember(row.dataset.uid);
-    row.addEventListener('click', go);
-    row.addEventListener('keydown', e => {
+  if (searching && !matches.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-text">No members match “${esc(lbQuery.trim())}”.</div></div>`;
+    if (countEl) countEl.textContent = `0 of ${ranked.length} members`;
+    if (toggleBtn) toggleBtn.hidden = true;
+    return;
+  }
+
+  const limited = !searching && !lbShowAll && matches.length > LB_TOP_N;
+  const visible = limited ? matches.slice(0, LB_TOP_N) : matches;
+  const usePodium = !searching && visible.length >= 3;
+  const listRows = usePodium ? visible.slice(3) : visible;
+
+  let html = usePodium ? podiumHtml(visible.slice(0, 3)) : '';
+  html += listRows.map(r => lbRowHtml(r, r.uid === currentUser.uid)).join('');
+
+  // When the list is cut to the top 10, keep the viewer's own position visible.
+  if (limited) {
+    const me = ranked.find(r => r.uid === currentUser.uid);
+    if (me && !visible.includes(me)) {
+      html += `<div class="lb-gap" aria-hidden="true">YOUR POSITION</div>` + lbRowHtml(me, true);
+    }
+  }
+  el.innerHTML = html;
+
+  el.querySelectorAll('.lb-row, .pod').forEach(node => {
+    const go = () => navigateToMember(node.dataset.uid);
+    node.addEventListener('click', go);
+    node.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
     });
   });
+
+  if (countEl) {
+    countEl.textContent = searching ? `${matches.length} of ${ranked.length} members`
+      : limited ? `Top ${LB_TOP_N} of ${ranked.length} members`
+      : `${ranked.length} member${ranked.length === 1 ? '' : 's'}`;
+  }
+  if (toggleBtn) {
+    toggleBtn.hidden = searching || ranked.length <= LB_TOP_N;
+    toggleBtn.textContent = lbShowAll ? `Show top ${LB_TOP_N} only` : `Show all ${ranked.length} members`;
+    toggleBtn.setAttribute('aria-expanded', String(lbShowAll));
+  }
 }
 
 // ── MEMBER DETAIL ─────────────────────────────────────────────────────────
@@ -292,6 +388,17 @@ function wireStaticControls() {
   document.getElementById('backToLeaderboardBtn').addEventListener('click', navigateToLeaderboard);
   document.getElementById('openRulesBtn').addEventListener('click', () => openModal('rulesModal'));
   document.getElementById('closeRulesModal').addEventListener('click', () => closeModal('rulesModal'));
+
+  // Leaderboard search + Top 10 / Show all. The list re-renders on every live
+  // data update, but these controls live outside it, so typing is never interrupted.
+  document.getElementById('lbSearch').addEventListener('input', e => {
+    lbQuery = e.target.value;
+    renderLeaderboard();
+  });
+  document.getElementById('lbToggle').addEventListener('click', () => {
+    lbShowAll = !lbShowAll;
+    renderLeaderboard();
+  });
 
   document.querySelectorAll('.modal-overlay').forEach(o =>
     o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })

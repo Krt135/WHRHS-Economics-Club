@@ -11,8 +11,14 @@
     rel="stylesheet">
     <link rel="stylesheet" href="styleFolder/style.css">
     <link rel = "stylesheet" href = "styleFolder/economic-forum.css">
-    <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+    <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <script src="scriptFolder/footer.js" defer></script>
+    <script src="scriptFolder/page-loader.js" defer></script>
+    <script src="scriptFolder/ui-enhance.js" defer></script>
     <script type="module" src="scriptFolder/sidebar.js" defer></script>
     <script type="module" src="scriptFolder/index.js" defer></script>
     <script type="module" src="scriptFolder/announcement.js"></script>
@@ -27,6 +33,26 @@
   <!-- MAIN -->
   <main class="main">
       <tef-announcement></tef-announcement>
+
+    <!-- NEW HERE? Shown by index.js to signed-out visitors only (never to signed-in members). -->
+    <aside class="newhere" id="newHereStrip" aria-label="New to The Economic Forum?" hidden>
+      <div class="newhere-inner">
+        <div class="newhere-intro">
+          <div class="newhere-title">New here?</div>
+          <p>The WHRHS Economics Club's home online: discussions, essays, lessons and games. Joining is free; an Exec Board member approves new accounts.</p>
+        </div>
+        <ul class="newhere-levels">
+          <li><span class="lvl-name">Public</span><span class="lvl-desc">Read everything and play the weekly games.</span></li>
+          <li><span class="lvl-name">Member</span><span class="lvl-desc">Post, comment, vote and earn points.</span></li>
+          <li><span class="lvl-name lvl-name--exec">Exec Board</span><span class="lvl-desc">Publish features, run polls, approve members.</span></li>
+        </ul>
+        <div class="newhere-actions">
+          <a class="btn-primary" href="auth.html#signup">Join</a>
+          <button type="button" class="newhere-dismiss" id="newHereDismiss" aria-label="Dismiss this message">×</button>
+        </div>
+      </div>
+    </aside>
+
     <!-- HERO -->
     <section class="hero">
       <div class="hero-content">
@@ -57,7 +83,7 @@
 
       <div class="hero-badge">
         <!-- TEF Logo SVG -->
-        <img class = "badge-svg" src = "images/TEF-image.jpeg" alt="The Economic Forum Logo">
+        <img class = "badge-svg" src = "images/TEF-image.jpeg" alt="The Economic Forum Logo" fetchpriority="high" decoding="async">
       </div>
     </section>
 

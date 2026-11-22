@@ -21,6 +21,19 @@ function safeUrl(url) {
   return /^(https?:\/\/|mailto:|\/|#)/i.test(raw) ? esc(raw) : "";
 }
 
+// What an admin types into the URL box, made into something safeUrl accepts:
+// "www.example.com" -> https://..., "the-floor.html" -> /the-floor.html.
+// Previously anything without a scheme was silently dropped from the banner.
+function normalizeUrl(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  if (/\s/.test(raw)) return null;
+  if (/^(https?:\/\/|mailto:|\/|#)/i.test(raw)) return raw;
+  if (/^[\w-]+\.html([?#].*)?$/i.test(raw)) return "/" + raw;
+  if (/^[\w-]+(\.[\w-]+)+([/?#].*)?$/.test(raw)) return "https://" + raw;
+  return null;
+}
+
 const style = `
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -30,6 +43,13 @@ const style = `
   width: 100%;
 }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Keyboard focus ring. This component's shadow DOM can't see the page's global
+       styles, and it sits on navy, so the ring is the light gold used elsewhere. */
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--gold-light, #e2c47a);
+      outline-offset: 2px;
+    }
 
     /* ── Bar ───────────────────────────────────────────────────────── */
     .announcement-bar {
@@ -573,31 +593,49 @@ class TEFAnnouncement extends HTMLElement {
       // These handlers are bound for every visitor (the admin bar is only
       // hidden with CSS), so re-check here rather than trusting that the
       // button was unreachable. The database rules are the real boundary.
-      if (!this._isAdmin) return;
+      if (!this._isAdmin || postBtn.disabled) return;
       const msg = this.shadowRoot.getElementById('compose-msg').value.trim();
-      if (!msg) return;
+      if (!msg) { this.shadowRoot.getElementById('compose-msg').focus(); return; }
 
       const linkText = this.shadowRoot.getElementById('compose-link-text').value.trim();
-      const url = this.shadowRoot.getElementById('compose-url').value.trim();
+      const url = normalizeUrl(this.shadowRoot.getElementById('compose-url').value);
       const type = this.shadowRoot.getElementById('compose-type').value;
+      if (url === null) {
+        alert("That link doesn't look like a web address. Use something like https://example.com or the-floor.html.");
+        return;
+      }
 
       const entry = { message: msg, type, createdAt: Date.now() };
       if (linkText) entry.linkText = linkText;
       if (url) entry.url = url;
 
-      await push(ref(db, 'announcements'), entry);
-
-      compose.classList.remove('open');
-      trigger.style.display = 'flex';
-      this._clearCompose();
+      // Disabled while saving so a double-click can't post it twice.
+      postBtn.disabled = true;
+      try {
+        await push(ref(db, 'announcements'), entry);
+        compose.classList.remove('open');
+        trigger.style.display = 'flex';
+        this._clearCompose();
+      } catch (err) {
+        console.error('TEF Announcement: post failed:', err);
+        alert('Could not post the announcement: ' + (err && err.message ? err.message : 'please try again.'));
+      } finally {
+        postBtn.disabled = false;
+      }
     });
 
     deleteBtn.addEventListener('click', async () => {
       if (!this._isAdmin) return;
       const ann = this._announcements[this._currentIndex];
       if (!ann) return;
-      if (!confirm('Delete this announcement?')) return;
-      await remove(ref(db, `announcements/${ann.id}`));
+      const preview = String(ann.message || '').slice(0, 80);
+      if (!confirm(`Delete this announcement?\n\n"${preview}${String(ann.message || '').length > 80 ? '…' : ''}"`)) return;
+      try {
+        await remove(ref(db, `announcements/${ann.id}`));
+      } catch (err) {
+        console.error('TEF Announcement: delete failed:', err);
+        alert('Could not delete the announcement. Please try again.');
+      }
     });
 
     // Read more popup handlers

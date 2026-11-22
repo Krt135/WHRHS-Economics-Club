@@ -7,6 +7,7 @@ import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 import { validateImageFile, validateDocFile } from './upload-validation.js';
+import { preserveInputs } from './preserve-inputs.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -75,12 +76,15 @@ function quillImageHandler() {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
+    // Same size/type checks as cover images; inline images skipped them entirely.
+    const invalid = validateImageFile(file);
+    if (invalid) { alert(invalid); return; }
 
     const editor = this.quill;
     const range = editor.getSelection(true);
 
     try {
-      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
       const snapshot = await uploadBytes(imgRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -203,7 +207,9 @@ onAuthStateChanged(auth, async (user) => {
     adminControls.style.display = (userRole === 'admin') ? 'block' : 'none';
   }
 
-  if (currentFeatureId) renderArticle();
+  // Sign-in can finish before the posts load. Rendering a missing item fell back
+  // to the list and dropped the link, so leave that case to the data listener.
+  if (currentFeatureId) { if (features.some(x => x.id === currentFeatureId)) renderArticle(); }
   else renderList();
 });
 
@@ -211,9 +217,33 @@ onAuthStateChanged(auth, async (user) => {
 let features = [];
 let currentFeatureId = sessionStorage.getItem("openFeature") || null;
 
-const urlParams = new URLSearchParams(window.location.search);
-const articleSlug = urlParams.get("article");
+// A ?article=<slug> link is resolved ONCE, when the data first arrives. It used
+// to be re-applied on every database update, so after a reader went back to the
+// list, the next like or comment from anyone pulled them back into the article.
+let pendingArticleSlug = new URLSearchParams(window.location.search).get("article");
 let activeTag = 'all';
+
+function slugOf(title) {
+  return String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Keeps the address bar in step with the open article so Back works and the
+// in-page "Back" button doesn't leave a stale ?article= behind.
+function syncArticleUrl(feature, mode) {
+  if (mode === 'none') return;
+  const params = new URLSearchParams(window.location.search);
+  const slug = feature ? slugOf(feature.title) : null;
+  if ((params.get('article') || null) === slug) return;
+  const url = slug ? `${window.location.pathname}?article=${encodeURIComponent(slug)}` : window.location.pathname;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](slug ? { article: feature.id } : {}, '', url);
+}
+
+window.addEventListener('popstate', () => {
+  const slug = new URLSearchParams(window.location.search).get('article');
+  const target = slug ? features.find(f => slugOf(f.title) === slug) : null;
+  if (target) window.showArticle(target.id, { history: 'none' });
+  else window.showList({ history: 'none' });
+});
 let pinnedIds = new Set();
 
 // Cover image state (single file)
@@ -316,7 +346,7 @@ window.renderPreviews = (type, category) => {
     const name = item instanceof File ? item.name : (item.name || 'File');
     return `
       <div style="display:flex; align-items:center; gap:6px; padding:6px 10px; background:#f3ede0; border:1px solid #d9c9a3; border-radius:20px; font-size:12px; color:#5a4a32;">
-        <span>📄 ${name}</span>
+        <span>📄 ${escHtml(name)}</span>
         <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')"
           style="background:none; border:none; cursor:pointer; color:#a04040; font-weight:bold; padding:0; line-height:1;">✕</button>
       </div>`;
@@ -362,14 +392,21 @@ function parseContent(raw) {
 }
 
 function relativeTime(ts) {
+  if (!ts) return 'just now';
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return 'just now';
   if (s < 3600) return Math.floor(s / 60) + ' min ago';
-  if (s < 86400) return Math.floor(s / 3600) + ' hours ago';
-  return Math.floor(s / 86400) + ' days ago';
+  const n = s < 86400 ? Math.floor(s / 3600) : Math.floor(s / 86400);
+  return `${n} ${s < 86400 ? 'hour' : 'day'}${n === 1 ? '' : 's'} ago`;
 }
 
 function wordCount(text) { return text.trim() ? text.trim().split(/\s+/).length : 0; }
+
+// Counts come from the per-user maps when present: the stored likes/dislikes
+// counters are read-modify-written by each client and drift when two people
+// react at the same moment. Older features without the maps keep their counter.
+function likeCount(f) { return f.userLikes ? Object.keys(f.userLikes).length : (f.likes || 0); }
+function dislikeCount(f) { return f.userDislikes ? Object.keys(f.userDislikes).length : (f.dislikes || 0); }
 
 function myLiked(f) { return !!(currentUser && f.userLikes && f.userLikes[currentUser.uid]); }
 function myDisliked(f) { return !!(currentUser && f.userDislikes && f.userDislikes[currentUser.uid]); }
@@ -383,33 +420,39 @@ document.querySelectorAll('.modal-overlay').forEach(o =>
   o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
 );
 
-window.showList = () => {
+window.showList = ({ history: historyMode = 'push' } = {}) => {
   document.getElementById('viewList').classList.add('active');
   document.getElementById('viewArticle').classList.remove('active');
   currentFeatureId = null;
+  syncArticleUrl(null, historyMode);
   renderList();
 };
 
-window.showArticle = (id) => {
+window.showArticle = (id, { history: historyMode = 'push' } = {}) => {
+  const switching = currentFeatureId !== id;
   currentFeatureId = id;
-
-  const feature = features.find(f => f.id === id);
-  if (feature) {
-    const slug = feature.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-    history.pushState({ article: id }, '', `weekly-feature.html?article=${slug}`);
-  }
+  syncArticleUrl(features.find(f => f.id === id), historyMode);
 
   document.getElementById('viewList').classList.remove('active');
   document.getElementById('viewArticle').classList.add('active');
   renderArticle();
+  if (switching) window.scrollTo(0, 0);
 };
 
 window.openConfirmDelete = () => { window.openModal('confirmModal'); };
 
 window.togglePin = async (id, alreadyPinned) => {
+  try {
+    await togglePinWrite(id, alreadyPinned);
+    if (alreadyPinned) pinnedIds.delete(id); else pinnedIds.add(id);
+  } catch (err) {
+    console.error('Pin/unpin failed:', err);
+    alert('Could not update the Bulletin. Please try again.');
+  }
+  renderArticle();
+};
+
+async function togglePinWrite(id, alreadyPinned) {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
@@ -440,8 +483,7 @@ window.togglePin = async (id, alreadyPinned) => {
       pinnedBy: name
     });
   }
-  renderArticle();
-};
+}
 
 // 6. ── FIREBASE LISTENER ──
 onValue(ref(db, 'features'), (snapshot) => {
@@ -453,18 +495,13 @@ onValue(ref(db, 'features'), (snapshot) => {
       const reactionsArray = f.reactions ? (Array.isArray(f.reactions) ? f.reactions : Object.values(f.reactions)) : [];
       return { id: key, ...f, comments: commentsArray, reactions: reactionsArray };
     });
-    features.sort((a, b) => b.postedAt - a.postedAt);
+    features.sort((a, b) => (b.postedAt || 0) - (a.postedAt || 0));
 
-    if (articleSlug && !currentFeatureId) {
-      const matchingArticle = features.find(f => {
-        const slug = f.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '');
-        return slug === articleSlug;
-      });
+    if (pendingArticleSlug && !currentFeatureId) {
+      const matchingArticle = features.find(f => slugOf(f.title) === pendingArticleSlug);
       if (matchingArticle) currentFeatureId = matchingArticle.id;
     }
+    pendingArticleSlug = null;
 
     if (currentFeatureId) {
       const postExists = features.find(f => f.id === currentFeatureId);
@@ -481,8 +518,12 @@ onValue(ref(db, 'features'), (snapshot) => {
   if (currentFeatureId) {
     document.getElementById('viewList').classList.remove('active');
     document.getElementById('viewArticle').classList.add('active');
+    // 'replace': runs on every update, and gives a Bulletin-opened article its URL.
+    syncArticleUrl(features.find(f => f.id === currentFeatureId), 'replace');
     renderArticle();
   } else {
+    // An article that was open (or linked) no longer exists: drop its ?article=.
+    syncArticleUrl(null, 'replace');
     get(ref(db, 'bulletin')).then(snap => {
       const bData = snap.val() || {};
       pinnedIds = new Set(Object.values(bData).map(v => v.originalId).filter(Boolean));
@@ -527,13 +568,14 @@ function renderList() {
     const isPinned = pinnedIds.has(f.id);
 
     return `
-    <div class="feature-card" onclick="showArticle('${f.id}')">
+    <div class="feature-card" role="link" tabindex="0" onclick="showArticle('${f.id}')">
+      <div class="section-label"><svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.9L22 10l-5.5 4.8L18.2 22 12 18.3 5.8 22l1.7-7.2L2 10l7.1-1.1z"/></svg>WEEKLY FEATURE</div>
       ${isPinned ? `
       <div class="pinned-badge">
         <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         Pinned to Bulletin
       </div>` : ''}
-      <div class="fc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${escHtml(f.title)}</div>
+      <div class="fc-title" style="${isPinned ? 'color:var(--gold-text)' : ''}">${escHtml(f.title)}</div>
       ${f.subtitle ? `<div class="fc-subtitle" style="font-style: italic; color: var(--text-muted, #8e8e93); font-size: 0.95rem; margin-top: 6px; margin-bottom: 8px;">${escHtml(f.subtitle)}</div>` : ''}
       ${f.imageUrl ? `<img src="${escHtml(f.imageUrl)}" class="fc-image" alt="Cover image" loading="lazy">` : ''}
       <div class="fc-excerpt">${escHtml(excerpt)}</div>
@@ -555,14 +597,14 @@ function renderList() {
             <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/>
             <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
           </svg>
-          ${f.likes || 0}
+          ${likeCount(f)}
         </button>
         <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="reactFeature('${f.id}','dislike')">
           <svg width="14" height="14" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/>
             <path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
           </svg>
-          ${f.dislikes || 0}
+          ${dislikeCount(f)}
         </button>
         <span class="see-reactions" onclick="openReactions('${f.id}')">See reactions</span>
       </div>
@@ -664,11 +706,12 @@ function renderArticle() {
           </div>
         </div>`;
     }).join('')
-    : '<p style="font-style:italic;color:#9ca3af;font-size:15px;">No comments yet. Be the first to respond!</p>';
+    : '<p style="font-style:italic;color:var(--text-muted);font-size:15px;">No comments yet. Be the first to respond!</p>';
 
   const fontStyle = f.richText ? '' : `font-family:${getFontStack(f.fontFamily)}`;
 
-  document.getElementById('articleBody').innerHTML = `
+  const articleBodyEl = document.getElementById('articleBody');
+  preserveInputs(articleBodyEl, () => { articleBodyEl.innerHTML = `
     <div class="article-eyebrow">WEEKLY FEATURE · ${f.tag ? f.tag.toUpperCase() : 'ECONOMICS'}</div>
     <div class="article-title">${escHtml(f.title)}</div>
     <div class="article-meta">
@@ -691,19 +734,19 @@ function renderArticle() {
           <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/>
           <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
         </svg>
-        ${f.likes || 0} likes
+        ${likeCount(f)} like${likeCount(f) === 1 ? '' : 's'}
       </button>
       <button class="react-btn ${iDisliked ? 'disliked' : ''}" onclick="reactFeature('${f.id}','dislike')">
         <svg width="15" height="15" fill="${iDisliked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/>
           <path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
         </svg>
-        ${f.dislikes || 0} dislikes
+        ${dislikeCount(f)} dislike${dislikeCount(f) === 1 ? '' : 's'}
       </button>
       <span class="reaction-count">
         ${f.reactions.length} reaction${f.reactions.length !== 1 ? 's' : ''}
         &nbsp;·&nbsp;
-        <span style="color:var(--gold);cursor:pointer" onclick="openReactions('${f.id}')">See all</span>
+        <span style="color:var(--gold-text);cursor:pointer" onclick="openReactions('${f.id}')">See all</span>
       </span>
     </div>
     <div class="comments-area">
@@ -721,11 +764,46 @@ function renderArticle() {
           <button class="btn-post-comment" onclick="postComment('${f.id}')">Post Comment</button>
         </div>
       </div>
-    </div>`;
+    </div>`; });
 }
 
 // 8. ── DATABASE MUTATIONS ──
-window.publishFeature = async () => {
+
+// Publishing and saving upload files first, which can take several seconds. The
+// buttons stayed live meanwhile, so a second click published a duplicate; and a
+// failed upload was an unhandled rejection that left the modal silently stuck.
+let featureSaving = false;
+async function runSaving(buttonSelector, busyLabel, task) {
+  if (featureSaving) return;
+  const btn = document.querySelector(buttonSelector);
+  const label = btn ? btn.innerHTML : '';
+  featureSaving = true;
+  if (btn) { btn.disabled = true; btn.textContent = busyLabel; }
+  try {
+    await task();
+  } catch (err) {
+    console.error(err);
+    alert('Something went wrong: ' + (err && err.message ? err.message : 'please try again.'));
+  } finally {
+    featureSaving = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+  }
+}
+
+// The Bulletin keeps its own copy of a pinned feature's title and text.
+async function syncPinnedCopy(id, fields) {
+  try {
+    const snap = await get(ref(db, 'bulletin'));
+    const entries = Object.entries(snap.val() || {}).filter(([, v]) => v.originalId === id && v.type === 'weekly');
+    await Promise.all(entries.map(([key]) => fields ? update(ref(db, `bulletin/${key}`), fields) : remove(ref(db, `bulletin/${key}`))));
+  } catch (err) {
+    console.warn('Could not update the Bulletin copy of this feature:', err);
+  }
+}
+
+window.publishFeature = () => runSaving('#publishModal .btn-full', 'Publishing…', publishFeatureTask);
+
+async function publishFeatureTask() {
   if (!currentUser) return alert("Please log in to post.");
 
   try {
@@ -760,7 +838,7 @@ window.publishFeature = async () => {
 
   const name = getDisplayName(currentUser);
 
-  set(push(ref(db, 'features')), {
+  await set(push(ref(db, 'features')), {
     title, subtitle, tag,
     richText: true,
     contentHtml,
@@ -774,21 +852,19 @@ window.publishFeature = async () => {
     postedAt: Date.now(),
     likes: 0,
     dislikes: 0
-  }).then(() => {
-    document.getElementById('pubTitle').value = '';
-    document.getElementById('pubSubtitle').value = '';
-    document.getElementById('pubTag').value = '';
-    pubCoverFile = null;
-    pubDocs = [];
-    window.renderCoverPreview('pub');
-    window.renderPreviews('pub', 'doc');
-    pubQuill.setContents([]);
-    document.getElementById('wordCount').textContent = '0 words';
-    window.closeModal('publishModal');
-  }).catch(error => {
-    alert("Publish failed: " + error.message);
   });
-};
+
+  document.getElementById('pubTitle').value = '';
+  document.getElementById('pubSubtitle').value = '';
+  document.getElementById('pubTag').value = '';
+  pubCoverFile = null;
+  pubDocs = [];
+  window.renderCoverPreview('pub');
+  window.renderPreviews('pub', 'doc');
+  pubQuill.setContents([]);
+  document.getElementById('wordCount').textContent = '0 words';
+  window.closeModal('publishModal');
+}
 
 window.reactFeature = (id, type) => {
   if (!currentUser) return alert("Please log in to react.");
@@ -798,8 +874,8 @@ window.reactFeature = (id, type) => {
   const uid = currentUser.uid;
   const wasLiked = !!(f.userLikes && f.userLikes[uid]);
   const wasDisliked = !!(f.userDislikes && f.userDislikes[uid]);
-  let likes = f.likes || 0;
-  let dislikes = f.dislikes || 0;
+  let likes = likeCount(f);
+  let dislikes = dislikeCount(f);
 
   const postRef = ref(db, `features/${id}`);
   const updates = {};
@@ -842,29 +918,43 @@ window.openReactions = (id) => {
     ? list.map(r => `
         <div class="reaction-row">
           ${profileAvatarHtml(r.uid, "div", "avatar-sm", "", escHtml(r.initials), { role: r.role || "member" })}
-          ${escHtml(r.name)}<span class="reaction-type">${r.type}</span>
+          ${escHtml(r.name)}<span class="reaction-type">${escHtml(r.type)}</span>
         </div>`).join("")
-    : '<p style="color:#9ca3af;font-size:14px;padding:12px 0">No reactions yet.</p>';
+    : '<p style="color:var(--text-muted);font-size:14px;padding:12px 0">No reactions yet.</p>';
   document.getElementById('reactionsList').innerHTML = html;
   window.openModal('reactionsModal');
 };
 
-window.postComment = (featureId) => {
+let commentSaving = false;
+window.postComment = async (featureId) => {
   if (!currentUser) return alert("Please log in to comment.");
   const input = document.getElementById('newCommentInput');
-  if (!input || !input.value.trim()) return;
+  if (!input || !input.value.trim() || commentSaving) return;
   const name = getDisplayName(currentUser);
-  set(push(ref(db, `features/${featureId}/comments`)), {
-    author: name,
-    initials: name.substring(0, 2).toUpperCase(),
-    authorId: currentUser.uid,
-    authorRole: userRole,
-    text: input.value.trim(),
-    postedAt: Date.now(),
-    likes: 0,
-    liked: false
-  });
+  const text = input.value.trim();
+  // Cleared before the write (which re-renders the article, keeping typed text);
+  // put back if the write fails, so the comment is never silently lost.
   input.value = '';
+  commentSaving = true;
+  try {
+    await set(push(ref(db, `features/${featureId}/comments`)), {
+      author: name,
+      initials: name.substring(0, 2).toUpperCase(),
+      authorId: currentUser.uid,
+      authorRole: userRole,
+      text,
+      postedAt: Date.now(),
+      likes: 0,
+      liked: false
+    });
+  } catch (err) {
+    console.error('Post comment failed:', err);
+    const box = document.getElementById('newCommentInput');
+    if (box && !box.value) box.value = text;
+    alert('Your comment could not be posted. Please try again.');
+  } finally {
+    commentSaving = false;
+  }
 };
 
 window.likeComment = async (featureId, commentId) => {
@@ -877,9 +967,14 @@ window.likeComment = async (featureId, commentId) => {
   if (hasLiked) { await remove(likeRef); } else { await set(likeRef, true); }
 };
 
-window.deleteComment = (featureId, commentId) => {
-  if (confirm("Delete this comment?"))
-    remove(ref(db, `features/${featureId}/comments/${commentId}`));
+window.deleteComment = async (featureId, commentId) => {
+  if (!confirm("Delete this comment?")) return;
+  try {
+    await remove(ref(db, `features/${featureId}/comments/${commentId}`));
+  } catch (err) {
+    console.error('Delete comment failed:', err);
+    alert('This comment could not be deleted. Please try again.');
+  }
 };
 
 window.openEditModal = async () => {
@@ -915,7 +1010,9 @@ window.openEditModal = async () => {
   window.openModal('editModal');
 };
 
-window.saveEdit = async () => {
+window.saveEdit = () => runSaving('#editModal .btn-full', 'Saving…', saveEditTask);
+
+async function saveEditTask() {
   const f = features.find(x => x.id === currentFeatureId); if (!f) return;
 
   const contentHtml = editQuill.root.innerHTML;
@@ -955,19 +1052,28 @@ window.saveEdit = async () => {
   updates.fileUrl = null;
   updates.fileName = null;
 
-  update(ref(db, `features/${currentFeatureId}`), updates).then(() => {
-    editCoverFile = null;
-    editCoverRemoved = false;
-    editDocs = [];
-    window.closeModal('editModal');
-  });
-};
+  const id = currentFeatureId;
+  await update(ref(db, `features/${id}`), updates);
+  // A pinned copy on the Bulletin otherwise kept showing the old title and text.
+  await syncPinnedCopy(id, { title: updates.title, subtitle: updates.subtitle, body: contentText, tags: updates.tag ? [updates.tag] : [] });
+  editCoverFile = null;
+  editCoverRemoved = false;
+  editDocs = [];
+  window.closeModal('editModal');
+}
 
 window.deleteFeature = async () => {
-  if (currentFeatureId) {
-    await softDelete('features', currentFeatureId);
+  if (!currentFeatureId) return;
+  const id = currentFeatureId;
+  try {
+    // Unpin first, or the Bulletin keeps a card that leads nowhere.
+    await syncPinnedCopy(id, null);
+    await softDelete('features', id);
     window.closeModal('confirmModal');
-    window.showList();
+    window.showList({ history: 'replace' });
+  } catch (err) {
+    console.error('Delete feature failed:', err);
+    alert('This feature could not be deleted. Please try again.');
   }
 };
 

@@ -5,8 +5,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account action – The Economic Forum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styleFolder/auth.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+  <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
 </head>
 
 <body class="auth-body">
@@ -72,8 +77,19 @@
           );
         })
         .catch((err) => {
-          subtitle.textContent = "Verification failed";
-          setFeedback(err.message, "error");
+          // A used or expired code is the common case: email scanners and
+          // double-clicks open the link more than once, so the address is
+          // often already verified by the time this runs.
+          if (err && (err.code === "auth/invalid-action-code" || err.code === "auth/expired-action-code")) {
+            subtitle.textContent = "Link already used or expired";
+            setFeedback(
+              "If you already opened this link, your email is verified and you can sign in once the Exec Board approves your account. Otherwise, try signing in and we will email you a new link.",
+              "error"
+            );
+          } else {
+            subtitle.textContent = "Verification failed";
+            setFeedback("We couldn't verify your email right now. Please try the link again in a minute.", "error");
+          }
         });
     } else if (mode === "resetPassword" && oobCode) {
       subtitle.textContent = "Choose a new password";
@@ -106,7 +122,14 @@
                 "success"
               );
             } catch (err) {
-              setFeedback(err.message, "error");
+              const code = err && err.code;
+              setFeedback(
+                code === "auth/weak-password" ? "That password is too weak. Please choose a longer one." :
+                (code === "auth/expired-action-code" || code === "auth/invalid-action-code")
+                  ? "This reset link has expired or was already used. Request a new one from the sign-in page."
+                  : "Could not update your password. Please try again.",
+                "error"
+              );
               submitBtn.disabled = false;
             }
           });

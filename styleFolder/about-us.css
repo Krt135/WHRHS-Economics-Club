@@ -163,9 +163,9 @@
   }
 
   .social-name { font-size: 15px; font-weight: 600; color: var(--navy); line-height: 1.2; }
-  .social-handle { font-size: 13px; color: var(--gold); font-weight: 300; }
+  .social-handle { font-size: 13px; color: var(--gold-text); font-weight: 300; }
 
-  .social-ext { color: #9ca3af; }
+  .social-ext { color: var(--text-muted); }
 
   .social-note {
     font-family: 'Space Mono', monospace;
@@ -200,7 +200,7 @@
     color: var(--navy);
     margin-bottom: 10px;
   }
-  .tier-card.exec .tier-name { color: var(--gold); }
+  .tier-card.exec .tier-name { color: var(--gold-text); }
 
   .tier-desc {
     font-size: 14px;
@@ -253,7 +253,7 @@
   .exec-role {
     font-family: 'Space Mono', monospace;
     font-size: 11px;
-    color: var(--gold);
+    color: var(--gold-text);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;

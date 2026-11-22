@@ -6,6 +6,7 @@ import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 import { validateImageFile, validateDocFile } from './upload-validation.js';
+import { preserveInputs } from './preserve-inputs.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -57,12 +58,14 @@ function quillImageHandler() {
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
+    const invalid = validateImageFile(file);
+    if (invalid) { alert(invalid); return; }
 
     const editor = this.quill;
     const range = editor.getSelection(true);
 
     try {
-      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name}`);
+      const imgRef = storageRef(storage, `inline_images/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
       const snapshot = await uploadBytes(imgRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -129,7 +132,9 @@ onAuthStateChanged(auth, async (user) => {
     userRole = "public";
     userProfile = null;
   }
-  if (currentId) renderLesson(); else renderList();
+  // Sign-in can finish before the posts load. Rendering a missing item fell back
+  // to the list and dropped the link, so leave that case to the data listener.
+  if (currentId) { if (lessons[currentId]) renderLesson(); } else renderList();
 });
 
 function getDisplayName(user) {
@@ -144,10 +149,17 @@ function getDisplayName(user) {
 const ICONS = { macro: "📊", micro: "🏪", trade: "🌍", money: "💵", markets: "📈", policy: "🏛️" };
 function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function rel(ts) {
+  if (!ts) return "just now";
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
-  if (s < 86400) return Math.floor(s / 3600) + " hours ago"; return Math.floor(s / 86400) + " days ago";
+  const n = s < 86400 ? Math.floor(s / 3600) : Math.floor(s / 86400);
+  return `${n} ${s < 86400 ? "hour" : "day"}${n === 1 ? "" : "s"} ago`;
 }
+
+// Counts come from the per-user maps when present: the stored counters drift
+// when two people react at the same moment.
+function likeCount(l) { return l.userLikes ? Object.keys(l.userLikes).length : (l.likes || 0); }
+function dislikeCount(l) { return l.userDislikes ? Object.keys(l.userDislikes).length : (l.dislikes || 0); }
 function wdCt(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
 
 function myLiked(l) { return !!(currentUser && l.userLikes && l.userLikes[currentUser.uid]); }
@@ -158,7 +170,25 @@ function myDisliked(l) { return !!(currentUser && l.userDislikes && l.userDislik
 // ─────────────────────────────────────────────
 
 let lessons = {};
-let currentId = null;
+// A lesson can be opened by link (the-academy.html?lesson=<id>) or handed over via
+// sessionStorage (profile activity). There was previously no way to link to one.
+let currentId = new URLSearchParams(window.location.search).get("lesson")
+  || sessionStorage.getItem("openLesson") || null;
+
+// Keeps the address bar in step with the open lesson so Back returns to the list.
+function syncLessonUrl(id, mode) {
+  if (mode === 'none') return;
+  const params = new URLSearchParams(window.location.search);
+  if ((params.get('lesson') || null) === (id || null)) return;
+  const url = id ? `${window.location.pathname}?lesson=${encodeURIComponent(id)}` : window.location.pathname;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](id ? { lesson: id } : {}, '', url);
+}
+
+window.addEventListener('popstate', () => {
+  const id = new URLSearchParams(window.location.search).get('lesson');
+  if (id && lessons[id]) showLesson(id, { history: 'none' });
+  else showList({ history: 'none' });
+});
 let topicFilter = "all";
 let levelFilter = "all";
 let sortMode = "newest";
@@ -265,7 +295,7 @@ function renderPreviews(type, category) {
     const name = item instanceof File ? item.name : (item.name || 'File');
     return `
       <div style="display:flex; align-items:center; gap:6px; padding:6px 10px; background:#f3ede0; border:1px solid #d9c9a3; border-radius:20px; font-size:12px; color:#5a4a32;">
-        <span>📄 ${name}</span>
+        <span>📄 ${esc(name)}</span>
         <button type="button" onclick="window.removeFile(${index}, '${type}', '${category}')"
           style="background:none; border:none; cursor:pointer; color:#a04040; font-weight:bold; padding:0; line-height:1;">✕</button>
       </div>`;
@@ -285,8 +315,17 @@ function removeFile(index, type, category) {
 onValue(ref(db, "lessons"), snapshot => {
   lessons = snapshot.val() || {};
   if (currentId) {
-    if (lessons[currentId]) renderLesson();
-    else showList();
+    if (lessons[currentId]) {
+      sessionStorage.removeItem("openLesson");
+      // Only switch views here; showLesson() would also reset quiz progress,
+      // and this runs on every like or comment from anyone.
+      document.getElementById("viewList").classList.remove("active");
+      document.getElementById("viewLesson").classList.add("active");
+      syncLessonUrl(currentId, 'replace');
+      renderLesson();
+    } else {
+      showList({ history: 'replace' });
+    }
   } else { renderList(); }
 });
 
@@ -294,7 +333,16 @@ onValue(ref(db, "lessons"), snapshot => {
 //  MODAL HELPERS
 // ─────────────────────────────────────────────
 
-function openModal(id) { document.getElementById(id).classList.add("open"); }
+async function openModal(id) {
+  if (id === "createModal") {
+    if (!auth.currentUser && typeof auth.authStateReady === "function") await auth.authStateReady();
+    if (!auth.currentUser) {
+      if (confirm("You need to sign in to create a lesson. Go to the sign-in page?")) window.location.href = "auth.html";
+      return;
+    }
+  }
+  document.getElementById(id).classList.add("open");
+}
 function closeModal(id) { document.getElementById(id).classList.remove("open"); }
 document.querySelectorAll(".modal-overlay").forEach(o =>
   o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); })
@@ -304,18 +352,22 @@ document.querySelectorAll(".modal-overlay").forEach(o =>
 //  VIEWS
 // ─────────────────────────────────────────────
 
-function showList() {
+function showList({ history: historyMode = 'push' } = {}) {
   currentId = null; quizState = {};
+  syncLessonUrl(null, historyMode);
   document.getElementById("viewList").classList.add("active");
   document.getElementById("viewLesson").classList.remove("active");
   renderList();
 }
 
-function showLesson(firebaseKey) {
+function showLesson(firebaseKey, { history: historyMode = 'push' } = {}) {
+  const switching = currentId !== firebaseKey;
   currentId = firebaseKey; quizState = {};
+  syncLessonUrl(firebaseKey, historyMode);
   document.getElementById("viewList").classList.remove("active");
   document.getElementById("viewLesson").classList.add("active");
   renderLesson();
+  if (switching) window.scrollTo(0, 0);
 }
 
 // ─────────────────────────────────────────────
@@ -344,13 +396,13 @@ function renderList() {
   if (topicFilter !== "all") items = items.filter(l => l.topic === topicFilter);
   if (levelFilter !== "all") items = items.filter(l => l.level === levelFilter);
   if (q) items = items.filter(l =>
-    l.title.toLowerCase().includes(q) ||
-    l.topic.includes(q) ||
-    l.level.toLowerCase().includes(q) ||
-    (l.desc || "").toLowerCase().includes(q)
+    String(l.title || "").toLowerCase().includes(q) ||
+    String(l.topic || "").toLowerCase().includes(q) ||
+    String(l.level || "").toLowerCase().includes(q) ||
+    String(l.desc || "").toLowerCase().includes(q)
   );
   if (sortMode === "oldest") items.sort((a, b) => a.postedAt - b.postedAt);
-  else if (sortMode === "popular") items.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+  else if (sortMode === "popular") items.sort((a, b) => likeCount(b) - likeCount(a));
   else items.sort((a, b) => b.postedAt - a.postedAt);
 
   const el = document.getElementById("lessonsList");
@@ -368,11 +420,11 @@ function renderList() {
     const readMin = Math.max(1, Math.round(wdCt(rawText) / 130));
     const commentCount = l.comments ? Object.keys(l.comments).length : 0;
     return `
-    <div class="lesson-card" onclick="showLesson('${l._key}')">
+    <div class="lesson-card" role="link" tabindex="0" onclick="showLesson('${l._key}')">
       <div class="lc-top">
         <div class="lc-icon" style="background:${iconBg}">${esc(l.icon || ICONS[l.topic] || "📚")}</div>
         <div class="lc-badges">
-          <span class="level-badge ${l.level.toLowerCase()}">${esc(l.level)}</span>
+          <span class="level-badge ${esc(String(l.level || "").toLowerCase())}">${esc(l.level)}</span>
           <span class="topic-badge">${esc(l.topic)}</span>
         </div>
       </div>
@@ -447,7 +499,7 @@ function renderLesson() {
         <div class="quiz-body">
           <div class="quiz-q">${esc(q.q)}</div>
           <div class="quiz-options">
-            ${(q.opts || []).map((o, i) => { let cls = "quiz-opt"; if (answered) cls += i === q.correct ? " correct" : i === chosen ? " wrong" : " dimmed"; return `<button class="${cls}" ${answered ? "disabled" : ""} onclick="answerQuiz(${i})">${esc(o)}</button>`; }).join("")}
+            ${(q.opts || []).map((o, i) => { if (!String(o || "").trim()) return ""; let cls = "quiz-opt"; if (answered) cls += i === q.correct ? " correct" : i === chosen ? " wrong" : " dimmed"; return `<button class="${cls}" ${answered ? "disabled" : ""} onclick="answerQuiz(${i})">${esc(o)}</button>`; }).join("")}
           </div>
           <div class="quiz-feedback ${answered ? "visible" : ""}">
             <strong>${answered && chosen === q.correct ? "✓ Correct! " : "✗ Not quite. "}</strong>
@@ -496,7 +548,7 @@ function renderLesson() {
           </div>
         </div>`;
     }).join("")
-    : `<p style="font-style:italic;color:#9ca3af;font-size:15px">No comments yet — ask a question or leave a thought!</p>`;
+    : `<p style="font-style:italic;color:var(--text-muted);font-size:15px">No comments yet — ask a question or leave a thought!</p>`;
 
   document.getElementById("lessonTopActions").innerHTML = `
   ${canEdit ? `
@@ -510,8 +562,10 @@ function renderLesson() {
 
   const concepts = Array.isArray(l.concepts) ? l.concepts : [];
 
-document.getElementById("lessonBody").innerHTML = `
-    <div class="lesson-eyebrow">THE ACADEMY · ${esc(l.topic.toUpperCase())} · <span class="level-badge ${l.level.toLowerCase()}">${esc(l.level)}</span></div>
+const lessonBodyEl = document.getElementById("lessonBody");
+  // Re-rendered on every database change: keep what the reader is typing.
+  preserveInputs(lessonBodyEl, () => { lessonBodyEl.innerHTML = `
+    <div class="lesson-eyebrow">THE ACADEMY · ${esc(String(l.topic || "lesson").toUpperCase())} · <span class="level-badge ${esc(String(l.level || "").toLowerCase())}">${esc(l.level)}</span></div>
     <div class="lesson-hero-icon">${esc(l.icon || ICONS[l.topic] || "📚")}</div>
     <div class="lesson-title">${esc(l.title)}</div>
     <div class="lesson-meta-row">
@@ -531,10 +585,10 @@ document.getElementById("lessonBody").innerHTML = `
     ${quizHtml}
     <div class="lesson-reaction">
       <button class="react-btn ${iLiked ? "liked" : ""}" onclick="reactLesson('like')">
-        👍 Helpful (${l.likes || 0})
+        👍 Helpful (${likeCount(l)})
       </button>
       <button class="react-btn ${iDisliked ? "disliked" : ""}" onclick="reactLesson('dislike')">
-        👎 Not Helpful (${l.dislikes || 0})
+        👎 Not Helpful (${dislikeCount(l)})
       </button>
     </div>
     <div class="comments-area">
@@ -544,14 +598,36 @@ document.getElementById("lessonBody").innerHTML = `
         <textarea class="new-comment-input" id="cmtInput" placeholder="Ask a question or leave a comment..."></textarea>
         <button class="btn-post-cmt" onclick="postComment()">Post</button>
       </div>
-    </div>`;
+    </div>`; });
 }
 
 // ─────────────────────────────────────────────
 //  PUBLISH LESSON
 // ─────────────────────────────────────────────
 
-async function publishLesson() {
+// Uploads can take seconds; a second click used to publish a duplicate, and a
+// failed upload was an unhandled rejection that left the modal silently stuck.
+let lessonSaving = false;
+async function runSaving(buttonSelector, busyLabel, task) {
+  if (lessonSaving) return;
+  const btn = document.querySelector(buttonSelector);
+  const label = btn ? btn.innerHTML : "";
+  lessonSaving = true;
+  if (btn) { btn.disabled = true; btn.textContent = busyLabel; }
+  try {
+    await task();
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong: " + (err && err.message ? err.message : "please try again."));
+  } finally {
+    lessonSaving = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+  }
+}
+
+function publishLesson() { return runSaving("#createModal .btn-full", "Publishing…", publishLessonTask); }
+
+async function publishLessonTask() {
   if (!currentUser) return alert("Please log in to post.");
 
   const title = document.getElementById("cTitle").value.trim();
@@ -564,7 +640,17 @@ async function publishLesson() {
   const name = getDisplayName(currentUser);
   const initials = name.substring(0, 2).toUpperCase();
   const concepts = document.getElementById("cConcepts").value.split("\n").map(s => s.trim()).filter(Boolean);
-  const validQuiz = qbQuestions.filter(q => q.q && q.opts.filter(Boolean).length >= 2);
+  // Drop blank options (they rendered as empty answer buttons) and remap the
+  // correct-answer index to the options that remain.
+  const validQuiz = [];
+  for (const [n, q] of qbQuestions.entries()) {
+    const kept = q.opts.map((o, i) => ({ o: String(o || '').trim(), i })).filter(x => x.o);
+    const text = String(q.q || '').trim();
+    if (!text || kept.length < 2) continue;
+    const correct = kept.findIndex(x => x.i === q.correct);
+    if (correct < 0) { alert(`Question ${n + 1}: the option marked correct is empty. Pick a filled-in option.`); return; }
+    validQuiz.push({ q: text, opts: kept.map(x => x.o), correct, exp: String(q.exp || '').trim() });
+  }
 
   const imgFile = createCoverFile;
 
@@ -610,7 +696,7 @@ async function publishLesson() {
 
 function openEditModal() {
   const l = lessons[currentId]; if (!l) return;
-  document.getElementById("eTitle").value = l.title;
+  document.getElementById("eTitle").value = l.title || "";
   document.getElementById("eTopic").value = l.topic;
   document.getElementById("eLevel").value = l.level;
   document.getElementById("eIcon").value = l.icon || "";
@@ -634,7 +720,9 @@ function openEditModal() {
   openModal("editModal");
 }
 
-async function saveEdit() {
+function saveEdit() { return runSaving("#editModal .btn-full", "Saving…", saveEditTask); }
+
+async function saveEditTask() {
   const l = lessons[currentId]; if (!l) return;
 
   const contentHtml = eQuill.root.innerHTML;
@@ -688,8 +776,15 @@ async function saveEdit() {
 }
 
 async function deleteLesson() {
-  await softDelete('lessons', currentId);
-  closeModal("confirmModal"); showList();
+  if (!currentId) return;
+  try {
+    await softDelete('lessons', currentId);
+    closeModal("confirmModal");
+    showList({ history: 'replace' });
+  } catch (err) {
+    console.error("Delete lesson failed:", err);
+    alert("This lesson could not be deleted. Please try again.");
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -703,8 +798,8 @@ async function reactLesson(type) {
   const uid = currentUser.uid;
   const wasLiked = !!(l.userLikes && l.userLikes[uid]);
   const wasDisliked = !!(l.userDislikes && l.userDislikes[uid]);
-  let likes = l.likes || 0;
-  let dislikes = l.dislikes || 0;
+  let likes = likeCount(l);
+  let dislikes = dislikeCount(l);
 
   const lessonRef = ref(db, `lessons/${currentId}`);
   const updates = {};
@@ -738,18 +833,30 @@ async function reactLesson(type) {
 //  COMMENTS
 // ─────────────────────────────────────────────
 
+let commentSaving = false;
 async function postComment() {
   if (!currentUser) return alert("Please log in to comment.");
   const inp = document.getElementById("cmtInput");
-  if (!inp || !inp.value.trim()) return;
+  if (!inp || !inp.value.trim() || commentSaving) return;
   const name = getDisplayName(currentUser);
-  const cmtRef = push(ref(db, `lessons/${currentId}/comments`));
-  await set(cmtRef, {
-    author: name, initials: name.substring(0, 2).toUpperCase(),
-    authorId: currentUser.uid, authorRole: userRole, text: inp.value.trim(),
-    postedAt: Date.now(), likes: 0, liked: false
-  });
+  const text = inp.value.trim();
+  // Cleared before the write (which re-renders, keeping typed text); restored on failure.
   inp.value = "";
+  commentSaving = true;
+  try {
+    await set(push(ref(db, `lessons/${currentId}/comments`)), {
+      author: name, initials: name.substring(0, 2).toUpperCase(),
+      authorId: currentUser.uid, authorRole: userRole, text,
+      postedAt: Date.now(), likes: 0, liked: false
+    });
+  } catch (err) {
+    console.error("Post comment failed:", err);
+    const box = document.getElementById("cmtInput");
+    if (box && !box.value) box.value = text;
+    alert("Your comment could not be posted. Please try again.");
+  } finally {
+    commentSaving = false;
+  }
 }
 
 async function likeComment(lessonKey, commentKey) {
@@ -764,7 +871,13 @@ async function likeComment(lessonKey, commentKey) {
 }
 
 async function deleteComment(lessonKey, commentKey) {
-  if (confirm("Delete this comment?")) await remove(ref(db, `lessons/${lessonKey}/comments/${commentKey}`));
+  if (!confirm("Delete this comment?")) return;
+  try {
+    await remove(ref(db, `lessons/${lessonKey}/comments/${commentKey}`));
+  } catch (err) {
+    console.error("Delete comment failed:", err);
+    alert("This comment could not be deleted. Please try again.");
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -797,6 +910,11 @@ function retryQuiz() {
 //  QUIZ BUILDER
 // ─────────────────────────────────────────────
 
+// The builder inputs used inline handlers that wrote to qbQuestions directly, but
+// it is module-scoped (not global), so every keystroke threw and no quiz was ever saved.
+function setQuizField(qi, field, value) { if (qbQuestions[qi]) qbQuestions[qi][field] = value; }
+function setQuizOption(qi, oi, value) { if (qbQuestions[qi]) qbQuestions[qi].opts[oi] = value; }
+
 function addQuizQuestion() { qbQuestions.push({ q: "", opts: ["", "", "", ""], correct: 0, exp: "" }); renderQuizBuilder(); }
 
 function renderQuizBuilder() {
@@ -804,16 +922,16 @@ function renderQuizBuilder() {
   el.innerHTML = qbQuestions.map((qq, qi) => `
     <div class="qb-question">
       <div class="qb-q-label">Question ${qi + 1}</div>
-      <input class="form-input" style="margin-bottom:8px;font-size:14px" placeholder="Question text..." value="${esc(qq.q)}" oninput="qbQuestions[${qi}].q=this.value">
+      <input class="form-input" style="margin-bottom:8px;font-size:14px" placeholder="Question text..." value="${esc(qq.q)}" oninput="setQuizField(${qi}, 'q', this.value)">
       <div class="qb-opts">
         ${qq.opts.map((o, oi) => `
           <div class="qb-opt-row">
-            <input class="qb-opt-input" placeholder="Option ${oi + 1}" value="${esc(o)}" oninput="qbQuestions[${qi}].opts[${oi}]=this.value">
-            <input type="radio" class="qb-correct-radio" name="correct_${qi}" ${qq.correct === oi ? "checked" : ""} onchange="qbQuestions[${qi}].correct=${oi}" title="Mark as correct">
+            <input class="qb-opt-input" placeholder="Option ${oi + 1}" value="${esc(o)}" oninput="setQuizOption(${qi}, ${oi}, this.value)">
+            <input type="radio" class="qb-correct-radio" name="correct_${qi}" ${qq.correct === oi ? "checked" : ""} onchange="setQuizField(${qi}, 'correct', ${oi})" title="Mark as correct">
             <span class="qb-correct-label">✓ correct</span>
           </div>`).join("")}
       </div>
-      <input class="form-input" style="margin-top:8px;font-size:13px" placeholder="Explanation (shown after answering)..." value="${esc(qq.exp)}" oninput="qbQuestions[${qi}].exp=this.value">
+      <input class="form-input" style="margin-top:8px;font-size:13px" placeholder="Explanation (shown after answering)..." value="${esc(qq.exp)}" oninput="setQuizField(${qi}, 'exp', this.value)">
     </div>`).join("");
 }
 
@@ -826,7 +944,7 @@ Object.assign(window, {
   setTopicFilter, setLevelFilter,
   publishLesson, openEditModal, saveEdit, deleteLesson,
   reactLesson, postComment, likeComment, deleteComment,
-  answerQuiz, nextQuiz, retryQuiz, addQuizQuestion, renderQuizBuilder,
+  answerQuiz, nextQuiz, retryQuiz, addQuizQuestion, renderQuizBuilder, setQuizField, setQuizOption,
   handleCoverFile, renderCoverPreview, removeCoverImage,
   handleMultipleFiles, renderPreviews, removeFile,
 });
