@@ -4,10 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - The Economic Forum</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styleFolder/style.css">
     <link rel="stylesheet" href="styleFolder/admin.css">
-    <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+    <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js">
     <script src="scriptFolder/footer.js" defer></script>
+    <script src="scriptFolder/page-loader.js" defer></script>
+    <script src="scriptFolder/ui-enhance.js" defer></script>
     <script type="module" src="scriptFolder/sidebar.js" defer></script>
     <script type="module" src="scriptFolder/announcement.js"></script>
 </head>
@@ -36,7 +44,7 @@
             </div>
 
             <div id="tab-content" class="tab-pane">
-                <div class="loading-state">Loading records...</div>
+                <div class="loading-state"><span class="loading-spinner"></span> Loading records...</div>
             </div>
         </section>
     </main>
@@ -77,6 +85,66 @@
             <div class="form-hint" id="apError" style="display:none; color:var(--red);"></div>
 
             <button class="btn-full" id="apConfirmBtn">Add Points</button>
+        </div>
+    </div>
+
+    <!-- ── EDIT ACCOUNT MODAL ── -->
+    <div class="modal-overlay" id="editAccountModal">
+        <div class="modal">
+            <button class="modal-close" id="closeEditAccountModal" aria-label="Close">×</button>
+            <div class="modal-title">Edit Account</div>
+            <div class="modal-subtitle" id="eaSubtitle"></div>
+
+            <div class="ea-facts" id="eaFacts"></div>
+
+            <div class="form-group">
+                <label class="form-label" for="eaName">Display Name</label>
+                <input class="form-input" id="eaName" type="text" autocomplete="off">
+                <div class="form-hint">Shows immediately on the leaderboard, points history and member lists. Older posts keep the name they were published under.</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="eaEmail">Login Email</label>
+                <input class="form-input" id="eaEmail" type="text" disabled>
+                <div class="form-hint">Can't be changed here: it is tied to this person's sign-in account.</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="eaSecondary">Secondary Email</label>
+                <input class="form-input" id="eaSecondary" type="email" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="eaPhone">Phone</label>
+                <input class="form-input" id="eaPhone" type="tel" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="eaBio">Bio</label>
+                <textarea class="form-textarea" id="eaBio"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="eaRole">Role</label>
+                    <select class="form-input" id="eaRole"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="eaStatus">Status</label>
+                    <select class="form-input" id="eaStatus"></select>
+                </div>
+            </div>
+            <div class="form-hint" id="eaSelfNote" hidden>You can't change your own role or status.</div>
+
+            <details class="ea-merge" id="eaMerge">
+                <summary>Merging a duplicate? Compare accounts</summary>
+                <p class="ea-merge-help">Accounts can't be merged automatically. To combine two by hand: give the duplicate's points to the main account, ask the person to sign in with the main one, then remove the duplicate.</p>
+                <div class="ea-dup-heading" id="eaDupHeading" hidden>POSSIBLE DUPLICATES</div>
+                <div id="eaDupList"></div>
+                <div class="form-group">
+                    <label class="form-label" for="eaCompareSelect">Compare with another account</label>
+                    <select class="form-input" id="eaCompareSelect"></select>
+                </div>
+                <div id="eaManualCard"></div>
+            </details>
+
+            <div class="form-hint" id="eaError" style="display:none; color:var(--red);"></div>
+            <button class="btn-full" id="eaSaveBtn">Save Changes</button>
         </div>
     </div>
 

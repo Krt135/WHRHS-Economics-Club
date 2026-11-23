@@ -11,9 +11,15 @@
     rel="stylesheet">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/points.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+  <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
   <script src="scriptFolder/footer.js" defer></script>
+  <script src="scriptFolder/page-loader.js" defer></script>
+  <script src="scriptFolder/ui-enhance.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/points.js" defer></script>
   <script type="module" src="scriptFolder/announcement.js"></script>
@@ -41,8 +47,7 @@
             <div class="mpc-total" id="myTotalPoints">—</div>
           </div>
           <div class="mpc-actions">
-            <button class="btn-secondary" id="viewMyHistoryBtn">View My History</button>
-            <button class="btn-publish" id="requestPointsBtn">Request Points</button>
+            <button class="btn-publish" id="viewMyHistoryBtn">View My History</button>
           </div>
         </div>
 
@@ -56,9 +61,17 @@
         <div class="board-card">
           <div class="board-title">🏆 Engagement Leaderboard</div>
           <div class="board-sub">Current accumulated points. There is no weekly leaderboard, and points do not reset automatically.</div>
-          <div id="leaderboardList">
-            <div class="loading-state">Loading leaderboard…</div>
+          <div class="board-tools">
+            <div class="lb-search">
+              <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-input" id="lbSearch" type="search" placeholder="Find a member…" aria-label="Find a member" autocomplete="off">
+            </div>
+            <div class="lb-count" id="lbCount" aria-live="polite"></div>
           </div>
+          <div id="leaderboardList">
+            <div class="loading-state"><span class="loading-spinner"></span> Loading leaderboard…</div>
+          </div>
+          <button class="lb-toggle" id="lbToggle" type="button" aria-expanded="false" hidden>Show all members</button>
         </div>
       </div>
       <tef-footer></tef-footer>
@@ -83,56 +96,6 @@
     </div>
 
   </main>
-
-  <!-- ── REQUEST POINTS MODAL ── -->
-  <div class="modal-overlay" id="requestModal">
-    <div class="modal">
-      <button class="modal-close" id="closeRequestModal">×</button>
-      <div class="modal-title">Request Points</div>
-      <div class="modal-subtitle">Submitting a request does not award points automatically — an admin will review it.</div>
-
-      <div class="form-group">
-        <label class="form-label">Activity</label>
-        <select class="form-input" id="reqActivity">
-          <option value="">Select an activity…</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Credit Level</label>
-        <select class="form-input" id="reqOption" disabled>
-          <option value="">Select an activity first…</option>
-        </select>
-        <div class="form-hint" id="reqOptionRequirements"></div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Date of Activity</label>
-        <input class="form-input" id="reqDate" type="date">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <textarea class="form-textarea reqDescriptionArea" id="reqDescription" placeholder="Briefly describe what you did…"></textarea>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Evidence (Optional)</label>
-        <div class="upload-btn" id="reqEvidenceTrigger">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-          </svg>
-          Attach a screenshot or file (image or PDF, max 8MB)
-        </div>
-        <input type="file" id="reqEvidenceFile" style="display:none;" accept="image/*,application/pdf">
-        <div id="reqEvidencePreview" class="evidence-preview" style="display:none;"></div>
-        <div class="form-hint" id="reqEvidenceError" style="display:none; color:var(--red);"></div>
-      </div>
-
-      <div class="form-hint" id="reqError" style="display:none; color:var(--red);"></div>
-      <button class="btn-full" id="submitRequestBtn">Submit Request</button>
-    </div>
-  </div>
 
   <!-- ── RULES / RUBRIC MODAL ── -->
   <div class="modal-overlay" id="rulesModal">

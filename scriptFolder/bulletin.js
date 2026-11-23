@@ -54,8 +54,9 @@ function rel(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60)    return "just now";
   if (s < 3600)  return Math.floor(s / 60)   + " min ago";
-  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
-  return Math.floor(s / 86400) + " days ago";
+  if (s < 86400) { const h = Math.floor(s / 3600); return h + (h === 1 ? " hour ago" : " hours ago"); }
+  const d = Math.floor(s / 86400);
+  return d + (d === 1 ? " day ago" : " days ago");
 }
 
 // ─────────────────────────────────────────────
@@ -64,11 +65,20 @@ function rel(ts) {
 
 let bulletinItems = [];
 
+// Where each pinned type opens, and what its card link says.
+const PIN_TARGETS = {
+  floor:       { key: "openFloorPost",   page: "the-floor.html",      label: "Read discussion" },
+  perspective: { key: "openPerspective", page: "perspectives.html",   label: "Read essay" },
+  weekly:      { key: "openFeature",     page: "weekly-feature.html", label: "Read feature" },
+};
+function pinTarget(type) { return PIN_TARGETS[type] || PIN_TARGETS.floor; }
+function pinType(type) { return PIN_TARGETS[type] ? type : "floor"; }
+
 onValue(ref(db, "bulletin"), snapshot => {
   const data = snapshot.val() || {};
   bulletinItems = Object.entries(data)
     .map(([key, val]) => ({ ...val, _key: key }))
-    .sort((a, b) => b.pinnedAt - a.pinnedAt);
+    .sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
   renderBulletin();
 });
 
@@ -95,7 +105,7 @@ function renderBulletin() {
     const tags = Array.isArray(item.tags) ? item.tags : [];
     const commentCount = item.commentCount || 0;
     return `
-    <div class="bulletin-card" style="border-left: 4px solid var(--gold, #c5a059); padding-left: 15px;" onclick="goToPost('${esc(item.originalId || item.discussionId)}', '${item.type}')">
+    <div class="bulletin-card" style="border-left: 4px solid var(--gold, #c5a059); padding-left: 15px;" onclick="goToPost('${esc(item.originalId || item.discussionId)}', '${pinType(item.type)}')">
       <div class="bc-pin-label">
         <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         PINNED BY EXEC BOARD · ${rel(item.pinnedAt)}
@@ -114,7 +124,7 @@ function renderBulletin() {
         <span>·</span>
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
         ${commentCount}
-        <span class="bc-goto">Read discussion →</span>
+        <span class="bc-goto">${pinTarget(item.type).label} →</span>
       </div>
       ${isAdmin ? `
       <div class="bc-admin-row" onclick="event.stopPropagation()">
@@ -132,18 +142,10 @@ function renderBulletin() {
 // ─────────────────────────────────────────────
 
 function goToPost(originalId, type) {
-  const targetType = type || 'floor';
-
-  if (targetType === 'perspective') {
-    sessionStorage.setItem("openPerspective", originalId);
-    window.location.href = "perspectives.html";
-  } else if (targetType === 'weekly') {
-    sessionStorage.setItem("openFeature", originalId);
-    window.location.href = "weekly-feature.html";
-  } else if (targetType === 'floor') {
-    sessionStorage.setItem("openFloorPost", originalId);
-    window.location.href = "the-floor.html";
-  }
+  // Older pins may lack a type; they were all Floor discussions.
+  const target = pinTarget(type);
+  if (originalId) sessionStorage.setItem(target.key, originalId);
+  window.location.href = target.page;
 }
 
 // ─────────────────────────────────────────────
@@ -152,7 +154,12 @@ function goToPost(originalId, type) {
 
 async function unpinPost(bulletinKey) {
   if (!confirm("Unpin this post from the Bulletin?")) return;
-  await remove(ref(db, `bulletin/${bulletinKey}`));
+  try {
+    await remove(ref(db, `bulletin/${bulletinKey}`));
+  } catch (err) {
+    console.error("Unpin failed:", err);
+    alert("This post could not be unpinned. Please try again.");
+  }
 }
 
 // ─────────────────────────────────────────────

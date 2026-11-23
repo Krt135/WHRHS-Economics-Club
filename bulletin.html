@@ -8,8 +8,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Crimson+Pro:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styleFolder/style.css">
   <link rel="stylesheet" href="styleFolder/the-floor.css">
-  <link rel="icon" type="image/png" href="images/TEF-favicon.png">
+  <link rel="icon" type="image/png" href="images/TEF-favicon-96.png">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js">
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="scriptFolder/footer.js" defer></script>
+  <script src="scriptFolder/page-loader.js" defer></script>
+  <script src="scriptFolder/ui-enhance.js" defer></script>
   <script type="module" src="scriptFolder/sidebar.js" defer></script>
   <script type="module" src="scriptFolder/bulletin.js" defer></script>
   <link rel = "stylesheet" href="styleFolder/bulletin.css">
@@ -32,7 +38,10 @@
     </div>
 
     <div class="content">
-      <div class="posts-list" id="bulletinList"></div>
+      <div class="posts-list" id="bulletinList">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
     </div>
 
     

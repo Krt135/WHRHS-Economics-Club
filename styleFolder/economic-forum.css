@@ -30,7 +30,7 @@
   font-family: 'Inter', sans-serif; /* Clean sans-serif */
   font-size: 0.75rem;
   letter-spacing: 0.15em;
-  color: #64748b;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -67,7 +67,7 @@
 }
 
 .gold {
-  color: #c1a062; /* Gold */
+  color: var(--gold-text-lg); /* large display text: 3.2:1 on cream (was 2.2:1) */
 }
 
 /* Description text - stays serif to match the image */
@@ -156,7 +156,10 @@
   overflow: hidden;
   padding: 12px 0;
   position: relative;
+  z-index: 1;
   width: 100%;
+  border-top: 3px solid var(--gold);
+  box-shadow: 0 10px 24px -12px rgba(15, 31, 61, 0.5);
 }
 
 .ticker-inner {
@@ -165,9 +168,9 @@
   animation: ticker 80s linear infinite;
 }
 
-.ticker-inner:hover {
-  animation-play-state: paused;
-  /* Optional: pauses on hover like a real news ticker */
+.ticker-wrap:hover .ticker-inner,
+.ticker-wrap:focus-within .ticker-inner {
+  animation-play-state: paused; /* hover anywhere on the bar, including the faded edges */
 }
 
 .ticker-track {
@@ -263,7 +266,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--gold);
+  color: var(--gold-text);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -271,7 +274,7 @@
 }
 
 .view-all:hover {
-  color: var(--gold-light);
+  color: var(--navy);
 }
 
 .floor-card {
@@ -288,13 +291,13 @@
   font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 15px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 /* Quick Links */
 .quick-links-card {
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 2px;
   padding: 20px;
 }
@@ -312,10 +315,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
+  padding: 12px 10px;
+  margin: 0 -10px;
   border-bottom: 1px solid #f3f4f6;
+  border-radius: 4px;
   text-decoration: none;
-  transition: opacity 0.15s;
+  transition: background-color 0.15s ease;
 }
 
 .quick-link-item:last-child {
@@ -323,7 +328,12 @@
 }
 
 .quick-link-item:hover {
-  opacity: 0.7;
+  background: var(--cream);
+}
+
+.quick-link-item:hover .ql-icon {
+  background: var(--navy);
+  color: #fff;
 }
 
 .ql-icon {
@@ -336,6 +346,7 @@
   justify-content: center;
   flex-shrink: 0;
   color: var(--navy);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .ql-name {
@@ -348,7 +359,7 @@
 .ql-sub {
   font-family: 'Space Mono', monospace;
   font-size: 9px;
-  color: var(--gold);
+  color: var(--gold-text);
   letter-spacing: 0.05em;
 }
 
@@ -359,23 +370,29 @@
     flex-direction: column;
     gap: 16px; /* Space between cards */
 }
+/* flex gap already spaces skeleton cards; the shared margin-bottom would double it up. */
+#latestFloorPosts .skeleton-card {
+    margin-bottom: 0;
+}
 
 .home-post-card {
-    background-color: #fcf6e5; /* Beige/cream background */
-    border-left: 4px solid #c9a84c; /* Gold accent border */
+    background-color: var(--gold-bg);
+    border: 1px solid #e8ddb8;
+    border-left: 4px solid var(--gold);
     padding: 20px;
     cursor: pointer;
-    transition: all 0.25s ease;
-    border-radius: 0 4px 4px 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    border-radius: 2px;
     text-align: left;
     max-width: 1100px;
 }
 
 .home-post-card:hover {
-    background-color: #f7eed5; /* Slightly darker beige on hover */
-    transform: translateX(6px); /* Nudge to the right */
-    box-shadow: 4px 4px 15px rgba(0,0,0,0.05);
+    border-color: var(--gold);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 31, 61, 0.10);
 }
+.home-post-card:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(15, 31, 61, 0.08); }
 
 /* Typography & Content Inside Cards */
 .hp-title {
@@ -400,7 +417,7 @@
     align-items: center;
     gap: 15px;
     font-size: 0.8rem;
-    color: #718096;
+    color: var(--text-muted);
     margin-bottom: 12px;
 }
 
@@ -440,6 +457,85 @@
 }
 
 
+/* ── NEW HERE? strip (signed-out visitors; shown by index.js) ── */
+.newhere {
+  background: var(--gold-bg);
+  border-bottom: 1px solid #e8ddb8;
+  border-left: 4px solid var(--gold);
+}
+.newhere[hidden] { display: none; }
+.newhere:not([hidden]) { animation: newhere-in 0.25s ease; }
+@keyframes newhere-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+.newhere-inner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px 28px;
+  padding: 18px 64px 20px;
+}
+.newhere-intro { max-width: 680px; }
+.newhere-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--navy);
+}
+.newhere-intro p {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.newhere-levels {
+  list-style: none;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.newhere-levels li {
+  background: #fff;
+  border: 1px solid #e8ddb8;
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+.lvl-name {
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin-bottom: 3px;
+}
+.lvl-name--exec { color: var(--gold-text); }
+.lvl-desc { display: block; font-size: 13.5px; line-height: 1.4; color: var(--text-muted); }
+.newhere-actions { display: flex; align-items: center; gap: 8px; }
+.newhere-actions .btn-primary { padding: 12px 30px; }
+.newhere-dismiss {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.newhere-dismiss:hover { color: var(--navy); }
+
+/* Motion-sensitive visitors get a static, wrapped list instead of a scrolling ticker. */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-inner { animation: none; width: auto; flex-wrap: wrap; justify-content: center; }
+  .ticker-track { flex-wrap: wrap; justify-content: center; }
+  .ticker-track[aria-hidden="true"] { display: none; }
+  .ticker-wrap::before, .ticker-wrap::after { display: none; }
+  .newhere:not([hidden]) { animation: none; }
+}
+
 /* ═══════════════════════════════════════════════
    MOBILE (added for mobile compatibility)
 ═══════════════════════════════════════════════ */
@@ -473,6 +569,23 @@
 
   /* ── TICKER ── */
   .ticker-item { font-size: 10px; padding: 0 14px; }
+
+  /* ── NEW HERE? ── */
+  .newhere { position: relative; }
+  .newhere-inner { grid-template-columns: 1fr; padding: 14px 16px 16px; gap: 10px; }
+  .newhere-title { font-size: 18px; padding-right: 32px; }
+  .newhere-intro { max-width: none; }
+  .newhere-intro p { font-size: 14px; line-height: 1.4; }
+  /* the three access levels become tight rows in a single box */
+  .newhere-levels { grid-template-columns: 1fr; gap: 0; background: #fff; border: 1px solid #e8ddb8; border-radius: 4px; }
+  .newhere-levels li { display: grid; grid-template-columns: 82px 1fr; gap: 8px; align-items: baseline;
+    background: transparent; border: none; border-bottom: 1px solid #e8ddb8; border-radius: 0; padding: 8px 10px; }
+  .newhere-levels li:last-child { border-bottom: none; }
+  .lvl-name { margin-bottom: 0; }
+  .lvl-desc { font-size: 13px; }
+  .newhere-actions { width: 100%; order: 3; }
+  .newhere-actions .btn-primary { flex: 1; justify-content: center; }
+  .newhere-dismiss { position: absolute; top: 8px; right: 10px; }
 
   /* ── CONTENT GRID ── */
   .content-grid {

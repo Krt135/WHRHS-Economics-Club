@@ -4,7 +4,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { profileAvatarHtml } from "./profile-link.js";
 import {
     RUBRIC, getActivity, getOption, formatOptionLabel, memberDisplayName,
-    computeAllTotals, rankLeaderboard, countActiveInWeek, todayDateStr,
+    computeAllTotals, computeMemberTotal, rankLeaderboard, countActiveInWeek, todayDateStr,
     validateActivityDate, resolveSelection, parsePointsValue, MIN_ACTIVITY_DATE
 } from "./points-rubric.js";
 
@@ -171,6 +171,7 @@ function renderApprovals(list, container) {
                 </div>
             </div>
             <div class="admin-actions">
+                <button class="btn-admin btn-admin--secondary" data-edit-account="${esc(user.id)}">Edit</button>
                 <button class="btn-approve" onclick="updateStatus('${user.id}', 'approved')">Approve</button>
                 <button class="btn-deny" onclick="denyUser('${user.id}')">Deny</button>
             </div>
@@ -178,13 +179,36 @@ function renderApprovals(list, container) {
     `).join('');
 }
 
-window.updateStatus = (uid, status) => {
-    update(ref(db, `users/${uid}`), { status });
-};
+// Every account write reports failure: the buttons used to do nothing visible
+// when a write was rejected (rules, lost connection).
+async function adminWrite(task, okMsg, failMsg) {
+    try {
+        await task();
+        if (okMsg) showToast(okMsg, 'success');
+    } catch (err) {
+        console.error(err);
+        showToast(failMsg, 'error');
+    }
+}
+
+function isSelfUid(uid) {
+    return !!(auth.currentUser && auth.currentUser.uid === uid);
+}
+
+function otherApprovedAdmins(uid) {
+    return Object.entries(latestUsersObj || {})
+        .filter(([id, u]) => id !== uid && u && u.role === 'admin' && u.status === 'approved').length;
+}
+
+window.updateStatus = (uid, status) => adminWrite(
+    () => update(ref(db, `users/${uid}`), { status }),
+    status === 'approved' ? 'Member approved.' : 'Status updated.',
+    'Could not update this account. Please try again.'
+);
 
 window.denyUser = (uid) => {
     if (confirm("Deny and delete this request?")) {
-        remove(ref(db, `users/${uid}`));
+        adminWrite(() => remove(ref(db, `users/${uid}`)), 'Request denied.', 'Could not deny this request. Please try again.');
     }
 };
 
@@ -209,12 +233,13 @@ function renderMembers(list, container, unrecognized = []) {
     const emailCounts = {};
     list.forEach(u => { if (u.email) emailCounts[u.email] = (emailCounts[u.email] || 0) + 1; });
 
-    const renderGroup = (group, label) => {
+    const renderGroup = (group, label, modifier) => {
         if (group.length === 0) return '';
         return `
+          <section class="members-group members-group--${modifier}">
             <div class="members-group-label">${label} (${group.length})</div>
             ${group.map(user => `
-                <div class="admin-list-item">
+                <div class="admin-list-item member-card">
                     <div class="member-info">
                         ${profileAvatarHtml(
                             user.id,
@@ -242,7 +267,7 @@ function renderMembers(list, container, unrecognized = []) {
                                     { stopPropagation: true }
                                 )}
                                 <span class="role-pill role-pill--${esc(user.role || 'member')}">${esc((user.role || 'member').toUpperCase())}</span>
-                                <button class="btn-edit-name" title="Edit name" data-edit-name-uid="${esc(user.id)}" data-edit-name-current="${esc(user.displayName || '')}">✏️</button>
+                                <button class="btn-edit-name" title="Edit account details" aria-label="Edit account details" data-edit-account="${esc(user.id)}">✏️</button>
                                 ${emailCounts[user.email] > 1 ? `<span class="dup-badge" title="Another approved member has this same email — likely a duplicate account. Check before removing either one.">⚠ duplicate email</span>` : ''}
                             </div>
                             <div class="member-email">${esc(user.email)}</div>
@@ -251,15 +276,17 @@ function renderMembers(list, container, unrecognized = []) {
                         </div>
                     </div>
                     <div class="admin-actions">
-                        <button class="btn-approve give-points-btn" data-give-points-uid="${esc(user.id)}">🏆 Give Points</button>
+                        <button class="btn-admin btn-admin--primary give-points-btn" data-give-points-uid="${esc(user.id)}">🏆 Give Points</button>
+                        <button class="btn-admin btn-admin--secondary" data-edit-account="${esc(user.id)}">Edit</button>
                         ${user.role !== 'admin'
-                            ? `<button class="btn-approve" onclick="promoteUser('${user.id}')">Promote</button>`
-                            : `<button class="btn-deny" onclick="demoteUser('${user.id}')">Demote</button>`
+                            ? `<button class="btn-admin btn-admin--secondary" onclick="promoteUser('${user.id}')">Promote</button>`
+                            : `<button class="btn-admin btn-admin--secondary" onclick="demoteUser('${user.id}')">Demote</button>`
                         }
-                        <button class="btn-deny" onclick="removeUser('${user.id}')">Remove</button>
+                        <button class="btn-admin btn-admin--danger" onclick="removeUser('${user.id}')">Remove</button>
                     </div>
                 </div>
             `).join('')}
+          </section>
         `;
     };
 
@@ -283,6 +310,7 @@ function renderMembers(list, container, unrecognized = []) {
                     </div>
                 </div>
                 <div class="admin-actions">
+                    <button class="btn-admin btn-admin--secondary" data-edit-account="${esc(user.id)}">Edit</button>
                     <button class="btn-approve" data-action="fix-approve" data-uid="${esc(user.id)}">Mark Approved</button>
                     <button class="btn-deny" onclick="removeUser('${esc(user.id)}')">Remove</button>
                 </div>
@@ -290,14 +318,21 @@ function renderMembers(list, container, unrecognized = []) {
         `).join('')}
     `;
 
+    const countText = `<strong>${list.length}</strong> approved member${list.length === 1 ? '' : 's'} · ${admins.length} Exec Board · ${members.length} Members`;
+
     container.innerHTML = `
-        <div class="members-search-wrap">
-            <input class="members-search" type="text" placeholder="Search members…" oninput="filterMembers(this.value)" />
+        <div class="members-toolbar">
+            <div class="members-search-wrap">
+                <svg class="members-search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="members-search" type="search" placeholder="Search members by name or email…" aria-label="Search members" oninput="filterMembers(this.value)" />
+            </div>
+            <div class="members-count" id="members-count" aria-live="polite" data-base="${esc(countText)}">${countText}</div>
         </div>
         ${unrecognizedHtml}
         <div id="members-list">
-            ${renderGroup(admins, 'EXEC BOARD')}
-            ${renderGroup(members, 'MEMBERS')}
+            ${renderGroup(admins, 'EXEC BOARD', 'exec')}
+            ${renderGroup(members, 'MEMBERS', 'members')}
+            <p class="empty-state" id="members-no-match" hidden>No members match your search.</p>
         </div>
     `;
 
@@ -313,24 +348,6 @@ function renderMembers(list, container, unrecognized = []) {
         });
     });
 
-    container.querySelectorAll('.btn-edit-name').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const uid = btn.dataset.editNameUid;
-            const current = btn.dataset.editNameCurrent;
-            const next = prompt('Enter new display name:', current);
-            if (next === null) return; // cancelled
-            const trimmed = next.trim();
-            if (!trimmed) { alert('Name cannot be empty.'); return; }
-            if (trimmed.length > 60) { alert('Name is too long (60 characters max).'); return; }
-            update(ref(db, `users/${uid}`), { displayName: trimmed })
-                .then(() => showToast('Name updated.', 'success'))
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to update name: ' + err.message, 'error');
-                });
-        });
-    });
-
     container.querySelectorAll('.give-points-btn').forEach(btn => {
         btn.addEventListener('click', () => openAddPointsModal(btn.dataset.givePointsUid));
     });
@@ -338,27 +355,70 @@ function renderMembers(list, container, unrecognized = []) {
 
 window.filterMembers = (query) => {
     const q = query.toLowerCase();
-    document.querySelectorAll('#members-list .admin-list-item').forEach(item => {
-        const text = item.textContent.toLowerCase();
-        item.style.display = text.includes(q) ? '' : 'none';
+    let shown = 0;
+    document.querySelectorAll('#members-list .members-group').forEach(group => {
+        let anyInGroup = false;
+        group.querySelectorAll('.admin-list-item').forEach(item => {
+            const text = item.textContent.toLowerCase();
+            const match = text.includes(q);
+            item.style.display = match ? '' : 'none';
+            if (match) { anyInGroup = true; shown++; }
+        });
+        // Hide a group heading when nothing under it matches.
+        group.style.display = anyInGroup ? '' : 'none';
     });
+
+    const noMatch = document.getElementById('members-no-match');
+    if (noMatch) noMatch.hidden = !(q && shown === 0);
+
+    const countEl = document.getElementById('members-count');
+    if (countEl) {
+        countEl.innerHTML = q
+            ? `Showing <strong>${shown}</strong> of ${document.querySelectorAll('#members-list .admin-list-item').length}`
+            : countEl.dataset.base;
+    }
 };
 
 window.promoteUser = (uid) => {
     if (confirm("Promote this member to Exec Board (admin)?")) {
-        update(ref(db, `users/${uid}`), { role: 'admin' });
+        adminWrite(() => update(ref(db, `users/${uid}`), { role: 'admin' }), 'Promoted to Exec Board.', 'Could not promote this member. Please try again.');
     }
 };
 
 window.demoteUser = (uid) => {
+    // Demoting yourself locks you out of this page mid-session.
+    if (isSelfUid(uid)) {
+        showToast("You can't demote your own account. Ask another Exec Board member.", 'error');
+        return;
+    }
+    if (otherApprovedAdmins(uid) === 0) {
+        showToast('That would leave the site with no Exec Board members.', 'error');
+        return;
+    }
     if (confirm("Demote this admin to member?")) {
-        update(ref(db, `users/${uid}`), { role: 'member' });
+        adminWrite(() => update(ref(db, `users/${uid}`), { role: 'member' }), 'Demoted to member.', 'Could not demote this admin. Please try again.');
     }
 };
 
 window.removeUser = (uid) => {
-    if (confirm("Remove this member from the forum? This cannot be undone.")) {
-        remove(ref(db, `users/${uid}`));
+    if (isSelfUid(uid)) {
+        showToast("You can't remove your own account from here.", 'error');
+        return;
+    }
+    if (latestUsersObj[uid] && latestUsersObj[uid].role === 'admin' && otherApprovedAdmins(uid) === 0) {
+        showToast('That would leave the site with no Exec Board members.', 'error');
+        return;
+    }
+    // Removing deletes the whole user record, including its point history. When the
+    // account has points, say so: for a duplicate, they should be given to the main
+    // account first (Edit > "Merging a duplicate?").
+    const { total, count } = accountPoints(latestUsersObj[uid] || {});
+    const pointsNote = count > 0
+        ? `\n\nThis account has ${total} point${total === 1 ? '' : 's'} from ${count} award${count === 1 ? '' : 's'}, and removing it permanently deletes that history. If it is a duplicate, use Edit > "Merging a duplicate?" and give the points to the main account first.`
+        : '';
+    const loginNote = `\n\nThis removes the forum record only. Their sign-in still exists in Firebase Authentication (an admin of the Firebase project has to delete it there), so tell them which account to use.`;
+    if (confirm("Remove this member from the forum? This cannot be undone." + pointsNote + loginNote)) {
+        adminWrite(() => remove(ref(db, `users/${uid}`)), 'Member removed.', 'Could not remove this member. Please try again.');
     }
 };
 
@@ -589,13 +649,21 @@ function renderPointsAwards(usersObj, container) {
             <table class="points-table">
                 <thead><tr><th>Member</th><th>Activity</th><th>Points</th><th>Date</th><th>Awarded By</th><th>Note</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                    ${rows.map(r => `
+                    ${rows.map(r => {
+                        // Prefer the CURRENT name of a member who still exists (so a rename
+                        // shows up immediately everywhere) and only fall back to the name
+                        // stored on the record at award time if that member/admin has since
+                        // been removed entirely - the one case that stored snapshot actually
+                        // protects against.
+                        const memberName = usersObj[r.uid] ? memberDisplayName(usersObj[r.uid]) : (r.memberName || 'Member');
+                        const awardedByName = usersObj[r.awardedByUid] ? memberDisplayName(usersObj[r.awardedByUid]) : (r.awardedByName || '—');
+                        return `
                         <tr class="${r.revoked ? 'row-revoked' : ''}">
-                            <td>${esc(r.memberName || memberDisplayName(usersObj[r.uid]))}</td>
+                            <td>${esc(memberName)}</td>
                             <td>${esc(formatOptionLabel(r.activity))}</td>
                             <td>${r.revoked ? '<s>' : ''}${r.points > 0 ? '+' : ''}${r.points}${r.revoked ? '</s>' : ''}</td>
                             <td>${esc(r.activityDate || '—')}</td>
-                            <td>${esc(r.awardedByName || '—')}</td>
+                            <td>${esc(awardedByName)}</td>
                             <td>${esc(r.note || '') || '—'}</td>
                             <td>${r.revoked ? `<span class="status-pill status-pill--revoked">Revoked</span>` : (r.correctionOf ? `<span class="status-pill status-pill--corrected">Correction</span>` : `<span class="status-pill status-pill--approved">Active</span>`)}</td>
                             <td>${!r.revoked ? `
@@ -603,7 +671,8 @@ function renderPointsAwards(usersObj, container) {
                                 <button class="btn-approve btn-sm" data-action="correct" data-uid="${esc(r.uid)}" data-award="${esc(r.awardId)}">Correct</button>
                             ` : ''}</td>
                         </tr>
-                    `).join('')}
+                    `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -617,7 +686,10 @@ function renderPointsRequests(usersObj, container) {
     const rows = [];
     Object.entries(usersObj).forEach(([uid, u]) => {
         Object.entries(u.pointRequests || {}).forEach(([reqId, r]) => {
-            if (r && r.status === 'pending') rows.push({ uid, reqId, ...r, memberName: r.memberName || memberDisplayName(u) });
+            // u is the live user for this uid (we're iterating usersObj directly),
+            // so always prefer their current name over whatever was snapshotted
+            // onto the request at submission time.
+            if (r && r.status === 'pending') rows.push({ uid, reqId, ...r, memberName: memberDisplayName(u) });
         });
     });
     rows.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
@@ -1102,6 +1174,229 @@ function wirePointsModals() {
     });
     document.getElementById('approveConfirmBtn').addEventListener('click', submitApprove);
 }
+// ── EDIT ACCOUNT (manual account management) ─────────────────────────────────
+// Lets an admin fix any account's profile details, and shows what is needed to
+// combine two accounts BY HAND. There is deliberately no automatic merge: the
+// sign-in itself can't be merged or deleted from the browser, and every post,
+// comment and vote references an account id.
+
+const EA_LIMITS = { displayName: 60, secondaryEmail: 120, phone: 40, bio: 1000 };
+const EA_KEEP = '__keep__';   // <option> that leaves an unrecognised role/status value untouched
+let activeEdit = null;        // { uid, original } - original = the record as it was when the modal opened
+
+const eaEl = (id) => document.getElementById(id);
+const eaText = (v) => String(v == null ? '' : v).trim();
+const eaKey = (v) => eaText(v).toLowerCase();
+const eaDigits = (v) => String(v == null ? '' : v).replace(/\D/g, '');
+
+// Active (not revoked) points for one account record.
+function accountPoints(user) {
+    const awards = Object.values((user && user.pointAwards) || {}).filter(a => a && !a.revoked);
+    return { total: computeMemberTotal(user && user.pointAwards), count: awards.length };
+}
+
+// Other accounts that look like the same person: a shared login/secondary email,
+// the same display name, or the same phone number.
+function findPossibleDuplicates(uid) {
+    const me = latestUsersObj[uid];
+    if (!me) return [];
+    const myEmails = [me.email, me.secondaryEmail].map(eaKey).filter(Boolean);
+    const myName = eaKey(me.displayName);
+    const myPhone = eaDigits(me.phone);
+    const found = [];
+    Object.entries(latestUsersObj).forEach(([otherUid, other]) => {
+        if (otherUid === uid || !other || typeof other !== 'object') return;
+        const reasons = [];
+        const theirEmails = [other.email, other.secondaryEmail].map(eaKey).filter(Boolean);
+        if (myEmails.some(e => theirEmails.includes(e))) reasons.push('shares an email address');
+        if (myName && myName === eaKey(other.displayName)) reasons.push('same display name');
+        if (myPhone.length >= 7 && myPhone === eaDigits(other.phone)) reasons.push('same phone number');
+        if (reasons.length) found.push({ uid: otherUid, user: other, reasons });
+    });
+    return found;
+}
+
+function eaCompareCard(uid, user, reasons) {
+    const { total, count } = accountPoints(user);
+    const status = user.status;
+    const statusHtml = status === 'approved' ? ''
+        : status === 'pending' ? ' <span class="status-pill status-pill--pending">PENDING</span>'
+        : ` <span class="status-raw">status: ${status === undefined ? '(missing)' : esc(JSON.stringify(status))}</span>`;
+    return `
+        <div class="ea-card">
+            <div class="ea-card-main">
+                <div class="ea-card-name">${esc(memberDisplayName(user))}
+                    <span class="role-pill role-pill--${esc(user.role || 'member')}">${esc((user.role || 'member').toUpperCase())}</span>${statusHtml}</div>
+                <div class="ea-card-meta">${esc(user.email || '—')} · <strong>${total} pts</strong> from ${count} award${count === 1 ? '' : 's'}</div>
+                ${reasons && reasons.length ? `<div class="ea-card-why">Matches: ${esc(reasons.join(', '))}</div>` : ''}
+            </div>
+            <div class="ea-card-actions">
+                ${status === 'approved' ? `<button type="button" class="btn-admin btn-admin--primary btn-sm" data-ea-give="${esc(uid)}">🏆 Give Points</button>` : ''}
+                <button type="button" class="btn-admin btn-admin--secondary btn-sm" data-ea-open="${esc(uid)}">Edit</button>
+            </div>
+        </div>`;
+}
+
+// <select> with a fixed set of choices, plus an "(unchanged)" choice when the
+// stored value isn't one of them so that saving never silently rewrites it.
+function eaFillSelect(el, current, options) {
+    const known = options.some(([value]) => value === current);
+    el.innerHTML = options.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join('')
+        + (known ? '' : `<option value="${EA_KEEP}">Current: ${current === undefined ? '(missing)' : esc(JSON.stringify(current))} (unchanged)</option>`);
+    el.value = known ? current : EA_KEEP;
+}
+
+function openEditAccountModal(uid) {
+    const user = latestUsersObj[uid];
+    if (!user) {
+        showToast('That account is no longer available. Refresh the page and try again.', 'error');
+        return;
+    }
+    const isSelf = !!(auth.currentUser && auth.currentUser.uid === uid);
+    activeEdit = { uid, original: { ...user } };
+
+    const { total, count } = accountPoints(user);
+    eaEl('eaSubtitle').textContent = `${memberDisplayName(user)} · ${user.email || 'no email on record'}`;
+    eaEl('eaFacts').innerHTML =
+        `<span><b>UID</b> ${esc(uid)}</span>` +
+        `<span><b>Points</b> ${total} from ${count} award${count === 1 ? '' : 's'}</span>`;
+
+    // The name field shows only a stored name; the email-prefix fallback is just a placeholder.
+    eaEl('eaName').value = user.displayName || '';
+    eaEl('eaName').placeholder = memberDisplayName(user);
+    eaEl('eaEmail').value = user.email || '';
+    eaEl('eaSecondary').value = user.secondaryEmail || '';
+    eaEl('eaPhone').value = user.phone || '';
+    eaEl('eaBio').value = user.bio || '';
+
+    eaFillSelect(eaEl('eaRole'), user.role === undefined ? 'member' : user.role,
+        [['member', 'Member'], ['admin', 'Exec Board (admin)']]);
+    eaFillSelect(eaEl('eaStatus'), user.status,
+        [['approved', 'Approved'], ['pending', 'Pending (blocks sign-in)']]);
+    eaEl('eaRole').disabled = isSelf;
+    eaEl('eaStatus').disabled = isSelf;
+    eaEl('eaSelfNote').hidden = !isSelf;
+
+    const dups = findPossibleDuplicates(uid);
+    eaEl('eaDupHeading').hidden = dups.length === 0;
+    eaEl('eaDupList').innerHTML = dups.map(d => eaCompareCard(d.uid, d.user, d.reasons)).join('');
+    eaEl('eaMerge').open = dups.length > 0;
+
+    const others = Object.entries(latestUsersObj)
+        .filter(([otherUid, u]) => otherUid !== uid && u && typeof u === 'object')
+        .sort((a, b) => memberDisplayName(a[1]).localeCompare(memberDisplayName(b[1])));
+    eaEl('eaCompareSelect').innerHTML = '<option value="">Choose an account…</option>' +
+        others.map(([otherUid, u]) => `<option value="${esc(otherUid)}">${esc(memberDisplayName(u))} — ${esc(u.email || 'no email')}</option>`).join('');
+    eaEl('eaManualCard').innerHTML = '';
+
+    const errEl = eaEl('eaError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    eaEl('eaSaveBtn').disabled = false;
+    eaEl('eaSaveBtn').textContent = 'Save Changes';
+    openModal('editAccountModal');
+    eaEl('eaName').focus();
+}
+
+async function submitEditAccount() {
+    if (!activeEdit) return;
+    const { uid, original } = activeEdit;
+    const errEl = eaEl('eaError');
+    errEl.style.display = 'none';
+
+    const next = {
+        displayName: eaText(eaEl('eaName').value),
+        secondaryEmail: eaText(eaEl('eaSecondary').value),
+        phone: eaText(eaEl('eaPhone').value),
+        bio: eaText(eaEl('eaBio').value)
+    };
+
+    // Only fields the admin actually changed are written (and validated), so saving
+    // can't overwrite something someone else edited meanwhile, and a legacy value
+    // that is already over a limit doesn't block an unrelated edit.
+    const changes = {};
+    Object.keys(next).forEach(key => {
+        if (eaText(original[key]) !== next[key]) changes[key] = next[key] === '' ? null : next[key];
+    });
+
+    if ('displayName' in changes && changes.displayName === null) {
+        return showAdminError(errEl, 'Display name cannot be empty.');
+    }
+    for (const [key, label] of [['displayName', 'Display name'], ['secondaryEmail', 'Secondary email'], ['phone', 'Phone'], ['bio', 'Bio']]) {
+        if (key in changes && changes[key] !== null && changes[key].length > EA_LIMITS[key]) {
+            return showAdminError(errEl, `${label} is too long (${EA_LIMITS[key]} characters max).`);
+        }
+    }
+    if (changes.secondaryEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(changes.secondaryEmail)) {
+        return showAdminError(errEl, 'Secondary email does not look like a valid email address.');
+    }
+
+    // Role / status are locked for your own account (the select is disabled), so a
+    // change here is always to someone else.
+    const roleValue = eaEl('eaRole').value;
+    if (roleValue !== EA_KEEP && roleValue !== (original.role === undefined ? 'member' : original.role)) {
+        if (roleValue !== 'admin') {
+            const otherAdmins = Object.entries(latestUsersObj)
+                .filter(([id, u]) => id !== uid && u && u.role === 'admin' && u.status === 'approved').length;
+            if (otherAdmins === 0) {
+                return showAdminError(errEl, 'That would leave the site with no Exec Board members.');
+            }
+        }
+        changes.role = roleValue;
+    }
+    const statusValue = eaEl('eaStatus').value;
+    if (statusValue !== EA_KEEP && statusValue !== original.status) changes.status = statusValue;
+
+    if (Object.keys(changes).length === 0) {
+        closeModal('editAccountModal');
+        showToast('No changes to save.', 'success');
+        return;
+    }
+
+    const saveBtn = eaEl('eaSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+        await update(ref(db, `users/${uid}`), changes);
+        closeModal('editAccountModal');
+        showToast('Account updated.', 'success');
+    } catch (err) {
+        console.error(err);
+        showAdminError(errEl, 'Could not save: ' + err.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+}
+
+function wireEditAccountModal() {
+    eaEl('closeEditAccountModal').addEventListener('click', () => closeModal('editAccountModal'));
+    eaEl('eaSaveBtn').addEventListener('click', submitEditAccount);
+
+    // Edit buttons live in lists that are re-rendered constantly, so listen once on the container.
+    eaEl('tab-content').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-edit-account]');
+        if (btn) openEditAccountModal(btn.dataset.editAccount);
+    });
+
+    // Buttons inside the compare cards.
+    eaEl('editAccountModal').addEventListener('click', (e) => {
+        const give = e.target.closest('[data-ea-give]');
+        if (give) {
+            closeModal('editAccountModal');
+            openAddPointsModal(give.dataset.eaGive);
+            return;
+        }
+        const open = e.target.closest('[data-ea-open]');
+        if (open) openEditAccountModal(open.dataset.eaOpen);
+    });
+
+    eaEl('eaCompareSelect').addEventListener('change', (e) => {
+        const other = latestUsersObj[e.target.value];
+        eaEl('eaManualCard').innerHTML = other ? eaCompareCard(e.target.value, other, null) : '';
+    });
+}
+
+wireEditAccountModal();
 wirePointsModals();
 // loadData() is kicked off by the admin check in onAuthStateChanged above,
 // not here — see the comment there.

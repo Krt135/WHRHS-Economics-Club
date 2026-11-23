@@ -8,6 +8,11 @@ const auth = getAuth(app);
 window.auth = auth;
 const db = getDatabase(app);
 
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 class SpecialSidebar extends HTMLElement {
     async connectedCallback() {
         const active = this.getAttribute('active-page') || 'nexus';
@@ -29,7 +34,7 @@ class SpecialSidebar extends HTMLElement {
         <aside class="sidebar" id="tef-sidebar-aside">
 
         <div class="sidebar-logo" onclick="window.location.href='index.html'" style="cursor:pointer">
-                <img class="logo-icon" src="images/TEF-image.jpeg" alt="Logo">
+                <img class="logo-icon" src="images/TEF-image-200.jpeg" width="100" height="100" alt="Logo" decoding="async">
                 <div class="logo-text">
                     <span class="top">THE ECONOMIC</span>
                     <span class="bot">FORUM</span>
@@ -142,11 +147,16 @@ class SpecialSidebar extends HTMLElement {
 </nav>
 
             <div class="sidebar-footer" id="sidebar-footer-content">
-                <div class="user-info" onclick="handleLogout()" style="cursor:pointer">
-                    <div class="avatar" id="user-avatar">??</div>
+                <!-- Neutral loading placeholder while Firebase Auth resolves the
+                     current session (checkAccess() below replaces this innerHTML
+                     entirely once it knows the real state) - showing "Guest /
+                     Public" here first meant every logged-in user briefly saw
+                     themselves signed out before it flipped to their real name. -->
+                <div class="user-info" style="display:flex; align-items:center; gap:8px;">
+                    <div class="skeleton-avatar"></div>
                     <div>
-                        <div class="user-name" id="user-display-name">Guest</div>
-                        <div class="user-role" id="user-display-role">Public</div>
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line"></div>
                     </div>
                 </div>
             </div>
@@ -183,6 +193,14 @@ class SpecialSidebar extends HTMLElement {
 
         overlay.addEventListener('click', closeMenu);
 
+        // Escape closes the open drawer on phones, as with any other menu.
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && aside.classList.contains('open')) {
+                closeMenu();
+                btn.focus();
+            }
+        });
+
         // Close the drawer when a nav link is tapped
         this.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', closeMenu);
@@ -195,8 +213,16 @@ class SpecialSidebar extends HTMLElement {
             const execSection = this.querySelector('#exec-section');
 
             if (user) {
-                const snapshot = await get(ref(db, 'users/' + user.uid));
-                const data = snapshot.val();
+                // A failed read (offline, or a rules denial) used to leave the
+                // skeleton pulsing forever; fall back to what Auth itself knows.
+                let data = null;
+                try {
+                    const snapshot = await get(ref(db, 'users/' + user.uid));
+                    data = snapshot.val();
+                } catch (err) {
+                    console.error('Sidebar: could not load your profile:', err);
+                    data = { email: user.email || '', role: 'member' };
+                }
 
                 if (data) {
                     // Admin logic
@@ -204,11 +230,14 @@ class SpecialSidebar extends HTMLElement {
                         execSection.style.display = data.role === "admin" ? "block" : "none";
                     }
 
-                    // Render Profile View
-                    const initials = (data.displayName || data.email).substring(0, 2).toUpperCase();
+                    // Render Profile View. Every field is optional on a legacy or
+                    // hand-edited record (a missing role used to throw here), and
+                    // the name is user-entered text, so it is escaped.
+                    const nameSource = String(data.displayName || data.email || user.email || 'Member');
+                    const initials = esc(nameSource.substring(0, 2).toUpperCase());
                     const bgColor = data.role === 'admin' ? '#c9a84c' : '#0f1f3d';
-                    const displayName = data.displayName || data.email.split('@')[0];
-                    const displayRole = data.role.toUpperCase();
+                    const displayName = esc(data.displayName || String(data.email || user.email || 'Member').split('@')[0]);
+                    const displayRole = esc(String(data.role || 'member').toUpperCase());
 
                     footerContent.innerHTML = `
                     <div class="user-profile-block" style="display: flex; align-items: center; gap: 12px;">
@@ -227,6 +256,20 @@ class SpecialSidebar extends HTMLElement {
                         </button>
                     </div>
                 `;
+                } else {
+                    // Authenticated, but no matching users/{uid} record (e.g. an
+                    // admin removed the account while this session was still
+                    // active). Must still replace the skeleton markup - leaving
+                    // it in place would pulse forever instead of resolving.
+                    footerContent.innerHTML = `
+                    <div class="user-info" onclick="auth.signOut()" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                        <div class="avatar" id="user-avatar">?</div>
+                        <div>
+                            <div class="user-name">Account issue</div>
+                            <div class="user-role">Click to sign out</div>
+                        </div>
+                    </div>
+                    `;
                 }
             } else {
                 // LOGGED OUT: Show Big Sign In Button

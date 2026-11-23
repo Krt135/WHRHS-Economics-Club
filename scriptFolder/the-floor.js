@@ -13,6 +13,7 @@ import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
 import { softDelete } from './deletePost.js';
 import { renderWithLinks, insertLinkAtCursor } from './floor-link-format.js';
+import { preserveInputs } from './preserve-inputs.js';
 
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
@@ -32,7 +33,27 @@ let attachedImageData = null;
 let isEditMode       = false;
 let pinnedIds        = new Set();
 
-let currentDiscId = sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
+// A post can be opened from a link (the-floor.html?post=<id>, e.g. the homepage's
+// "Latest from The Floor" cards) or handed over via sessionStorage (Bulletin,
+// profile activity). The URL was previously ignored, so those links just showed the list.
+let currentDiscId = new URLSearchParams(window.location.search).get("post")
+  || sessionStorage.getItem("openFloorPost") || sessionStorage.getItem("openDiscussion") || null;
+
+// Keeps the address bar in step with the open post so Back returns to the list
+// and a post's URL can be shared. mode: 'push' | 'replace' | 'none'.
+function syncPostUrl(key, mode) {
+  if (mode === 'none') return;
+  const params = new URLSearchParams(window.location.search);
+  if ((params.get('post') || null) === (key || null)) return;
+  const url = key ? `${window.location.pathname}?post=${encodeURIComponent(key)}` : window.location.pathname;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](key ? { post: key } : {}, '', url);
+}
+
+window.addEventListener('popstate', () => {
+  const key = new URLSearchParams(window.location.search).get('post');
+  if (key && discussions[key]) showDiscussion(key, { history: 'none' });
+  else showList({ history: 'none' });
+});
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -55,7 +76,9 @@ onAuthStateChanged(auth, async (user) => {
   const pollBtn = document.getElementById("openPollModalBtn");
   if (pollBtn) pollBtn.style.display = (userRole === "admin") ? "block" : "none";
 
-  if (currentDiscId) showDiscussion(currentDiscId);
+  // Sign-in can finish before the posts load. Rendering a missing item fell back
+  // to the list and dropped the link, so leave that case to the data listener.
+  if (currentDiscId) { if (discussions[currentDiscId]) showDiscussion(currentDiscId, { history: 'replace' }); }
   else renderDiscussions();
   renderPolls();
 });
@@ -94,23 +117,25 @@ async function loadAllUsers() {
   }
 }
 
-// The "mention key" is the displayName with spaces removed — what gets typed after @.
-// e.g. displayName "John Smith" → mention key "JohnSmith" → typed as @JohnSmith
+// The "mention key" is the displayName with everything but letters, digits and
+// underscores removed — what gets typed after @.
+// e.g. "John Smith" → @JohnSmith, "Liam O'Connor" → @LiamOConnor.
+// (Only spaces used to be removed, so a name with an apostrophe or hyphen
+// produced a key the @-parser below could never match.)
+const MENTION_CHAR = /[\p{L}\p{N}_]/u;
 function mentionKey(displayName) {
-  return displayName.replace(/\s+/g, '');
+  return [...String(displayName || '')].filter(ch => MENTION_CHAR.test(ch)).join('');
 }
 
 // Extract all @mention keys from a body of text.
 function extractMentions(text) {
-  const keys = [...new Set((text.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
-  console.log('[mentions] extractMentions: text =', JSON.stringify(text), '→ keys =', keys);
-  return keys;
+  return [...new Set((text.match(/@[\p{L}\p{N}_]+/gu) || []).map(m => m.slice(1)))];
 }
 
 // Write mention records to Firebase. A Cloud Function (onNewMention) watches
 // /mentions/{id} and sends the email — same onValueCreated pattern as the
 // other functions in this Firebase project.
-async function notifyMentions(text, contextLabel) {
+async function notifyMentions(text, contextLabel, postId) {
   try {
     console.log(`[mentions] notifyMentions: START (context: "${contextLabel}")`);
     const keys = extractMentions(text);
@@ -151,7 +176,9 @@ async function notifyMentions(text, contextLabel) {
         mentionedName:  user.displayName,
         mentionedBy:    getDisplayName(),
         context:        contextLabel,
-        url:            'https://whrhs-economics-club.vercel.app/the-floor.html',
+        // Straight to the post on the live site (was a hard-coded old Vercel
+        // address that only opened the Floor's front page).
+        url:            `https://theeconomicforum.net/the-floor.html${postId ? `?post=${encodeURIComponent(postId)}` : ''}`,
         createdAt:      Date.now()
       };
 
@@ -188,8 +215,8 @@ function handleMentionInput(e) {
   const ta = e.target;
   const cursor = ta.selectionStart;
   const beforeCursor = ta.value.slice(0, cursor);
-  // Match the last @ and any word characters following it, right before the cursor
-  const match = beforeCursor.match(/@(\w*)$/);
+  // Match the last @ and any name characters following it, right before the cursor
+  const match = beforeCursor.match(/@([\p{L}\p{N}_]*)$/u);
 
   if (match) {
     mentionState = {
@@ -338,6 +365,14 @@ function getDisplayName() {
 //  FIREBASE LISTENERS
 // ─────────────────────────────────────────────
 
+// Pinned-post lookup resolves to null on failure so a bulletin read error can't
+// stop the discussion list from rendering.
+const fetchBulletin = () => get(ref(db, 'bulletin')).catch(() => null);
+
+// Started now, in parallel with the discussions listener below, instead of
+// only after the first discussions snapshot arrives (one fewer round trip).
+let bulletinPrefetch = fetchBulletin();
+
 onValue(ref(db, "discussions"), snapshot => {
   discussions = snapshot.val() || {};
 
@@ -345,15 +380,19 @@ onValue(ref(db, "discussions"), snapshot => {
     if (discussions[currentDiscId]) {
       sessionStorage.removeItem("openFloorPost");
       sessionStorage.removeItem("openDiscussion");
-      showDiscussion(currentDiscId);
+      // 'replace' (not push): this runs on every data update, and also gives a
+      // post opened from the Bulletin its own shareable ?post= address.
+      showDiscussion(currentDiscId, { history: 'replace' });
     } else {
       console.warn("Discussion not found, defaulting to list.");
       currentDiscId = null;
-      showList();
+      showList({ history: 'replace' });
     }
   } else {
-    get(ref(db, 'bulletin')).then(snap => {
-      const data = snap.val() || {};
+    const bulletinReq = bulletinPrefetch || fetchBulletin();
+    bulletinPrefetch = null;
+    bulletinReq.then(snap => {
+      const data = (snap && snap.val()) || {};
       pinnedIds = new Set(
         Object.values(data).map(v => v.originalId || v.discussionId).filter(Boolean)
       );
@@ -395,9 +434,9 @@ function renderDiscussions() {
     const isPinned = pinnedIds.has(d._key);
 
     return `
-<div class="disc-card ${cardTheme}" onclick="window.showDiscussion('${d._key}')">
+<div class="disc-card ${cardTheme}" role="link" tabindex="0" onclick="window.showDiscussion('${d._key}')">
   ${d.image ? `<img src="${esc(d.image)}" class="disc-image" alt="">` : ""}
-  <div class="disc-title" style="${isPinned ? 'color:var(--gold)' : ''}">${esc(d.title)}</div>
+  <div class="disc-title" style="${isPinned ? 'color:var(--gold-text)' : ''}">${esc(d.title)}</div>
   ${isPinned ? `
   <div class="pinned-badge">
     <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
@@ -426,7 +465,7 @@ function renderDiscussions() {
 
 function renderDiscussionView() {
   const d = discussions[currentDiscId];
-  if (!d) { showList(); return; }
+  if (!d) { showList({ history: 'replace' }); return; }
 
   const commentEntries = d.comments
     ? Object.entries(d.comments).map(([k, v]) => ({ ...v, _key: k })).sort((a, b) => a.postedAt - b.postedAt)
@@ -525,24 +564,32 @@ function renderDiscussionView() {
     </div>`;
   }).join("");
 
-  document.getElementById("discussionBody").innerHTML = `
+  const plural = commentEntries.length === 1 ? '' : 's';
+  const commentLabel = `${commentEntries.length} comment${plural}`;
+  const commentTitle = `${commentEntries.length} Comment${plural}`;
+  const bodyEl = document.getElementById("discussionBody");
+  // Re-rendered on every database change: keep what the reader is typing
+  // (and any reply box they opened) instead of wiping it.
+  preserveInputs(bodyEl, () => {
+    bodyEl.innerHTML = `
     <div class="main-post-wrapper ${postTheme}">
       <div class="disc-view-title">${esc(d.title)}</div>
       <div class="disc-view-meta">
-        <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentEntries.length} comments
+        <strong>${esc(d.author)}</strong> · ${rel(d.postedAt)} · ${commentLabel}
       </div>
       ${d.image ? `<img src="${esc(d.image)}" class="disc-view-image" alt="">` : ""}
       <div class="disc-view-body">${renderWithLinks(d.body, esc)}</div>
     </div>
     <div class="comments-area">
-      <div class="comments-title">${commentEntries.length} Comments</div>
+      <div class="comments-title">${commentTitle}</div>
       ${commentsHtml}
       <div class="new-comment-box" style="margin-top:16px">
         <textarea class="new-comment-input" id="cmtInput"
-          placeholder="Join the discussion… type @ to mention someone"></textarea>
+          placeholder="${currentUser ? 'Join the discussion… type @ to mention someone' : 'Sign in to join the discussion'}"></textarea>
         <button class="btn-post-cmt" onclick="window.postComment()">Post</button>
       </div>
     </div>`;
+  }, { keepOpenSelector: '[id^="reply-box-"]' });
 
   // Attach @mention listeners to the newly rendered comment/reply inputs
   attachMentionListeners();
@@ -554,6 +601,18 @@ function renderDiscussionView() {
 // ─────────────────────────────────────────────
 
 async function togglePin(discId, alreadyPinned) {
+  try {
+    await togglePinWrite(discId, alreadyPinned);
+    // The list's "Pinned" badge reads this set; it was only filled on first load.
+    if (alreadyPinned) pinnedIds.delete(discId); else pinnedIds.add(discId);
+  } catch (err) {
+    console.error("Pin/unpin failed:", err);
+    alert("Could not update the Bulletin. Please try again.");
+  }
+  renderDiscussionView();
+}
+
+async function togglePinWrite(discId, alreadyPinned) {
   if (alreadyPinned) {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
@@ -579,7 +638,6 @@ async function togglePin(discId, alreadyPinned) {
       pinnedBy:       name
     });
   }
-  renderDiscussionView();
 }
 
 
@@ -587,33 +645,59 @@ async function togglePin(discId, alreadyPinned) {
 //  PUBLISH DISCUSSION
 // ─────────────────────────────────────────────
 
+// One flag for the post/edit button: a second click while the first save is
+// still in flight used to publish the same discussion twice.
+let discussSaving = false;
+
 async function handleMainButtonClick() {
-  if (isEditMode) await saveEditDiscussion();
-  else await publishDiscussion();
+  if (discussSaving) return;
+  const btn = document.getElementById("mainSubmitBtn");
+  const label = btn ? btn.innerText : "";
+  discussSaving = true;
+  if (btn) { btn.disabled = true; btn.innerText = isEditMode ? "Saving…" : "Publishing…"; }
+  try {
+    if (isEditMode) await saveEditDiscussion();
+    else await publishDiscussion();
+  } finally {
+    discussSaving = false;
+    // closeModal() resets the label on success; only restore it if still open.
+    if (btn) {
+      btn.disabled = false;
+      if (document.getElementById("discussModal").classList.contains("open")) btn.innerText = label;
+    }
+  }
 }
 
 async function publishDiscussion() {
-  if (!currentUser) return alert("Please log in to post.");
+  if (!currentUser) return alert("Please sign in to post.");
   const body = document.getElementById("discContent").value.trim();
-  if (!body) return;
+  if (!body) { document.getElementById("discContent").focus(); return; }
+
+  // The picked image may still be compressing; wait so it isn't posted without it.
+  if (attachedImagePromise) await attachedImagePromise;
 
   const name   = getDisplayName();
   const newRef = push(ref(db, "discussions"));
-  await set(newRef, {
-    body,
-    author:         name,
-    authorId:       currentUser.uid,
-    authorRole:     userRole,
-    authorInitials: name.substring(0, 2).toUpperCase(),
-    image:          attachedImageData || null,
-    postedAt:       Date.now()
-  });
-
-  // Notify anyone @mentioned in the post
-  console.log('[mentions] publishDiscussion: discussion saved, invoking notifyMentions');
-  await notifyMentions(body, 'a discussion post');
+  try {
+    await set(newRef, {
+      body,
+      author:         name,
+      authorId:       currentUser.uid,
+      authorRole:     userRole,
+      authorInitials: name.substring(0, 2).toUpperCase(),
+      image:          attachedImageData || null,
+      postedAt:       Date.now()
+    });
+  } catch (err) {
+    console.error("Publish discussion failed:", err);
+    alert("Your post could not be published. Please try again.");
+    return;
+  }
 
   closeModal("discussModal");
+
+  // Notify anyone @mentioned in the post (never blocks or undoes the post itself)
+  await notifyMentions(body, 'a discussion post', newRef.key);
 }
 
 
@@ -710,13 +794,18 @@ async function saveEditDiscussion() {
 }
 
 async function deleteDiscussion() {
-  if (confirm("Delete this discussion?")) {
+  if (!confirm("Delete this discussion?")) return;
+  try {
     const snap = await get(ref(db, "bulletin"));
     const data = snap.val() || {};
     const entry = Object.entries(data).find(([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId);
     if (entry) await remove(ref(db, `bulletin/${entry[0]}`));
     await softDelete('discussions', currentDiscId);
-    showList();
+    // 'replace' so Back doesn't return to the post that was just deleted.
+    showList({ history: 'replace' });
+  } catch (err) {
+    console.error("Delete discussion failed:", err);
+    alert("This discussion could not be deleted. Please try again.");
   }
 }
 
@@ -742,46 +831,69 @@ async function deletePoll(pollKey) {
 //  COMMENTS
 // ─────────────────────────────────────────────
 
+let commentSaving = false;
+
 async function postComment() {
-  if (!currentUser) return alert("Please log in to comment.");
+  if (!currentUser) return alert("Please sign in to comment.");
   const inp = document.getElementById("cmtInput");
-  if (!inp.value.trim()) return;
+  if (!inp || !inp.value.trim() || commentSaving) return;
 
   const text = inp.value.trim();
   const name = getDisplayName();
+  const discId = currentDiscId;
 
-  await set(push(ref(db, `discussions/${currentDiscId}/comments`)), {
-    author:     name,
-    authorId:   currentUser.uid,
-    authorRole: userRole,
-    initials:   name.substring(0, 2).toUpperCase(),
-    text,
-    postedAt:   Date.now()
-  });
+  // Cleared before the write: the write re-renders this view (keeping any typed
+  // text), so clearing afterwards would leave the sent comment in the box.
   inp.value = "";
+  commentSaving = true;
+  try {
+    await set(push(ref(db, `discussions/${discId}/comments`)), {
+      author:     name,
+      authorId:   currentUser.uid,
+      authorRole: userRole,
+      initials:   name.substring(0, 2).toUpperCase(),
+      text,
+      postedAt:   Date.now()
+    });
+  } catch (err) {
+    console.error("Post comment failed:", err);
+    const box = document.getElementById("cmtInput");
+    if (box && !box.value) box.value = text;
+    alert("Your comment could not be posted. Please try again.");
+    return;
+  } finally {
+    commentSaving = false;
+  }
 
   // Notify anyone @mentioned in the comment
-  console.log('[mentions] postComment: comment saved, invoking notifyMentions');
-  await notifyMentions(text, 'a comment');
+  await notifyMentions(text, 'a comment', discId);
 
-  // Update bulletin comment count if pinned
-  const snap = await get(ref(db, "bulletin"));
-  const bulletinData = snap.val() || {};
-  const entry = Object.entries(bulletinData).find(
-    ([, v]) => v.discussionId === currentDiscId || v.originalId === currentDiscId
-  );
-  if (entry) {
-    // Recount straight from the source of truth instead of the local cache,
-    // which may already have been refreshed by the discussions listener by now.
-    const commentsSnap = await get(ref(db, `discussions/${currentDiscId}/comments`));
-    const newCount = commentsSnap.exists() ? Object.keys(commentsSnap.val()).length : 0;
-    await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
+  // Update bulletin comment count if pinned (best-effort: the comment is already saved)
+  try {
+    const snap = await get(ref(db, "bulletin"));
+    const bulletinData = snap.val() || {};
+    const entry = Object.entries(bulletinData).find(
+      ([, v]) => v.discussionId === discId || v.originalId === discId
+    );
+    if (entry) {
+      // Recount straight from the source of truth instead of the local cache,
+      // which may already have been refreshed by the discussions listener by now.
+      const commentsSnap = await get(ref(db, `discussions/${discId}/comments`));
+      const newCount = commentsSnap.exists() ? Object.keys(commentsSnap.val()).length : 0;
+      await update(ref(db, `bulletin/${entry[0]}`), { commentCount: newCount });
+    }
+  } catch (err) {
+    console.warn("Could not update the pinned copy's comment count:", err);
   }
 }
 
 async function deleteComment(discKey, cmtKey) {
-  if (confirm("Delete this comment?")) {
+  if (!confirm("Delete this comment?")) return;
+  try {
     await remove(ref(db, `discussions/${discKey}/comments/${cmtKey}`));
+  } catch (err) {
+    console.error("Delete comment failed:", err);
+    alert("This comment could not be deleted. Please try again.");
   }
 }
 
@@ -799,32 +911,50 @@ function toggleReplyBox(cmtId) {
   }
 }
 
+const replySaving = new Set();
+
 async function postReply(cmtId) {
-  if (!currentUser) return alert("Please log in to reply.");
+  if (!currentUser) return alert("Please sign in to reply.");
   const inp = document.getElementById(`reply-input-${cmtId}`);
-  if (!inp.value.trim()) return;
+  if (!inp || !inp.value.trim() || replySaving.has(cmtId)) return;
 
   const text = inp.value.trim();
   const name = getDisplayName();
+  const discId = currentDiscId;
 
-  await set(push(ref(db, `discussions/${currentDiscId}/comments/${cmtId}/replies`)), {
-    author:     name,
-    authorId:   currentUser.uid,
-    authorRole: userRole,
-    initials:   name.substring(0, 2).toUpperCase(),
-    text,
-    postedAt:   Date.now()
-  });
+  // Cleared before the write for the same reason as postComment().
   inp.value = "";
+  replySaving.add(cmtId);
+  try {
+    await set(push(ref(db, `discussions/${discId}/comments/${cmtId}/replies`)), {
+      author:     name,
+      authorId:   currentUser.uid,
+      authorRole: userRole,
+      initials:   name.substring(0, 2).toUpperCase(),
+      text,
+      postedAt:   Date.now()
+    });
+  } catch (err) {
+    console.error("Post reply failed:", err);
+    const box = document.getElementById(`reply-input-${cmtId}`);
+    if (box && !box.value) box.value = text;
+    alert("Your reply could not be posted. Please try again.");
+    return;
+  } finally {
+    replySaving.delete(cmtId);
+  }
 
   // Notify anyone @mentioned in the reply
-  console.log('[mentions] postReply: reply saved, invoking notifyMentions');
-  await notifyMentions(text, 'a reply');
+  await notifyMentions(text, 'a reply', discId);
 }
 
 async function deleteReply(discId, cmtId, replyId) {
-  if (confirm("Delete this reply?")) {
+  if (!confirm("Delete this reply?")) return;
+  try {
     await remove(ref(db, `discussions/${discId}/comments/${cmtId}/replies/${replyId}`));
+  } catch (err) {
+    console.error("Delete reply failed:", err);
+    alert("This reply could not be deleted. Please try again.");
   }
 }
 
@@ -911,12 +1041,13 @@ function rel(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60)    return "just now";
   if (s < 3600)  return Math.floor(s / 60) + " min ago";
-  if (s < 86400) return Math.floor(s / 3600) + " hours ago";
-  return Math.floor(s / 86400) + " days ago";
+  const n = s < 86400 ? Math.floor(s / 3600) : Math.floor(s / 86400);
+  return `${n} ${s < 86400 ? 'hour' : 'day'}${n === 1 ? '' : 's'} ago`;
 }
 
-function showList() {
+function showList({ history: historyMode = 'push' } = {}) {
   currentDiscId = null;
+  syncPostUrl(null, historyMode);
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
   if (vList) vList.classList.add("active");
@@ -924,13 +1055,16 @@ function showList() {
   renderDiscussions();
 }
 
-function showDiscussion(key) {
+function showDiscussion(key, { history: historyMode = 'push' } = {}) {
+  const switching = currentDiscId !== key;
   currentDiscId = key;
+  syncPostUrl(key, historyMode);
   const vList = document.getElementById("viewList");
   const vDisc = document.getElementById("viewDiscussion");
   if (vList) vList.classList.remove("active");
   if (vDisc) vDisc.classList.add("active");
   renderDiscussionView();
+  if (switching) window.scrollTo(0, 0);
 }
 
 function switchTab(tab) {
@@ -942,7 +1076,19 @@ function switchTab(tab) {
   if (filterBar) filterBar.style.display = tab === "discussions" ? "" : "none";
 }
 
-function openModal(id) { document.getElementById(id).classList.add("open"); }
+async function openModal(id) {
+  // Signed-out visitors used to be able to write a whole post and only learn at
+  // "Publish" that they had to sign in. Wait for Firebase to restore the session
+  // first, so a signed-in member clicking right after page load isn't turned away.
+  if (id === "discussModal" || id === "pollModal") {
+    if (!auth.currentUser && typeof auth.authStateReady === "function") await auth.authStateReady();
+    if (!auth.currentUser) {
+      if (confirm("You need to sign in to post on The Floor. Go to the sign-in page?")) window.location.href = "auth.html";
+      return;
+    }
+  }
+  document.getElementById(id).classList.add("open");
+}
 
 function closeModal(id) {
   document.getElementById(id).classList.remove("open");
@@ -954,18 +1100,91 @@ function closeModal(id) {
     if (btn) btn.innerText = "Publish Discussion";
     document.getElementById("discContent").value = "";
     document.getElementById("attachPreview").textContent = "";
+    // Reset the picker too; otherwise choosing the same image again fires no
+    // change event and it can't be re-attached.
+    const fileInput = document.getElementById("fileInput");
+    if (fileInput) fileInput.value = "";
     attachedImageData = null;
+    attachedImagePromise = null;
   }
 }
 
+// Floor images are stored inline in the database as base64, so every visitor
+// downloads every image on every page load. Downscale before storing so one
+// phone photo doesn't add several MB to /discussions.
+const MAX_IMAGE_EDGE = 1280;
+const IMAGE_QUALITY  = 0.8;
+const MAX_GIF_BYTES  = 1.5 * 1024 * 1024;
+let attachedImagePromise = null;
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function compressImage(file) {
+  const original = await readAsDataUrl(file);
+
+  // Canvas would flatten an animated GIF to one frame, so GIFs pass through as-is.
+  if (file.type === "image/gif") {
+    if (file.size > MAX_GIF_BYTES) {
+      const err = new Error("GIFs must be under 1.5 MB. Please choose a smaller file.");
+      err.userFacing = true;
+      throw err;
+    }
+    return original;
+  }
+
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload  = () => resolve(el);
+    el.onerror = reject;
+    el.src = original;
+  });
+
+  const scale  = Math.min(1, MAX_IMAGE_EDGE / Math.max(img.width, img.height));
+  const width  = Math.round(img.width * scale);
+  const height = Math.round(img.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width  = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff"; // JPEG has no alpha: flatten transparent PNGs onto white
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const compressed = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+  // Never make an already small, well-optimised file bigger.
+  return compressed.length < original.length ? compressed : original;
+}
+
 function previewFile(input) {
-  const file   = input.files[0];
-  const reader = new FileReader();
-  reader.onload = e => {
-    attachedImageData = e.target.result;
-    document.getElementById("attachPreview").textContent = "📎 " + file.name;
-  };
-  if (file) reader.readAsDataURL(file);
+  const file    = input.files[0];
+  const preview = document.getElementById("attachPreview");
+  attachedImageData = null;
+
+  if (!file) {
+    attachedImagePromise = null;
+    preview.textContent = "";
+    return;
+  }
+
+  preview.textContent = "Preparing image…";
+  attachedImagePromise = compressImage(file)
+    .then(data => {
+      attachedImageData = data;
+      preview.textContent = "📎 " + file.name;
+    })
+    .catch(err => {
+      attachedImageData = null;
+      input.value = "";
+      preview.textContent = "";
+      alert(err.userFacing ? err.message : "Couldn't read that image. Please try a different file.");
+    });
 }
 
 function insertLink() {

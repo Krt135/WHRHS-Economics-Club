@@ -1,104 +1,146 @@
+/* Admin panel: same palette and type as the public pages, laid out as cards. */
 .main {
-    margin-left: 260px; /* Ensures content starts AFTER the sidebar */
-    padding: 40px;
-    background-color: #f8f5f0; /* That nice beige from your design */
+    margin-left: var(--sidebar-width);   /* was a hard-coded 260px: 15px short of the sidebar */
+    padding: 32px 40px 60px;
+    background-color: var(--cream);
     min-height: 100vh;
 }
 
 .admin-container {
-    padding: 40px;
     max-width: 1000px;
     margin: 0 auto;
 }
 
+.admin-header { margin-bottom: 28px; }
 .admin-header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    color: #0f1f3d;
-    margin-bottom: 30px;
-}
-
-/* Tab Styling from your screenshot */
-.admin-tabs {
     display: flex;
-    gap: 10px;
-    margin-bottom: 40px;
-}
-
-.tab-btn {
-    background: #e5e7eb;
-    border: 1px solid #d1d5db;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #4b5563;
-    cursor: pointer;
-    text-transform: uppercase;
-}
-
-.tab-btn.active {
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-/* Table / List Styling */
-.admin-list-item {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    background: transparent;
-    padding: 15px 0;
-    border-bottom: 1px solid #d1d5db;
+    gap: 12px;
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--navy);
+    margin: 0 0 12px;
 }
-
-.user-info {
-    font-family: 'Crimson Pro', serif;
-    font-style: italic;
-    color: #4b5563;
-    font-size: 1.1rem;
-}
-
-.admin-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.btn-approve {
-    color: #10b981;
-    background: none;
-    border: 1px solid #10b981;
-    padding: 5px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-deny {
-    color: #ef4444;
-    background: none;
-    border: 1px solid #ef4444;
-    padding: 5px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.empty-state {
-    text-align: center;
-    font-family: 'Crimson Pro', serif;
-    font-style: italic;
-    color: #9ca3af;
-    margin-top: 50px;
-    font-size: 1.2rem;
+.admin-header::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 2px;
+    background: var(--gold);
+    border-radius: 2px;
 }
 
 #shield-icon {
     width: 30px;
     height: 30px;
-    transform: translateY(3px);
-    margin-left: 35px;
-    margin-right: 15px;
-    color: --var(--gold);
+    flex-shrink: 0;
+    fill: var(--gold);
+}
+
+/* Tabs */
+.admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+}
+
+.tab-btn {
+    background: #fff;
+    border: 1px solid var(--border);
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-transform: uppercase;
+}
+.tab-btn:hover { border-color: var(--navy); color: var(--navy); }
+.tab-btn.active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(15, 31, 61, 0.18);
+}
+
+/* Every admin list (approvals, members, moderation) is a stack of cards */
+.admin-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    background: #fff;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(15, 31, 61, 0.04);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.admin-list-item:hover {
+    border-color: var(--gold-light);
+    box-shadow: 0 4px 14px rgba(15, 31, 61, 0.08);
+}
+
+.user-info {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+/* Action buttons: real buttons, right-aligned on the card */
+.admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+.btn-approve, .btn-deny, .btn-admin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1.5px solid transparent;
+    border-radius: 6px;
+    background: #fff;
+    font-family: 'Crimson Pro', serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+/* Approve / Restore: positive */
+.btn-approve { color: var(--beginner-text); border-color: var(--green); }
+.btn-approve:hover { background: var(--beginner-text); border-color: var(--beginner-text); color: #fff; }
+/* Deny / Delete: negative */
+.btn-deny { color: var(--advanced-text); border-color: var(--red); }
+.btn-deny:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* Member card actions: one filled primary, one outlined secondary, one destructive */
+.btn-admin--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn-admin--primary:hover { background: var(--navy-light); border-color: var(--navy-light); }
+.btn-admin--secondary { color: var(--navy); border-color: var(--navy); }
+.btn-admin--secondary:hover { background: var(--navy); color: #fff; }
+.btn-admin--danger { color: var(--advanced-text); border-color: var(--red); }
+.btn-admin--danger:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
+.empty-state {
+    text-align: center;
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-top: 50px;
+    font-size: 1.2rem;
 }
 
 /* ── Add these to your existing admin.css ────────────────────────────────── */
@@ -185,7 +227,7 @@
 
 .role-pill--admin {
     background: rgba(201,168,76,0.15);
-    color: var(--gold);
+    color: var(--gold-text);
     border: 1px solid rgba(201,168,76,0.35);
 }
 
@@ -195,41 +237,60 @@
     border: 1px solid var(--border);
 }
 
-/* Members group label */
+/* Members: Exec Board and Members are separate sections */
+.members-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    margin-bottom: 22px;
+}
+.members-search-wrap { position: relative; flex: 1 1 360px; min-width: 240px; }
+.members-search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.members-search {
+    width: 100%;
+    padding: 13px 16px 13px 45px;
+    border: 1.5px solid var(--navy);
+    border-radius: 8px;
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 1.05rem;
+    color: var(--text-dark);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 31, 61, 0.06);
+}
+.members-search:focus { box-shadow: 0 0 0 3px var(--cream-dark); }
+.members-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.members-count strong { color: var(--navy); font-size: 0.95rem; }
+
+.members-group {
+    margin-bottom: 24px;
+    padding-left: 14px;
+    border-left: 4px solid var(--border);
+}
+.members-group--exec { border-left-color: var(--gold); }
+.members-group--exec .admin-list-item { background: var(--gold-bg); border-color: #e8ddb8; }
 .members-group-label {
+    font-family: 'Space Mono', monospace;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.12em;
     color: var(--text-muted);
     text-transform: uppercase;
-    padding: 18px 0 8px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 4px;
+    padding: 0 0 12px;
 }
-
-/* Members search */
-.members-search-wrap {
-    margin-bottom: 16px;
-}
-
-.members-search {
-    width: 100%;
-    max-width: 320px;
-    padding: 9px 14px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: 'Crimson Pro', Georgia, serif;
-    font-size: 0.95rem;
-    color: var(--text-dark);
-    background: var(--cream);
-    outline: none;
-    transition: border-color 0.18s;
-}
-
-.members-search:focus {
-    border-color: var(--navy);
-    background: #fff;
-}
+.members-group--exec .members-group-label { color: var(--gold-text); }
 
 /* ── Moderation / Recycling Bin ──────────────────────────────────────────── */
 
@@ -266,7 +327,7 @@
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--gold);
+    color: var(--gold-text);
     background: rgba(201,168,76,0.1);
     border: 1px solid rgba(201,168,76,0.25);
     border-radius: 3px;
@@ -331,35 +392,33 @@ div.member-name .profile-link-name:hover,
 @media (max-width: 900px) {
   .main {
     margin-left: 0;
-    padding: 20px 16px;
+    padding: 20px 16px 40px;
   }
 
-  .admin-container { padding: 0; }
+  .admin-header h1 { font-size: 1.6rem; }
+  .admin-header { margin-bottom: 20px; }
 
-  .admin-header h1 { font-size: 1.5rem; margin-bottom: 20px; }
-
-  #shield-icon { margin-left: 10px; }
+  .members-group { padding-left: 10px; }
+  .members-search-wrap { flex-basis: 100%; }
 
   /* ── TABS ── */
   .admin-tabs { flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
   .tab-btn { padding: 7px 12px; font-size: 0.7rem; }
 
-  /* ── MEMBERS SEARCH ── */
-  .members-search { max-width: 100%; }
 
   /* ── LIST ITEMS ── */
   .admin-list-item {
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 10px;
-    padding: 14px 0;
+    padding: 14px;
   }
 
   .member-info { min-width: 0; flex-wrap: wrap; }
 
   .member-bio { max-width: 100%; }
 
-  .admin-actions { width: 100%; justify-content: flex-start; }
+  .admin-actions { width: 100%; justify-content: flex-end; }
 
   .user-info { font-size: 1rem; }
 
@@ -375,7 +434,7 @@ div.member-name .profile-link-name:hover,
 
 .points-subtabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
 .subtab-btn { background:#fff; border:1px solid var(--border); padding:7px 14px; border-radius:20px; font-family:'Space Mono', monospace; font-size:0.68rem; font-weight:700; letter-spacing:0.05em; color:var(--text-muted); cursor:pointer; text-transform:uppercase; transition:all 0.15s; }
-.subtab-btn:hover { border-color:var(--gold); color:var(--gold); }
+.subtab-btn:hover { border-color:var(--accent); color:var(--accent-text); }
 .subtab-btn.active { background:var(--navy); border-color:var(--navy); color:#fff; }
 
 .points-table-wrap { overflow-x:auto; }
@@ -397,7 +456,7 @@ div.member-name .profile-link-name:hover,
     padding: 2px 8px;
     border-radius: 3px;
     background: rgba(220,38,38,0.1);
-    color: #dc2626;
+    color: var(--advanced-text);
     border: 1px solid rgba(220,38,38,0.3);
 }
 
@@ -412,15 +471,15 @@ div.member-name .profile-link-name:hover,
     letter-spacing: 0.04em;
     text-transform: uppercase;
     background: rgba(217,119,6,0.12);
-    color: #d97706;
+    color: var(--intermediate-text);
     border: 1px solid rgba(217,119,6,0.3);
     cursor: help;
 }
 
 .status-pill { display:inline-flex; align-items:center; padding:2px 10px; border-radius:20px; font-family:'Space Mono', monospace; font-size:0.62rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; }
-.status-pill--pending { background:rgba(217,119,6,0.12); color:#d97706; border:1px solid rgba(217,119,6,0.3); }
-.status-pill--approved { background:var(--green-bg); color:var(--green); border:1px solid var(--green-border); }
-.status-pill--rejected { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
+.status-pill--pending { background:rgba(217,119,6,0.12); color:var(--intermediate-text); border:1px solid rgba(217,119,6,0.3); }
+.status-pill--approved { background:var(--green-bg); color:var(--beginner-text); border:1px solid var(--green-border); }
+.status-pill--rejected { background:var(--red-bg); color:var(--advanced-text); border:1px solid var(--red-border); }
 .status-pill--revoked { background:rgba(107,114,128,0.12); color:var(--text-muted); border:1px solid var(--border); }
 .status-pill--corrected { background:rgba(59,132,247,0.12); color:var(--blue); border:1px solid rgba(59,132,247,0.3); }
 
@@ -429,7 +488,7 @@ div.member-name .profile-link-name:hover,
 /* ── MODALS (shared pattern, matches weekly-feature.css) ── */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
-.modal { background:var(--cream); border-radius:3px; width:100%; max-width:600px; padding:36px 36px 28px; position:relative; max-height:92vh; overflow-y:auto; }
+.modal { background:var(--cream); border-radius:3px; width:100%; max-width:600px; padding:36px 36px 28px; position:relative; max-height:92vh; overflow-y:auto; overflow-x:hidden; }
 .modal-title { font-family:'Playfair Display',serif; font-size:22px; font-weight:900; color:var(--navy); margin-bottom:6px; }
 .modal-subtitle { font-size:14px; color:var(--text-muted); font-weight:300; margin-bottom:24px; }
 .modal-close { position:absolute; top:16px; right:16px; background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:22px; line-height:1; transition:color 0.15s; }
@@ -445,6 +504,25 @@ div.member-name .profile-link-name:hover,
 .btn-full { width:100%; padding:13px; background:var(--navy); color:#fff; border:none; border-radius:4px; font-family:'Crimson Pro',serif; font-size:15px; font-weight:600; cursor:pointer; transition:background 0.2s; margin-top:6px; }
 .btn-full:hover { background:var(--navy-light); }
 .btn-full:disabled { opacity:0.6; cursor:not-allowed; }
+
+/* ── Edit Account modal ── */
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.ea-facts { display:flex; flex-wrap:wrap; gap:6px 18px; margin:-8px 0 20px; padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:4px;
+  font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--text-muted); overflow-wrap:anywhere; }
+.ea-facts b { color:var(--navy); letter-spacing:0.06em; margin-right:4px; }
+.ea-merge { margin:4px 0 18px; padding:0 14px; background:#fff; border:1px solid var(--border); border-radius:6px; }
+.ea-merge summary { padding:12px 0; font-weight:600; color:var(--navy); cursor:pointer; }
+.ea-merge[open] summary { margin-bottom:12px; border-bottom:1px solid var(--border); }
+.ea-merge-help { margin-bottom:12px; font-size:0.85rem; line-height:1.5; color:var(--text-muted); }
+.ea-dup-heading { margin-bottom:8px; font-family:'Space Mono',monospace; font-size:0.65rem; font-weight:700; letter-spacing:0.12em; color:var(--gold-text); }
+.ea-card { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:10px; padding:12px;
+  background:var(--gold-bg); border:1px solid #e8ddb8; border-radius:6px; }
+.ea-card-main { flex:1 1 220px; min-width:0; }
+.ea-card-name { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-weight:700; color:var(--navy); }
+.ea-card-meta { margin-top:2px; font-size:0.82rem; color:var(--text-muted); overflow-wrap:anywhere; }
+.ea-card-why { margin-top:4px; font-size:0.78rem; font-style:italic; color:var(--gold-text); }
+.ea-card-actions { display:flex; gap:8px; }
+@media (max-width: 600px) { .form-row { grid-template-columns:1fr; } }
 
 /* ── Toast ── */
 .toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(16px); padding:12px 24px; border-radius:8px; font-size:0.95rem; font-weight:600; opacity:0; pointer-events:none; transition:opacity 0.25s, transform 0.25s; z-index:9999; max-width:calc(100% - 32px); }

@@ -3,27 +3,22 @@
 // ─────────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getDatabase, ref, onValue, push, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from './profile-link.js';
-import { validateEvidenceFile } from './upload-validation.js';
 import {
   RUBRIC, getActivity, getOption, formatOptionLabel, memberDisplayName,
-  computeMemberTotal, computeAllTotals, rankLeaderboard, todayDateStr,
-  validateActivityDate, resolveSelection, MIN_ACTIVITY_DATE
+  computeMemberTotal, computeAllTotals, rankLeaderboard
 } from './points-rubric.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 let currentUser = null;
 let usersTree = {};
 let viewingUid = null;
 
-let pendingEvidenceFile = null;
 let toastTimer = null;
 
 function esc(s) {
@@ -60,7 +55,6 @@ let routeApplied = false;
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "auth.html"; return; }
   currentUser = user;
-  populateActivitySelect();
   renderRubricList();
   subscribeToUsers();
 });
@@ -139,37 +133,133 @@ function renderMyPointsCard() {
   document.getElementById('myTotalPoints').textContent = computeMemberTotal(u.pointAwards);
 }
 
+const LB_TOP_N = 10;
+let lbQuery = '';
+let lbShowAll = false;
+
+// A stable palette colour per person, derived from their name, so avatars in a
+// long list are easy to tell apart. Classes live in style.css (.av-tone-0..5).
+function avatarToneClass(name) {
+  const s = String(name || '?').trim().toLowerCase();
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return 'av-tone-' + (h % 6);
+}
+
+function rankLabel(rank) {
+  return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
+}
+
+function lbAvatar(r) {
+  // No `role` option on purpose: role-based colouring would give every member the
+  // same navy circle. Exec status is shown with an EXEC pill instead.
+  return profileAvatarHtml(
+    r.uid, 'span', `avatar-sm ${avatarToneClass(r.name)}`, '',
+    esc((r.name || '?').substring(0, 2).toUpperCase()), { stopPropagation: true }
+  );
+}
+
+function lbPills(r, isYou) {
+  return (isYou ? '<span class="lb-pill lb-pill--you">YOU</span>' : '') +
+         (r.role === 'admin' ? '<span class="lb-pill lb-pill--exec">EXEC</span>' : '');
+}
+
+function lbAriaLabel(r, isYou) {
+  return `${r.name}${isYou ? ' (you)' : ''}, rank ${r.rank}, ${r.total} points`;
+}
+
+function lbRowHtml(r, isYou) {
+  return `
+    <div class="lb-row ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
+         role="button" tabindex="0" aria-label="${esc(lbAriaLabel(r, isYou))}">
+      <div class="lb-rank ${r.rank <= 3 ? 'lb-rank--top' : ''}" aria-hidden="true">${rankLabel(r.rank)}</div>
+      <div class="lb-name-wrap">
+        ${lbAvatar(r)}
+        <span class="lb-name">${esc(r.name)}</span>
+        ${lbPills(r, isYou)}
+      </div>
+      <div class="lb-points">${r.total} pts</div>
+    </div>`;
+}
+
+// Top three as a podium. Visual order is 2nd | 1st | 3rd; the size class follows
+// list position (not rank) so a tie for first still renders three sensible cards.
+function podiumHtml(topThree) {
+  const order = [topThree[1], topThree[0], topThree[2]];
+  return `<div class="podium">${order.map(r => {
+    const pos = topThree.indexOf(r) + 1;
+    const isYou = r.uid === currentUser.uid;
+    return `
+      <div class="pod pod--${pos} ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
+           role="button" tabindex="0" aria-label="${esc(lbAriaLabel(r, isYou))}">
+        <div class="pod-medal" aria-hidden="true">${rankLabel(r.rank)}</div>
+        ${lbAvatar(r)}
+        <div class="pod-name">${esc(r.name)}</div>
+        <div class="pod-tags">${lbPills(r, isYou)}</div>
+        <div class="pod-points">${r.total} pts</div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
 function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
+  const countEl = document.getElementById('lbCount');
+  const toggleBtn = document.getElementById('lbToggle');
   const ranked = rankLeaderboard(computeAllTotals(usersTree));
 
   if (!ranked.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-text">No members yet.</div></div>`;
+    if (countEl) countEl.textContent = '';
+    if (toggleBtn) toggleBtn.hidden = true;
     return;
   }
 
-  el.innerHTML = ranked.map(r => {
-    const isYou = r.uid === currentUser.uid;
-    const label = `${r.name}${isYou ? ' (you)' : ''}, rank ${r.rank}, ${r.total} points`;
-    return `
-    <div class="lb-row ${isYou ? 'lb-you' : ''}" data-uid="${esc(r.uid)}"
-         role="button" tabindex="0" aria-label="${esc(label)}">
-      <div class="lb-rank ${r.rank === 1 ? 'lb-rank--1' : ''}" aria-hidden="true">${r.rank === 1 ? '🏆' : '#' + r.rank}</div>
-      <div class="lb-name-wrap">
-        ${profileAvatarHtml(r.uid, "span", "avatar-sm", "", esc((r.name || '?').substring(0, 2).toUpperCase()), { stopPropagation: true, role: r.role })}
-        <span class="lb-name">${esc(r.name)}${isYou ? ' (You)' : ''}</span>
-      </div>
-      <div class="lb-points">${r.total} pts</div>
-    </div>`;
-  }).join('');
+  const q = lbQuery.trim().toLowerCase();
+  const searching = q.length > 0;
+  const matches = searching ? ranked.filter(r => (r.name || '').toLowerCase().includes(q)) : ranked;
 
-  el.querySelectorAll('.lb-row').forEach(row => {
-    const go = () => navigateToMember(row.dataset.uid);
-    row.addEventListener('click', go);
-    row.addEventListener('keydown', e => {
+  if (searching && !matches.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-text">No members match “${esc(lbQuery.trim())}”.</div></div>`;
+    if (countEl) countEl.textContent = `0 of ${ranked.length} members`;
+    if (toggleBtn) toggleBtn.hidden = true;
+    return;
+  }
+
+  const limited = !searching && !lbShowAll && matches.length > LB_TOP_N;
+  const visible = limited ? matches.slice(0, LB_TOP_N) : matches;
+  const usePodium = !searching && visible.length >= 3;
+  const listRows = usePodium ? visible.slice(3) : visible;
+
+  let html = usePodium ? podiumHtml(visible.slice(0, 3)) : '';
+  html += listRows.map(r => lbRowHtml(r, r.uid === currentUser.uid)).join('');
+
+  // When the list is cut to the top 10, keep the viewer's own position visible.
+  if (limited) {
+    const me = ranked.find(r => r.uid === currentUser.uid);
+    if (me && !visible.includes(me)) {
+      html += `<div class="lb-gap" aria-hidden="true">YOUR POSITION</div>` + lbRowHtml(me, true);
+    }
+  }
+  el.innerHTML = html;
+
+  el.querySelectorAll('.lb-row, .pod').forEach(node => {
+    const go = () => navigateToMember(node.dataset.uid);
+    node.addEventListener('click', go);
+    node.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
     });
   });
+
+  if (countEl) {
+    countEl.textContent = searching ? `${matches.length} of ${ranked.length} members`
+      : limited ? `Top ${LB_TOP_N} of ${ranked.length} members`
+      : `${ranked.length} member${ranked.length === 1 ? '' : 's'}`;
+  }
+  if (toggleBtn) {
+    toggleBtn.hidden = searching || ranked.length <= LB_TOP_N;
+    toggleBtn.textContent = lbShowAll ? `Show top ${LB_TOP_N} only` : `Show all ${ranked.length} members`;
+    toggleBtn.setAttribute('aria-expanded', String(lbShowAll));
+  }
 }
 
 // ── MEMBER DETAIL ─────────────────────────────────────────────────────────
@@ -189,8 +279,11 @@ function renderMemberDetail(uid) {
   const total = computeMemberTotal(u.pointAwards);
   const name = memberDisplayName(u);
 
-  topActions.innerHTML = isOwn ? `<button class="topbar-btn" id="memberRequestBtn">Request Points</button>` : '';
-  if (isOwn) document.getElementById('memberRequestBtn').addEventListener('click', openRequestModal);
+  // No topbar action here anymore — members can no longer submit point
+  // requests (only Exec Board members award points directly). Left empty
+  // rather than removed outright in case a future admin-only action needs
+  // this slot again.
+  topActions.innerHTML = '';
 
   const awards = Object.entries(u.pointAwards || {})
     .map(([id, a]) => ({ id, ...a }))
@@ -201,11 +294,18 @@ function renderMemberDetail(uid) {
     let statusHtml = '';
     if (a.revoked) statusHtml = `<span class="status-pill status-pill--revoked">Revoked</span>`;
     else if (a.correctionOf) statusHtml = `<span class="status-pill status-pill--corrected">Correction</span>`;
+    // Prefer the admin's CURRENT name if they still have an account, same as
+    // the admin panel's All Awards table - otherwise a rename never shows up
+    // on a member's own history, only falling back to the name stored on the
+    // award if that admin has since been removed entirely.
+    const awardedByName = usersTree[a.awardedByUid]
+      ? memberDisplayName(usersTree[a.awardedByUid])
+      : (a.awardedByName || '—');
     return `<tr>
       <td>${esc(label)}</td>
       <td>${a.revoked ? '<s>' : ''}${a.points > 0 ? '+' : ''}${a.points}${a.revoked ? '</s>' : ''}</td>
       <td>${esc(a.activityDate || '—')}</td>
-      <td>${esc(a.awardedByName || '—')}</td>
+      <td>${esc(awardedByName)}</td>
       <td class="hist-note">${esc(a.note || '') || '—'}${statusHtml ? ' ' + statusHtml : ''}${a.revoked && a.revocationReason ? `<div>Reason: ${esc(a.revocationReason)}</div>` : ''}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No point history yet.</td></tr>`;
@@ -259,138 +359,6 @@ function renderMemberDetail(uid) {
   `;
 }
 
-// ── REQUEST POINTS MODAL ─────────────────────────────────────────────────
-
-function populateActivitySelect() {
-  const sel = document.getElementById('reqActivity');
-  sel.innerHTML = '<option value="">Select an activity…</option>' +
-    RUBRIC.map(a => `<option value="${esc(a.key)}">${esc(a.label)}${a.weeklyLimit ? ` (max ${a.weeklyLimit}/week)` : ''}</option>`).join('');
-}
-
-function populateOptionSelect(activityKey) {
-  const sel = document.getElementById('reqOption');
-  const hint = document.getElementById('reqOptionRequirements');
-  if (!activityKey) {
-    sel.innerHTML = '<option value="">Select an activity first…</option>';
-    sel.disabled = true;
-    hint.textContent = '';
-    return;
-  }
-  const activity = getActivity(activityKey);
-  sel.disabled = false;
-  sel.innerHTML = '<option value="">Select a credit level…</option>' +
-    activity.options.map(o => `<option value="${esc(o.key)}">${esc(o.label)} (${o.points > 0 ? '+' : ''}${o.points} pts)</option>`).join('');
-  hint.textContent = '';
-}
-
-function openRequestModal() {
-  const dateEl = document.getElementById('reqDate');
-  dateEl.value = todayDateStr();
-  dateEl.max = todayDateStr();
-  dateEl.min = MIN_ACTIVITY_DATE;
-  document.getElementById('reqDescription').value = '';
-  document.getElementById('reqActivity').value = '';
-  populateOptionSelect(null);
-  clearEvidence();
-  document.getElementById('reqError').style.display = 'none';
-  openModal('requestModal');
-}
-
-function showFormError(el, msg) {
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function clearEvidence() {
-  pendingEvidenceFile = null;
-  document.getElementById('reqEvidenceFile').value = '';
-  document.getElementById('reqEvidencePreview').style.display = 'none';
-  document.getElementById('reqEvidencePreview').innerHTML = '';
-  document.getElementById('reqEvidenceError').style.display = 'none';
-}
-
-// Returns { url, name, storagePath } so the caller can clean the object up
-// again if the database write that was supposed to reference it fails.
-async function uploadEvidence(uid) {
-  if (!pendingEvidenceFile) return { url: null, name: null, storagePath: null };
-  const fileName = `${Date.now()}_${pendingEvidenceFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-  const storagePath = `point_evidence/${uid}/${fileName}`;
-  const sRef = storageRef(storage, storagePath);
-  await uploadBytes(sRef, pendingEvidenceFile);
-  const url = await getDownloadURL(sRef);
-  return { url, name: pendingEvidenceFile.name, storagePath };
-}
-
-async function submitRequest() {
-  const btn = document.getElementById('submitRequestBtn');
-  const errEl = document.getElementById('reqError');
-  errEl.style.display = 'none';
-
-  const activityKey = document.getElementById('reqActivity').value;
-  const optionKey = document.getElementById('reqOption').value;
-  const activityDate = document.getElementById('reqDate').value;
-  const description = document.getElementById('reqDescription').value.trim();
-
-  const selection = resolveSelection(activityKey, optionKey);
-  if (selection.error) return showFormError(errEl, selection.error);
-
-  const dateError = validateActivityDate(activityDate);
-  if (dateError) return showFormError(errEl, dateError);
-
-  if (!description) return showFormError(errEl, 'Please provide a short description.');
-  if (description.length > 2000) {
-    return showFormError(errEl, 'Please keep the description under 2000 characters.');
-  }
-
-  // Accidental double submissions (double-tap, a second tab, a back-button
-  // replay) would otherwise create two identical pending requests for an admin
-  // to untangle.
-  const myRequests = (usersTree[currentUser.uid] || {}).pointRequests || {};
-  const duplicate = Object.values(myRequests).some(r =>
-    r && r.status === 'pending' && r.activity === activityKey && r.activityDate === activityDate
-  );
-  if (duplicate) {
-    return showFormError(errEl, 'You already have a pending request for this activity on this date.');
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Submitting…';
-  let uploaded = { url: null, name: null, storagePath: null };
-  try {
-    uploaded = await uploadEvidence(currentUser.uid);
-    await set(push(ref(db, `users/${currentUser.uid}/pointRequests`)), {
-      memberId: currentUser.uid,
-      memberName: memberDisplayName(usersTree[currentUser.uid]) || currentUser.email,
-      activity: activityKey,
-      claimedOptionKey: optionKey,
-      activityDate,
-      description,
-      evidenceUrl: uploaded.url,
-      evidenceFileName: uploaded.name,
-      submittedAt: Date.now(),
-      status: 'pending'
-    });
-    closeModal('requestModal');
-    showToast('Request submitted. An admin will review it.', 'success');
-    // No manual refresh needed — the live subscription re-renders on its own.
-  } catch (err) {
-    console.error(err);
-    // The evidence file was uploaded but nothing references it now, so remove
-    // it instead of leaving an orphan sitting in Storage forever.
-    if (uploaded.storagePath) {
-      try {
-        await deleteObject(storageRef(storage, uploaded.storagePath));
-      } catch (cleanupError) {
-        console.warn('Could not clean up orphaned evidence upload:', cleanupError);
-      }
-    }
-    showFormError(errEl, 'Failed to submit request. Please check your connection and try again.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Submit Request';
-  }
-}
-
 // ── RULES / RUBRIC MODAL ─────────────────────────────────────────────────
 
 function renderRubricList() {
@@ -417,39 +385,19 @@ function renderRubricList() {
 
 function wireStaticControls() {
   document.getElementById('viewMyHistoryBtn').addEventListener('click', () => navigateToMember(currentUser.uid));
-  document.getElementById('requestPointsBtn').addEventListener('click', openRequestModal);
   document.getElementById('backToLeaderboardBtn').addEventListener('click', navigateToLeaderboard);
   document.getElementById('openRulesBtn').addEventListener('click', () => openModal('rulesModal'));
   document.getElementById('closeRulesModal').addEventListener('click', () => closeModal('rulesModal'));
-  document.getElementById('closeRequestModal').addEventListener('click', () => closeModal('requestModal'));
-  document.getElementById('submitRequestBtn').addEventListener('click', submitRequest);
 
-  document.getElementById('reqActivity').addEventListener('change', (e) => populateOptionSelect(e.target.value || null));
-  document.getElementById('reqOption').addEventListener('change', (e) => {
-    const found = e.target.value ? getOption(e.target.value) : null;
-    document.getElementById('reqOptionRequirements').textContent =
-      found && found.option.requirements.length ? 'Typically requires: ' + found.option.requirements.join('; ') : '';
+  // Leaderboard search + Top 10 / Show all. The list re-renders on every live
+  // data update, but these controls live outside it, so typing is never interrupted.
+  document.getElementById('lbSearch').addEventListener('input', e => {
+    lbQuery = e.target.value;
+    renderLeaderboard();
   });
-
-  document.getElementById('reqEvidenceTrigger').addEventListener('click', () => document.getElementById('reqEvidenceFile').click());
-  document.getElementById('reqEvidenceFile').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    const errEl = document.getElementById('reqEvidenceError');
-    if (!file) return;
-    const fileError = validateEvidenceFile(file);
-    if (fileError) {
-      errEl.textContent = fileError;
-      errEl.style.display = 'block';
-      e.target.value = '';
-      pendingEvidenceFile = null;
-      return;
-    }
-    errEl.style.display = 'none';
-    pendingEvidenceFile = file;
-    const preview = document.getElementById('reqEvidencePreview');
-    preview.style.display = 'flex';
-    preview.innerHTML = `<span>📎 ${esc(file.name)}</span> <button type="button" id="reqEvidenceRemove">Remove</button>`;
-    document.getElementById('reqEvidenceRemove').addEventListener('click', clearEvidence);
+  document.getElementById('lbToggle').addEventListener('click', () => {
+    lbShowAll = !lbShowAll;
+    renderLeaderboard();
   });
 
   document.querySelectorAll('.modal-overlay').forEach(o =>

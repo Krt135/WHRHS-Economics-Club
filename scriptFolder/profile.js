@@ -67,7 +67,7 @@ const ACTIVITY_TYPE = {
   discussion:  { label: 'The Floor',     color: '#0f1f3d', sessionKey: 'openFloorPost',   page: 'the-floor.html'      },
   perspective: { label: 'Perspectives',  color: '#7c3aed', sessionKey: 'openPerspective', page: 'perspectives.html'   },
   feature:     { label: 'Weekly Feature',color: '#c9a84c', sessionKey: 'openFeature',     page: 'weekly-feature.html' },
-  lesson:      { label: 'Academy',       color: '#16a34a', sessionKey: null,              page: 'the-academy.html'    },
+  lesson:      { label: 'Academy',       color: '#16a34a', sessionKey: 'openLesson',      page: 'the-academy.html'    },
 };
 
 // Navigate to a post from the activity list.
@@ -227,7 +227,9 @@ function wireOwnProfile(user, data) {
   });
   phoneEl.removeAttribute("readonly");
 
-  displayNameEl.value    = data.displayName || user.email || "";
+  // Never prefill the login email: saving would publish it as the member's name.
+  displayNameEl.value    = data.displayName || "";
+  displayNameEl.placeholder = (user.email || "").split("@")[0] || "Your name";
   primaryEmailEl.value   = user.email || "";
   secondaryEmailEl.value = data.secondaryEmail || "";
   bioEl.value            = data.bio || "";
@@ -245,6 +247,16 @@ function wireOwnProfile(user, data) {
 
   document.getElementById("btn-save").onclick = async () => {
     const btn = document.getElementById("btn-save");
+    const nameVal = document.getElementById("field-display-name").value.trim();
+    const secondaryVal = document.getElementById("field-secondary-email").value.trim();
+    if (nameVal.length > 60) {
+      showToast("Display name must be 60 characters or fewer.", "error");
+      return;
+    }
+    if (secondaryVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(secondaryVal)) {
+      showToast("Please enter a valid secondary email, or leave it blank.", "error");
+      return;
+    }
     btn.disabled = true;
     btn.textContent = "Saving…";
     const updates = {

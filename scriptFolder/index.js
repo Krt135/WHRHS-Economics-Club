@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getDatabase, ref, query, orderByChild, limitToLast, onValue } 
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getDatabase, ref, query, orderByChild, limitToLast, onValue }
   from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 import { firebaseConfig } from './config.js';
 import { profileAvatarHtml } from "./profile-link.js";
@@ -9,6 +10,25 @@ const app = initializeApp(firebaseConfig);
 
 // 2. NOW you can get the database
 const db = getDatabase(app);
+
+// "New here?" strip: signed-out visitors only. It starts hidden (see index.html)
+// so a signed-in member never sees it flash, and appears once auth state is known.
+const newHereStrip = document.getElementById("newHereStrip");
+if (newHereStrip) {
+  const DISMISS_KEY = "tef-newhere-dismissed";
+  let dismissed = false;
+  try { dismissed = localStorage.getItem(DISMISS_KEY) === "1"; } catch (_) {}
+
+  document.getElementById("newHereDismiss")?.addEventListener("click", () => {
+    dismissed = true;
+    newHereStrip.hidden = true;
+    try { localStorage.setItem(DISMISS_KEY, "1"); } catch (_) {}
+  });
+
+  onAuthStateChanged(getAuth(app), (user) => {
+    newHereStrip.hidden = !!user || dismissed;
+  });
+}
 
 // 3. Now your logic will work without the "No Firebase App" error
 const latestRef = query(ref(db, "discussions"), orderByChild("postedAt"), limitToLast(3));
@@ -25,18 +45,28 @@ function rel(ts) {
 onValue(latestRef, (snapshot) => {
   const data = snapshot.val();
   const list = document.getElementById("latestFloorPosts");
-  if (!list || !data) return;
+  if (!list) return;
 
-  const items = Object.entries(data)
-    .map(([key, val]) => ({ ...val, _key: key }))
-    .filter(d => !d.deleted)
-    .sort((a, b) => b.postedAt - a.postedAt);
+  // Previously this bailed out entirely on !data, leaving the initial loading
+  // skeleton (see index.html) stuck on screen forever for a club with zero
+  // Floor posts, instead of ever showing a real empty state.
+  const items = data
+    ? Object.entries(data)
+        .map(([key, val]) => ({ ...val, _key: key }))
+        .filter(d => !d.deleted)
+        .sort((a, b) => b.postedAt - a.postedAt)
+    : [];
+
+  if (!items.length) {
+    list.innerHTML = `<p class="floor-empty">The Floor is quiet. Be the first to start a discussion.</p>`;
+    return;
+  }
 
   list.innerHTML = items.map(d => {
     const commentCount = d.comments ? Object.keys(d.comments).length : 0;
     const body = d.body || '';
     return `
-    <div class="home-post-card" onclick="window.location.href='the-floor.html?post=${d._key}'">
+    <div class="home-post-card" role="link" tabindex="0" onclick="window.location.href='the-floor.html?post=${d._key}'">
       <div class="hp-content">
         <p class="hp-body">${esc(body.substring(0, 120))}...</p>
         
